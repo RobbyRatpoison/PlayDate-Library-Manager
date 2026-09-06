@@ -39,6 +39,16 @@ Point `RELAY_URL` in `diagnostics.py` at the Worker URL from step 3. Nothing
 else in `diagnostics.py` needs a Discord credential anymore -- the real
 webhook only ever lives in the Worker's secret store.
 
+## Redeploying after a worker.js change
+
+`wrangler deploy` from this directory. The Worker also accepts an optional
+second file field, `diagnostics` (a small JSON snapshot -- settings, library
+counts, plugins, renderer -- built by `diagnostics.py`), forwarded to Discord
+as a second attachment alongside the log. A relay that hasn't been
+redeployed after this was added just silently ignores that field and posts
+the log alone, so submissions still work either way -- but redeploy to
+actually get the extra attachment in `#logs`.
+
 ## If the relay URL itself gets spammed
 
 Unlike the raw webhook, the Worker only ever forwards a fixed message

@@ -22,6 +22,7 @@
 // Deploy: see README.md in this directory.
 
 const MAX_LOG_BYTES = 1024 * 1024; // matches RotatingFileHandler cap
+const MAX_DIAG_BYTES = 256 * 1024; // matches diagnostics.py's MAX_DIAG_BYTES
 const MAX_MESSAGE_CHARS = 1000;
 const MAX_SHORT_FIELD_CHARS = 100;
 
@@ -79,6 +80,16 @@ export default {
       return Response.json({ status: 'error', message: 'Log file missing or too large.' }, { status: 400 });
     }
 
+    // Optional second attachment: a small JSON snapshot of settings/library
+    // counts/plugins/renderer, for reproducing bugs the log alone doesn't
+    // explain (e.g. a filter or hidden-platform state that empties the library).
+    let diagBuf = null;
+    const diagFile = form.get('diagnostics');
+    if (diagFile instanceof File) {
+      const buf = await diagFile.arrayBuffer();
+      if (buf.byteLength > 0 && buf.byteLength <= MAX_DIAG_BYTES) diagBuf = buf;
+    }
+
     let meta = {};
     const metaRaw = form.get('meta');
     if (typeof metaRaw === 'string') {
@@ -99,12 +110,18 @@ export default {
       `OS: ${os}\n`;
     if (message) content += `Message: ${message}\n`;
 
+    const attachments = [{ id: 0, filename: 'playdate.log' }];
     const discordForm = new FormData();
+    discordForm.append('files[0]', new Blob([logBuf], { type: 'text/plain' }), 'playdate.log');
+    if (diagBuf) {
+      attachments.push({ id: 1, filename: 'diagnostics.json' });
+      discordForm.append('files[1]', new Blob([diagBuf], { type: 'application/json' }), 'diagnostics.json');
+    }
     discordForm.append('payload_json', JSON.stringify({
       content,
       allowed_mentions: { parse: [] },
+      attachments,
     }));
-    discordForm.append('file', new Blob([logBuf], { type: 'text/plain' }), 'playdate.log');
 
     let discordResp;
     try {

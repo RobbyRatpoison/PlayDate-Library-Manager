@@ -7,6 +7,7 @@
 - Gamepad/d-pad navigation on the library and home pages now scrolls smoothly into view and no longer hides the focused card behind the top bar.
 - Backups now include your custom background image and uploaded card-badge icons.
 - Restoring a backup on a different machine no longer carries over settings tied to the old one (window size and position, renderer choice).
+- "Send Log to Developer" now also includes your settings, library/plugin counts, and renderer info, for better bug diagnosis.
 
 ### Fixes
 
