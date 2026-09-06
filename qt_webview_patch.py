@@ -31,7 +31,7 @@ logger = logging.getLogger('pywebview')
 # it. Confirm this actually has an effect now before fine-tuning the value
 # -- the previous approach (patching wheelEvent directly) silently did
 # nothing at all, up to 50x.
-_WHEEL_SCROLL_MULTIPLIER = 5
+_WHEEL_SCROLL_MULTIPLIER = 3
 
 
 def install(qt_module):
