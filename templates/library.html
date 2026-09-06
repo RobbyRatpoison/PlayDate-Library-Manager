@@ -747,6 +747,15 @@
         </p>
     </div>
 
+    {% if games|length == 0 %}
+    <div id="library-empty-state" style="text-align:center; padding:60px 20px; opacity:0.8;">
+        <p style="margin-bottom:16px;">No games to show.</p>
+        {% if _has_plat_filter or _is_filtered %}
+        <button onclick="_showAllGames()">Show All Games</button>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <div class="game-grid" id="game-grid"></div>
 
     <!-- List mode layout -->

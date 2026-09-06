@@ -201,6 +201,11 @@
         await sendStateUpdate({ filter_tree: emptyTree, hidden_platforms: [..._hiddenPlatforms] });
     }
 
+    async function _showAllGames() {
+        const emptyTree = { type: 'group', logic: 'AND', items: [] };
+        await sendStateUpdate({ filter_tree: emptyTree, hidden_platforms: [] });
+    }
+
     const _hiddenPlatforms = window._hiddenPlatforms;
 
     function togglePlatform(platform) {

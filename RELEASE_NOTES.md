@@ -8,6 +8,10 @@
 - Backups now include your custom background image and uploaded card-badge icons.
 - Restoring a backup on a different machine no longer carries over settings tied to the old one (window size and position, renderer choice).
 
+### Fixes
+
+- The library page now shows a "Show All Games" button when a filter or hidden platform leaves nothing to display.
+
 ## v1.10.2 - 2026-09-05
 ### Improvements
 
