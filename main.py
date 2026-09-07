@@ -992,9 +992,12 @@ class PyWebviewAPI:
             try:
                 # On Linux/GTK, start at about:blank so we can inject the anti-bot
                 # user script before the first real page load (some sites fingerprint
-                # on the very first request). On Windows/Mac the GTK setup block
-                # won't run, so navigate directly to the login URL.
-                initial_url = 'about:blank' if sys.platform == 'linux' else url
+                # on the very first request). On Windows/Mac and Linux/Qt the GTK
+                # setup block below won't run (no WebKit2 typelib under Qt's
+                # org.kde.Platform runtime), so navigate directly to the login URL --
+                # otherwise the popup silently freezes on about:blank forever, since
+                # the GTK setup's own ImportError handler has no url-load fallback.
+                initial_url = 'about:blank' if (sys.platform == 'linux' and not _USE_QT) else url
                 popup = webview.create_window(
                     'Login',
                     initial_url,
