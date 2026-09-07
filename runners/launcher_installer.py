@@ -162,14 +162,15 @@ def _run_install(platform_id: str, installer_cfg: dict, prefix: str, wine_bin: s
     import shutil
     from runners.wine import find_wine_binary
 
-    from runners.wine import build_proton_env, find_proton_wine, is_proton_wine, _build_run, find_umu_run, _proton_root
+    from runners.wine import (NO_WINE_MSG, build_proton_env, find_proton_wine, is_proton_wine,
+                              _build_run, find_umu_run, _proton_root)
     if wine_bin and not host_is_executable(wine_bin):
         log.warning('Launcher install [%s]: saved wine_bin no longer exists on host (%s), re-detecting',
                     platform_id, wine_bin)
         wine_bin = None
     wb = wine_bin or find_proton_wine() or find_wine_binary()
     if not wb:
-        _fail(platform_id, 'No Wine binary found. Install Wine or GE-Proton via Steam.')
+        _fail(platform_id, NO_WINE_MSG)
         return
 
     prefix = os.path.expanduser(prefix)

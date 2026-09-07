@@ -56,6 +56,23 @@ chmod +x launch.sh && ./launch.sh
 
 On first run, `launch.sh` sets up a virtual environment, installs Python dependencies, and registers a desktop entry so PlayDate appears in your app launcher. After that it just launches. Re-running it after moving the folder keeps the desktop entry up to date.
 
+To run **Windows** games or launchers from non-Steam plugins (GOG, Epic, EA App, etc.), you also need a Windows runtime plus `winetricks` and `p7zip`/`7zip`. Native Linux games (common on GOG and itch.io) need none of this.
+
+Some plugins work with plain Wine; several **require GE-Proton together with [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher)** — installing all of it is the safe choice.
+
+```bash
+# Debian, Ubuntu, Mint, Pop!_OS   (umu-launcher: .deb from its GitHub releases — not in apt)
+sudo apt install wine winetricks p7zip-full
+
+# Fedora, Nobara
+sudo dnf install wine winetricks p7zip p7zip-plugins umu-launcher
+
+# Arch, CachyOS, EndeavourOS   (multilib enabled)
+sudo pacman -S wine winetricks p7zip umu-launcher
+```
+
+Install **GE-Proton** with [ProtonUp-Qt](https://davidotek.github.io/protonup-qt/), or use Steam's built-in Proton.
+
 ### Linux (Flatpak)
 
 Download **PlayDate-\<version\>-Linux.flatpak** from the [latest release](https://github.com/RobbyRatpoison/PlayDate-Library-Manager/releases/latest), then either double-click it in your file manager or install it from a terminal:
@@ -66,7 +83,7 @@ flatpak install PlayDate-<version>-Linux.flatpak
 
 If your system doesn't already have Flathub configured as a remote, the bundle fetches the missing GNOME runtime from Flathub automatically. The Flatpak stays up to date on its own — updates ship via an in-app "Perform Update" button, and it's also compatible with `flatpak update` or GNOME Software once installed.
 
-Wine, Proton, winetricks, and 7z are not bundled — install them on the host if you plan to use non-Steam launcher plugins (GOG, Epic, etc.).
+Windows games and launchers from non-Steam plugins need the same runtime as the source install above — Wine, or GE-Proton + [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher), plus `winetricks` and `p7zip`/`7zip` — but installed on the **host** system, not as Flatpaks, since PlayDate runs them via `flatpak-spawn --host`. Native Linux games need none of it.
 
 ### Steam Deck
 

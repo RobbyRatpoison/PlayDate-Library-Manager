@@ -11,6 +11,17 @@ from runners.sandbox import IN_FLATPAK, host_is_executable, host_popen, host_run
 
 log = logging.getLogger(__name__)
 
+# Shared message for "we need Wine/Proton and there is none". Names the whole
+# accepted set (system Wine, or GE-Proton + umu-launcher for the Proton path),
+# and — under Flatpak, where these run on the host via flatpak-spawn — makes
+# clear they're host packages, not Flatpaks.
+NO_WINE_MSG = (
+    'No Wine or Proton found. Install a system Wine package, or GE-Proton '
+    '(ProtonUp-Qt / Steam) together with umu-launcher for the Proton path.'
+    + ('  Under Flatpak these must be installed on the host system, not as Flatpaks.'
+       if IN_FLATPAK else '')
+)
+
 _prefix_locks = {}
 _prefix_locks_guard = threading.Lock()
 
@@ -378,7 +389,7 @@ def create_prefix(prefix_path, wine_bin=None):
     if wine_bin is None:
         wine_bin = find_wine_binary()
         if not wine_bin:
-            raise RuntimeError('No Wine binary found. Install Wine to use this plugin.')
+            raise RuntimeError(NO_WINE_MSG)
 
     os.makedirs(prefix_path, exist_ok=True)
     cmd_prefix, env = _build_run(prefix_path, wine_bin)
@@ -421,7 +432,7 @@ def run_in_prefix(prefix_path, exe, args=None, wine_bin=None, env_extra=None, cw
     if wine_bin is None:
         wine_bin = find_wine_binary()
         if not wine_bin:
-            raise RuntimeError('No Wine binary found. Install Wine to use this plugin.')
+            raise RuntimeError(NO_WINE_MSG)
 
     if cwd is None:
         cwd = os.path.dirname(exe)
@@ -478,7 +489,7 @@ def launch_protocol_url(prefix_path, url, wine_bin=None, env_extra=None,
     if wine_bin is None:
         wine_bin = find_wine_binary()
         if not wine_bin:
-            raise RuntimeError('No Wine binary found. Install Wine to use this plugin.')
+            raise RuntimeError(NO_WINE_MSG)
 
     with _get_prefix_lock(prefix_path):
         already_running = _prefix_has_running_process(prefix_path)
