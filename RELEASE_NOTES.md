@@ -1,6 +1,6 @@
 # Release Notes
 
-## v1.10.3 - Pending
+## v1.10.3 - 2026-09-06
 ### Improvements
 
 - Linux: added an experimental Qt renderer option (Settings → Renderer) to fix choppy library scrolling on NVIDIA + Wayland. On Flatpak, switching installs a separate app and removes the one you're switching from.
