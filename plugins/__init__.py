@@ -80,6 +80,13 @@ OFFICIAL_PLUGINS = [
     {'id': 'amazon_games', 'name': 'Amazon Games',  'source': 'RobbyRatpoison/playdate-plugin-amazon-games',
      'platform_status': {'windows': 'untested', 'linux': 'untested', 'mac': 'untested'},
      'notes': {'linux': 'Account connection and library sync confirmed working. Install/launch/uninstall were rewritten around a from-scratch reimplementation of Amazon\'s real download protocol, but are unverified end to end -- no owned Amazon game to test against yet. Please report back if you own games here.'}},
+    {'id': 'legacy_games', 'name': 'Legacy Games', 'source': 'RobbyRatpoison/playdate-plugin-legacy-games',
+     'platform_status': {'windows': 'untested', 'linux': 'working', 'mac': 'untested'},
+     'notes': {'linux': 'Install opens the real Legacy Games Launcher (no automation possible); launch and uninstall are fully automated via the registry and the game exe. Ownership syncs from the launcher\'s local app state with no API calls. Confirmed working via Wine.'}},
+    {'id': 'xbox', 'name': 'Xbox / Game Pass for PC', 'source': 'RobbyRatpoison/playdate-plugin-xbox',
+     'platform_status': {'windows': 'untested', 'linux': 'broken', 'mac': 'broken'},
+     'notes': {'linux': 'Account connect and library sync (full owned-title history) work, but install/launch/uninstall are Windows-only -- native UWP titles have no Wine equivalent. Microsoft exposes no current-ownership signal, so every Game Pass title you\'ve ever played is included on sync.',
+               'mac': 'Install/launch/uninstall are Windows-only -- native UWP titles do not run on macOS. Account connect and library sync work.'}},
 ]
 
 
