@@ -5139,7 +5139,7 @@ async function _renderPluginCatalog() {
                 html += `
                 <div class="hub-section" id="catalog-plugin-row-${escHtml(p.id)}" style="display:flex;justify-content:space-between;align-items:center;margin-left:12px;">
                     <div>
-                        <div style="font-size:0.9rem;color:var(--text-primary);">${escHtml(p.name)}${p.beta ? ' <span style="font-size:0.72rem;color:#8f98a0;">(beta)</span>' : ''}</div>
+                        <div style="font-size:0.9rem;color:var(--text-primary);">${escHtml(p.name)}</div>
                         ${p.note ? `<div style="font-size:0.75rem;color:#8f98a0;margin-top:2px;">${escHtml(p.note)}</div>` : ''}
                     </div>
                     <button class="nav-btn" style="font-size:0.78rem;flex-shrink:0;margin-left:12px;"

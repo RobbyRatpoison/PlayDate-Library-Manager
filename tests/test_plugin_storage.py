@@ -1,10 +1,8 @@
 """Plugin storage-split logic (plugins._migrate_legacy_plugin_dirs,
-_plugin_was_configured, _plugin_on_disk, OFFICIAL_PLUGINS, BETA_PLUGINS,
+_plugin_was_configured, _plugin_on_disk, OFFICIAL_PLUGINS,
 _current_platform_key) -- pure filesystem and dict logic, no Flask app, DB,
 or network involved."""
 import sys
-
-import pytest
 
 import config
 import plugins
@@ -125,38 +123,30 @@ class TestPluginOnDisk:
         assert plugins._plugin_on_disk('zzz_test_definitely_not_a_real_plugin') is False
 
 
-@pytest.mark.parametrize("registry_name", ["OFFICIAL_PLUGINS", "BETA_PLUGINS"])
 class TestPluginRegistries:
-    def test_every_entry_has_required_fields(self, registry_name):
-        for entry in getattr(plugins, registry_name):
+    def test_every_entry_has_required_fields(self):
+        for entry in plugins.OFFICIAL_PLUGINS:
             assert entry.get('id')
             assert entry.get('name')
             assert entry.get('source')
 
-    def test_ids_are_unique(self, registry_name):
-        ids = [e['id'] for e in getattr(plugins, registry_name)]
+    def test_ids_are_unique(self):
+        ids = [e['id'] for e in plugins.OFFICIAL_PLUGINS]
         assert len(ids) == len(set(ids))
 
-    def test_sources_are_owner_slash_repo(self, registry_name):
-        for entry in getattr(plugins, registry_name):
+    def test_sources_are_owner_slash_repo(self):
+        for entry in plugins.OFFICIAL_PLUGINS:
             assert entry['source'].count('/') == 1
             owner, repo = entry['source'].split('/')
             assert owner and repo
 
-    def test_platform_status_covers_all_three_platforms_with_valid_values(self, registry_name):
-        for entry in getattr(plugins, registry_name):
+    def test_platform_status_covers_all_three_platforms_with_valid_values(self):
+        for entry in plugins.OFFICIAL_PLUGINS:
             status = entry.get('platform_status')
             assert status, f"{entry['id']} has no platform_status"
             assert set(status.keys()) == _VALID_PLATFORM_KEYS
             for value in status.values():
                 assert value in _VALID_STATUSES
-
-
-class TestPluginRegistriesDontOverlap:
-    def test_no_id_appears_in_both_registries(self):
-        official_ids = {e['id'] for e in plugins.OFFICIAL_PLUGINS}
-        beta_ids = {e['id'] for e in plugins.BETA_PLUGINS}
-        assert not (official_ids & beta_ids)
 
 
 class TestCurrentPlatformKey:

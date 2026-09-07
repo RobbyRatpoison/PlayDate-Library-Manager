@@ -28,12 +28,15 @@ _launcher_status_cache = {}  # keyed by platform: {available, detail, checked_at
 # why they're missing and still offer to remove the folder.
 _incompatible_plugins: dict = {}
 
-# Plugins that used to ship as source directly in this repo (plugins/<id>/).
-# No longer bundled -- installed on first run (and re-offered any time after
-# an uninstall) from their own GitHub release, the same mechanism any
-# third-party plugin uses. This is what makes "uninstall" actually stick
-# across a PlayDate update: there's no bundled copy left for an update to
-# silently reintroduce.
+# PlayDate's own first-party plugins. None ship as source in this repo (some
+# used to, before the split); each is published as its own GitHub repo and
+# installed from its latest release -- the same mechanism any third-party
+# plugin uses, and what makes "uninstall" actually stick across a PlayDate
+# update: there's no bundled copy left for an update to silently reintroduce.
+#
+# There is no separate "beta"/experimental list. How finished a plugin is
+# lives entirely in its per-platform platform_status below -- an unproven one
+# just carries 'untested'.
 
 # platform_status: {windows, linux, mac} -> 'working' | 'untested' | 'broken'.
 # 'working' means confirmed by real reports (this session's own Linux testing,
@@ -67,24 +70,16 @@ OFFICIAL_PLUGINS = [
     {'id': 'ubisoft',    'name': 'Ubisoft Connect', 'source': 'RobbyRatpoison/playdate-plugin-ubisoft',
      'platform_status': {'windows': 'untested', 'linux': 'working', 'mac': 'untested'},
      'notes': {'linux': 'Library sync, install, launch, and uninstall all work with no sign-in. Signing in is still blocked by Ubisoft bot detection but is not required.'}},
-]
-
-# Unfinished/unconfirmed plugins -- never auto-reinstalled by
-# reinstall_configured_official_plugins() regardless of saved config, since
-# even a partial config attempt on something this unproven isn't a reliable
-# "the user wants this back" signal the way it is for OFFICIAL_PLUGINS. Purely
-# opt-in via the catalog, same install mechanism as everything else.
-BETA_PLUGINS = [
-    {'id': 'amazon_games', 'name': 'Amazon Games',    'source': 'RobbyRatpoison/playdate-plugin-amazon-games',
-     'platform_status': {'windows': 'untested', 'linux': 'untested', 'mac': 'untested'},
-     'notes': {'linux': 'Account connection and library sync confirmed working. Install/launch/uninstall were rewritten around a from-scratch reimplementation of Amazon\'s real download protocol, but are unverified end to end -- no owned Amazon game to test against yet. Please report back if you own games here.'}},
-    {'id': 'rockstar',     'name': 'Rockstar Games',  'source': 'RobbyRatpoison/playdate-plugin-rockstar',
+    {'id': 'rockstar',   'name': 'Rockstar Games', 'source': 'RobbyRatpoison/playdate-plugin-rockstar',
      'platform_status': {'windows': 'untested', 'linux': 'working', 'mac': 'untested'},
      'notes': {'linux': 'Launcher install, library sync (read straight from the signed-in launcher, '
                         'no account connection needed), install, and launch dispatch are all confirmed '
                         'working. One tested title (GTA: San Andreas) hit an unrelated Wine/Proton crash '
                         'in the game binary itself after a correct launch -- report back with what you '
                         'see on your own games.'}},
+    {'id': 'amazon_games', 'name': 'Amazon Games',  'source': 'RobbyRatpoison/playdate-plugin-amazon-games',
+     'platform_status': {'windows': 'untested', 'linux': 'untested', 'mac': 'untested'},
+     'notes': {'linux': 'Account connection and library sync confirmed working. Install/launch/uninstall were rewritten around a from-scratch reimplementation of Amazon\'s real download protocol, but are unverified end to end -- no owned Amazon game to test against yet. Please report back if you own games here.'}},
 ]
 
 
@@ -652,28 +647,25 @@ def list_incompatible_plugins():
 @plugins_bp.route('/api/plugins/catalog')
 def list_plugin_catalog():
     """
-    Every OFFICIAL_PLUGINS + BETA_PLUGINS entry not currently loaded, each
-    tagged with its status for the platform PlayDate is actually running on
-    right now (not a full cross-platform matrix -- just "is this worth
-    trying on my system") -- lets the Plugins modal offer a one-click install
-    for anything not yet set up, bucketed by status rather than by
-    official/beta origin (still returned as `beta` so the UI can show that
-    distinction too if useful). Separate from
+    Every OFFICIAL_PLUGINS entry not currently loaded, each tagged with its
+    status for the platform PlayDate is actually running on right now (not a
+    full cross-platform matrix -- just "is this worth trying on my system")
+    -- lets the Plugins modal offer a one-click install for anything not yet
+    set up, bucketed by working/untested/broken status. Separate from
     reinstall_configured_official_plugins() (which only runs automatically
-    at startup, and only for an OFFICIAL_PLUGINS entry with evidence of
-    prior configuration): that covers "Flatpak wiped something you already
-    had," this covers "I've never used this and want to try it."
+    at startup, and only for an entry with evidence of prior configuration):
+    that covers "Flatpak wiped something you already had," this covers
+    "I've never used this and want to try it."
     """
     platform_key = _current_platform_key()
     result = []
-    for entry in OFFICIAL_PLUGINS + BETA_PLUGINS:
+    for entry in OFFICIAL_PLUGINS:
         if has(entry['id']):
             continue
         result.append({
             'id':     entry['id'],
             'name':   entry['name'],
             'source': entry['source'],
-            'beta':   entry in BETA_PLUGINS,
             'status': entry.get('platform_status', {}).get(platform_key, 'untested'),
             'note':   entry.get('notes', {}).get(platform_key),
         })
