@@ -230,13 +230,15 @@ def create_app(template_folder=None, static_folder=None):
     # 1-2s at startup with the sync threads hammering the DB -- happens behind
     # it. The browser keeps this document painted until the replace() target
     # commits its first paint, so there's no blank gap in between.
-    _SPLASH_TARGETS = {'/', '/library', '/pick'}
+    # Maps the requested target to the canonical literal that gets written into
+    # the page. Looking the value up (rather than reflecting request.args back)
+    # means only these three constants can ever reach the HTML/JS below -- an
+    # unknown or hostile 'to' collapses to '/'.
+    _SPLASH_TARGETS = {'/': '/', '/library': '/library', '/pick': '/pick'}
 
     @app.route('/__splash__')
     def _startup_splash():
-        to = request.args.get('to', '/')
-        if to not in _SPLASH_TARGETS:
-            to = '/'
+        to = _SPLASH_TARGETS.get(request.args.get('to', '/'), '/')
         logo = _splash_logo_uri()
         img = f'<img src="{logo}" alt="PlayDate">' if logo else ''
         html = (
