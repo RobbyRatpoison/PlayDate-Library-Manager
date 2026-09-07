@@ -11,3 +11,4 @@
 ### Fixes
 
 - Linux Qt renderer: fixed plugin account login popups getting stuck on a blank white window instead of loading the sign-in page.
+- Linux: when a non-Steam plugin can't run a Windows game because Wine, GE-Proton, or umu-launcher is missing, PlayDate now says exactly what to install instead of crashing or showing a vague error — and the Plugins modal flags it up front.
