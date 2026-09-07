@@ -40,13 +40,25 @@ def _apply_new_platform_defaults(state, shelves_config, available_platforms):
     games just synced in) defaults to hidden -- on every existing Home shelf, and in
     the global Library/Pick 6 platform filter -- instead of silently appearing
     everywhere it was never intended to show. Opt-out via the "Auto-hide new
-    platforms" toggle in the Shelf Priority panel. Mutates shelves_config's
+    platforms" toggle in the Library modal's Platforms section. Mutates shelves_config's
     hidden_platforms in place so the Home-shelf half applies immediately; the
     global half takes effect on next load of Library/Pick 6 (both read state fresh)."""
     if 'seen_platforms' not in state:
         # First run of this feature -- adopt the current library as the baseline
         # rather than retroactively hiding platforms that were already showing.
-        save_state({'seen_platforms': available_platforms})
+        # Also fold in every plugin that's already configured/loaded, not just
+        # platforms with games synced in yet: a plugin connected moments before
+        # this first Home load (e.g. during initial multi-plugin onboarding) may
+        # not have finished its first sync, and its platform must not be treated
+        # as "new" once those games do land a few seconds later -- that raced
+        # a real user's onboarding into an empty library with everything hidden.
+        try:
+            from plugins import loaded as _plugins_loaded
+            configured_platforms = {p.platform for p in _plugins_loaded().values()}
+        except Exception:
+            configured_platforms = set()
+        baseline = set(available_platforms) | configured_platforms | {'steam'}
+        save_state({'seen_platforms': sorted(baseline)})
         return
 
     seen = set(state.get('seen_platforms', []))
