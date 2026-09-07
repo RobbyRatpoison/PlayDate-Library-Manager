@@ -160,17 +160,17 @@ def _write_post_install_files(platform_id: str, installer_cfg: dict, prefix: str
 
 def _run_install(platform_id: str, installer_cfg: dict, prefix: str, wine_bin: str | None):
     import shutil
-    from runners.wine import find_wine_binary
 
-    from runners.wine import (NO_WINE_MSG, build_proton_env, find_proton_wine, is_proton_wine,
-                              _build_run, find_umu_run, _proton_root)
+    from runners.wine import (_resolve_runnable_wine, build_proton_env, find_proton_wine,
+                              is_proton_wine, _build_run, find_umu_run, _proton_root)
     if wine_bin and not host_is_executable(wine_bin):
         log.warning('Launcher install [%s]: saved wine_bin no longer exists on host (%s), re-detecting',
                     platform_id, wine_bin)
         wine_bin = None
-    wb = wine_bin or find_proton_wine() or find_wine_binary()
-    if not wb:
-        _fail(platform_id, NO_WINE_MSG)
+    try:
+        wb = _resolve_runnable_wine(wine_bin or find_proton_wine())
+    except RuntimeError as e:
+        _fail(platform_id, str(e))
         return
 
     prefix = os.path.expanduser(prefix)

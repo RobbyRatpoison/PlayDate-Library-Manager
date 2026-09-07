@@ -22,6 +22,17 @@ NO_WINE_MSG = (
        if IN_FLATPAK else '')
 )
 
+# A Proton wine binary can't run standalone -- it needs umu-launcher's Steam
+# Runtime container (vkd3d/wined3d fail to load otherwise). This is the message
+# for "GE-Proton is here but umu-launcher isn't, and there's no plain Wine to
+# fall back to".
+PROTON_NEEDS_UMU_MSG = (
+    'Found GE-Proton but not umu-launcher, which it needs in order to run '
+    'games. Install umu-launcher, or install a system Wine package instead.'
+    + ('  Under Flatpak both must be on the host system, not Flatpaks.'
+       if IN_FLATPAK else '')
+)
+
 _prefix_locks = {}
 _prefix_locks_guard = threading.Lock()
 
@@ -143,6 +154,38 @@ def wine_user_dir(prefix):
 def find_umu_run():
     """Return the umu-run binary path if installed on the host, else None."""
     return host_which('umu-run')
+
+
+def proton_without_umu():
+    """True when the host's only Windows runtime is a Proton build with no
+    umu-launcher and no plain system Wine -- in which case nothing can
+    actually be launched, even though a Proton wine binary is 'found'."""
+    return bool(find_proton_wine()) and not find_umu_run() and not find_wine_binary()
+
+
+def _resolve_runnable_wine(preferred):
+    """
+    Resolve a wine binary that can actually launch Windows programs, or raise
+    RuntimeError with install guidance.
+
+    `preferred` is a caller-supplied path (from launcher config or the
+    plugin's own detection), or None to fall back to a system Wine. A Proton
+    binary that lands here without umu-launcher on the host cannot run
+    standalone, so we quietly switch to a system Wine when one exists, and
+    otherwise raise PROTON_NEEDS_UMU_MSG rather than let the caller invoke it
+    and crash on a vkd3d/wined3d load failure.
+    """
+    wine_bin = preferred or find_wine_binary()
+    if not wine_bin:
+        raise RuntimeError(NO_WINE_MSG)
+    if is_proton_wine(wine_bin) and not find_umu_run():
+        fallback = find_wine_binary()
+        if fallback and fallback != wine_bin:
+            log.warning('wine: %s is Proton but umu-launcher is not installed; '
+                        'using system Wine at %s instead', wine_bin, fallback)
+            return fallback
+        raise RuntimeError(PROTON_NEEDS_UMU_MSG)
+    return wine_bin
 
 
 def _proton_root(wine_bin):
@@ -384,12 +427,10 @@ def create_prefix(prefix_path, wine_bin=None):
     """
     Initialise a Wine prefix at prefix_path.
     Runs `WINEPREFIX=<prefix_path> wine wineboot --init` and waits for it to finish.
-    Raises RuntimeError if wine_bin is None and no wine binary can be found.
+    Raises RuntimeError (with install guidance) if no usable Wine/Proton is
+    available -- see _resolve_runnable_wine().
     """
-    if wine_bin is None:
-        wine_bin = find_wine_binary()
-        if not wine_bin:
-            raise RuntimeError(NO_WINE_MSG)
+    wine_bin = _resolve_runnable_wine(wine_bin)
 
     os.makedirs(prefix_path, exist_ok=True)
     cmd_prefix, env = _build_run(prefix_path, wine_bin)
@@ -427,12 +468,10 @@ def run_in_prefix(prefix_path, exe, args=None, wine_bin=None, env_extra=None, cw
                   to end first (Ubisoft Connect).
 
     Returns a subprocess.Popen object (caller should not wait -- game runs in background).
-    Raises RuntimeError if no Wine binary is available.
+    Raises RuntimeError (with install guidance) if no usable Wine/Proton is
+    available -- see _resolve_runnable_wine().
     """
-    if wine_bin is None:
-        wine_bin = find_wine_binary()
-        if not wine_bin:
-            raise RuntimeError(NO_WINE_MSG)
+    wine_bin = _resolve_runnable_wine(wine_bin)
 
     if cwd is None:
         cwd = os.path.dirname(exe)
@@ -476,7 +515,8 @@ def launch_protocol_url(prefix_path, url, wine_bin=None, env_extra=None,
     """
     Open a Windows protocol URL (e.g. com.epicgames.launcher://...) inside a Wine
     prefix using `wine start <url>`. Returns a subprocess.Popen object.
-    Raises RuntimeError if no Wine binary is found.
+    Raises RuntimeError (with install guidance) if no usable Wine/Proton is
+    available -- see _resolve_runnable_wine().
 
     restart_session_if_running: when a Wine session is already live for this
         prefix AND it's a Proton wine_bin, end that session and cold-start a
@@ -486,10 +526,7 @@ def launch_protocol_url(prefix_path, url, wine_bin=None, env_extra=None,
         running game that must not be killed. Set True only for a launcher
         confirmed not to accept deep links while running (Ubisoft Connect).
     """
-    if wine_bin is None:
-        wine_bin = find_wine_binary()
-        if not wine_bin:
-            raise RuntimeError(NO_WINE_MSG)
+    wine_bin = _resolve_runnable_wine(wine_bin)
 
     with _get_prefix_lock(prefix_path):
         already_running = _prefix_has_running_process(prefix_path)

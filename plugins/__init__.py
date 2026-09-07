@@ -345,13 +345,30 @@ def _install_plugin_zip(raw_bytes, target_core_version=None):
     return plugin_id, manifest.get('name', plugin_id)
 
 
+def _augment_launcher_status(result):
+    """A plugin's launcher_status() checks its own launcher/prefix, but not
+    whether the host's Windows runtime can actually run anything. If the only
+    runtime is a Proton build with no umu-launcher (and no system Wine), a
+    game or launcher will crash on start -- so downgrade an otherwise-'ready'
+    result and say what to install."""
+    if not isinstance(result, dict) or not result.get('available'):
+        return result
+    try:
+        from runners.wine import proton_without_umu, PROTON_NEEDS_UMU_MSG
+        if proton_without_umu():
+            return {**result, 'available': False, 'detail': PROTON_NEEDS_UMU_MSG}
+    except Exception:
+        pass
+    return result
+
+
 def _startup_launcher_status_check():
     time.sleep(3)
     for p in loaded().values():
         if not hasattr(p, 'launcher_status'):
             continue
         try:
-            result = p.launcher_status()
+            result = _augment_launcher_status(p.launcher_status())
             result['checked_at'] = time.time()
             _launcher_status_cache[p.platform] = result
         except Exception as e:
@@ -819,7 +836,7 @@ def recheck_launcher_status(platform_id):
     if not plugin_obj or not hasattr(plugin_obj, 'launcher_status'):
         return jsonify({'status': 'error', 'message': 'Plugin not found or does not support launcher_status'}), 404
     try:
-        result = plugin_obj.launcher_status()
+        result = _augment_launcher_status(plugin_obj.launcher_status())
         result['checked_at'] = time.time()
         _launcher_status_cache[platform_id] = result
         return jsonify({'status': 'success', 'launcher_status': result})
