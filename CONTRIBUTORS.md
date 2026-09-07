@@ -16,6 +16,9 @@ People who've helped make PlayDate better - bug reports, feature suggestions, te
 - Suggested platform and installed-status badges on game cards - led to the Card Badges feature (Appearance menu)
 - Requested Amazon Games and LegacyGames.com support (Amazon skipped for now - already a stuck effort; LegacyGames.com noted as a future research item)
 
+**beckett**
+- Empty library after a fresh setup connecting Steam and several plugins in one session, despite correct sync counts - traced to a platform-visibility race during onboarding
+
 **Blue™**
 - Couldn't find where to view/filter games synced from Play or Pay - led to Play or Pay generating a saved filter automatically, matching how PAGYWOSG does it
 - PAGYWOSG tags showing as one combined line in the tooltip/game-edit panel instead of one line per tag

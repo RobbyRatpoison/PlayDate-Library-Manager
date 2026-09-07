@@ -12,4 +12,4 @@
 ### Fixes
 
 - The library page now shows a "Show All Games" button when a filter or hidden platform leaves nothing to display.
-- Fixed a fresh setup with multiple plugins sometimes ending up with an empty library, if a plugin's games synced in right after connecting it.
+- Fixed a fresh setup with multiple plugins ending up with an empty library, if a plugin's games synced in right after connecting it. (reported by beckett)
