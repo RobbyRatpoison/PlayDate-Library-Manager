@@ -570,7 +570,6 @@ def inject_config_status():
         button_remaps=state.get('button_remaps', {}),
         hltb_match_threshold=state.get('hltb_match_threshold', 99),
         hide_duplicates=state.get('hide_duplicates', True),
-        auto_hide_new_platforms=state.get('auto_hide_new_platforms', True),
         require_double_click_launch=state.get('require_double_click_launch', False),
         ui_scale=state.get('ui_scale', 100),
         auto_promote_unfinished=state.get('auto_promote_unfinished', True),
@@ -1162,12 +1161,6 @@ def save_state(updates):
             import re as _re
             _plat_re = _re.compile(r'^[a-z][a-z0-9_]*$')
             state["hidden_platforms"] = [p for p in (updates["hidden_platforms"] or []) if _plat_re.match(p or '')]
-        if "seen_platforms" in updates:
-            import re as _re
-            _plat_re = _re.compile(r'^[a-z][a-z0-9_]*$')
-            state["seen_platforms"] = [p for p in (updates["seen_platforms"] or []) if _plat_re.match(p or '')]
-        if "auto_hide_new_platforms" in updates:
-            state["auto_hide_new_platforms"] = bool(updates["auto_hide_new_platforms"])
         if "pagywosg_comp_defaults" in updates:
             _valid_cs = {'Never Played', 'Unfinished', 'Beaten', 'Completed', "Won't Play"}
             state["pagywosg_comp_defaults"] = [s for s in (updates["pagywosg_comp_defaults"] or []) if s in _valid_cs]

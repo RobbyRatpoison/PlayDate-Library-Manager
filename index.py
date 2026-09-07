@@ -3,7 +3,7 @@ import re
 import sqlite3
 import time
 from flask import Blueprint, jsonify, render_template, request
-from config import load_state, save_state, get_default_shelves, BUILTIN_FILTERS, api_error
+from config import load_state, get_default_shelves, BUILTIN_FILTERS, api_error
 from database import get_db
 
 log = logging.getLogger(__name__)
@@ -33,55 +33,6 @@ SORT_COLUMNS = {
 }
 
 from library import is_safe_sql, build_tree_sql, VIRTUAL_SORT_COLS, _strip_sql_wrapper, _auto_cast_int_division
-
-
-def _apply_new_platform_defaults(state, shelves_config, available_platforms):
-    """A platform that wasn't in the library before (e.g. a freshly installed plugin's
-    games just synced in) defaults to hidden -- on every existing Home shelf, and in
-    the global Library/Pick 6 platform filter -- instead of silently appearing
-    everywhere it was never intended to show. Opt-out via the "Auto-hide new
-    platforms" toggle in the Library modal's Platforms section. Mutates shelves_config's
-    hidden_platforms in place so the Home-shelf half applies immediately; the
-    global half takes effect on next load of Library/Pick 6 (both read state fresh)."""
-    if 'seen_platforms' not in state:
-        # First run of this feature -- adopt the current library as the baseline
-        # rather than retroactively hiding platforms that were already showing.
-        # Also fold in every plugin that's already configured/loaded, not just
-        # platforms with games synced in yet: a plugin connected moments before
-        # this first Home load (e.g. during initial multi-plugin onboarding) may
-        # not have finished its first sync, and its platform must not be treated
-        # as "new" once those games do land a few seconds later -- that raced
-        # a real user's onboarding into an empty library with everything hidden.
-        try:
-            from plugins import loaded as _plugins_loaded
-            configured_platforms = {p.platform for p in _plugins_loaded().values()}
-        except Exception:
-            configured_platforms = set()
-        baseline = set(available_platforms) | configured_platforms | {'steam'}
-        save_state({'seen_platforms': sorted(baseline)})
-        return
-
-    seen = set(state.get('seen_platforms', []))
-    new_platforms = [p for p in available_platforms if p not in seen]
-    if not new_platforms:
-        return
-
-    updates = {'seen_platforms': sorted(seen | set(new_platforms))}
-    if state.get('auto_hide_new_platforms', True):
-        changed = False
-        for s in shelves_config:
-            hp = set(s.get('hidden_platforms') or [])
-            if any(p not in hp for p in new_platforms):
-                hp.update(new_platforms)
-                s['hidden_platforms'] = sorted(hp)
-                changed = True
-        if changed:
-            updates['shelves'] = shelves_config
-
-        global_hidden = set(state.get('hidden_platforms') or [])
-        if any(p not in global_hidden for p in new_platforms):
-            updates['hidden_platforms'] = sorted(global_hidden | set(new_platforms))
-    save_state(updates)
 
 
 def achievement_bucket(unlocked, total):
@@ -200,7 +151,6 @@ def index():
 
     saved_filters = state.get('saved_filters', {})
     shelves_config = state.get('shelves') or get_default_shelves()
-    _apply_new_platform_defaults(state, shelves_config, available_platforms)
     visible_shelves = [s for s in shelves_config if s.get('visible', True)]
 
     # Fetch in dedup-priority order
