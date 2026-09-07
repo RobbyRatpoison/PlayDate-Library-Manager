@@ -1580,9 +1580,22 @@ if __name__ == '__main__':
         log.warning("Steam path not found — steamapps watcher not started")
 
     import plugins
-    for _p in plugins.loaded().values():
-        if hasattr(_p, 'on_startup'):
-            _p.on_startup()
+
+    # Plugin on_startup() calls are install-status DB syncs + filesystem-watcher
+    # starts -- the same kind of work as the Steam _run_install_sync below, and
+    # nothing the first page render needs to wait for. Run them off the main
+    # thread so they don't add ~1s of serial delay before the window appears
+    # (install badges refresh on their own once each sync lands).
+    def _run_plugin_on_startup():
+        for _p in plugins.loaded().values():
+            if not hasattr(_p, 'on_startup'):
+                continue
+            try:
+                _p.on_startup()
+            except Exception as e:
+                log.warning(f"Plugin on_startup failed for {getattr(_p, 'NAME', _p)}: {e}")
+
+    threading.Thread(target=_run_plugin_on_startup, daemon=True).start()
 
     def _run_install_sync():
         try:
@@ -1627,12 +1640,18 @@ if __name__ == '__main__':
     flask_thread = threading.Thread(target=_run_flask, args=(flask_app,), daemon=True)
     flask_thread.start()
 
-    # 4. Wait for Flask to be ready
+    # 4. Wait for Flask to be ready. Hit a path that doesn't exist so any HTTP
+    #    response (including the 404) means "server is listening" -- polling
+    #    URL itself rendered the full home page on every check, ~0.3s of work
+    #    thrown away right before the window loads that same page for real.
+    import urllib.request
+    import urllib.error
     for _ in range(20):
         try:
-            import urllib.request
-            urllib.request.urlopen(URL, timeout=1)
+            urllib.request.urlopen(URL + '__ready__', timeout=1)
             break
+        except urllib.error.HTTPError:
+            break  # server answered (404) — it's up
         except Exception:
             time.sleep(0.25)
     else:
