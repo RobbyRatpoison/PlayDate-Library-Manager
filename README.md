@@ -110,3 +110,9 @@ Use **Add or Remove Programs** — PlayDate registers a standard uninstaller.
 ```bash
 flatpak uninstall io.github.robbyratpoison.PlayDate
 ```
+
+---
+
+## Support & Feedback
+
+Bug reports and feature requests come in through the [Discord](https://discord.gg/ESqXvFWkFe) or the [PlayDate thread on SteamGifts](https://www.steamgifts.com/discussion/vxHo8/). From inside the app, **System → Support → Send Log to Developer** attaches your log and version info to a report.
