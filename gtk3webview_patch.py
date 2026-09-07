@@ -17,6 +17,7 @@ instead of Gdk.Surface, GdkX11.X11Window instead of GdkX11.X11Surface.
 import logging
 
 import gi
+from gi.repository import Gdk
 from gi.repository import GLib as glib
 
 import gamescope_focus
@@ -67,6 +68,20 @@ def install(gtk_module):
 
     def patched_init(self, window):
         orig_init(self, window)
+        # Paint the webview in the window background colour, then show it from
+        # the start. pywebview styles only the GtkWindow and keeps the webview
+        # at opacity 0 until the first load-changed signal -- so the
+        # window-appears-to-first-paint gap otherwise shows through the
+        # transparent webview to the grey GTK theme ground, then flashes
+        # WebKit's white default. With the webview's own background set to the
+        # Steam-blue ground there's nothing left to hide.
+        try:
+            _wvbg = Gdk.RGBA()
+            if _wvbg.parse(getattr(window, 'background_color', None) or '#1b2838'):
+                self.webview.set_background_color(_wvbg)
+            self.webview.set_opacity(1.0)
+        except Exception:
+            logger.exception('gtk3webview_patch: webview background/opacity setup failed')
         self.window.connect('notify::is-active', lambda w, p: _on_window_active_changed(self, w, p))
         self.window.connect('realize', lambda w: _on_window_realize(self, w))
 

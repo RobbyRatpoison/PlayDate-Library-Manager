@@ -83,6 +83,29 @@ def install(qt_module):
                 self._reinjecting = False
             return True  # consume the original, unscaled event
 
+    # Paint the web page in the window background colour. pywebview sets the
+    # QMainWindow's palette but never the QWebEnginePage's background, so the
+    # gap between the window appearing and the first paint is a white flash of
+    # Chromium's default background instead of the Steam-blue ground. The page
+    # only exists after BrowserView.__init__'s setPage() call, so hook that.
+    try:
+        from qtpy.QtGui import QColor
+        BrowserView = qt_module.BrowserView
+        _orig_bv_init = BrowserView.__init__
+
+        def _patched_bv_init(self, window):
+            _orig_bv_init(self, window)
+            try:
+                self.webview.page().setBackgroundColor(
+                    QColor(getattr(window, 'background_color', None) or '#1b2838'))
+            except Exception:
+                logger.exception('qt_webview_patch: setBackgroundColor failed')
+
+        BrowserView.__init__ = _patched_bv_init
+        logger.info('qt_webview_patch: installed page background-colour fix')
+    except Exception:
+        logger.warning('qt_webview_patch: could not install page background-colour fix')
+
     WebView = qt_module.BrowserView.WebView
     orig_init = WebView.__init__
 

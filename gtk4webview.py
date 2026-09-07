@@ -222,7 +222,20 @@ class BrowserView:
             webkit_settings.enable_html5_database = False
             webkit_settings.enable_html5_local_storage = False
 
-        self.webview.set_opacity(0.0)
+        # Paint the webview itself in the window background colour, then leave
+        # it visible from the start. pywebview styles only the GtkWindow and
+        # keeps the webview at opacity 0 until the first load-changed signal --
+        # so the window-appears-to-first-paint gap otherwise shows through the
+        # transparent webview to the grey GTK theme ground, then flashes
+        # WebKit's white default. With the webview's own background set to the
+        # Steam-blue ground there's nothing to hide, so show it immediately.
+        try:
+            _wvbg = Gdk.RGBA()
+            if _wvbg.parse(window.background_color or '#1b2838'):
+                self.webview.set_background_color(_wvbg)
+        except Exception:
+            logger.exception('gtk4webview: set_background_color failed')
+        self.webview.set_opacity(1.0)
         scrolled_window.set_child(self.webview)
 
         # GTK4 has no set_icon_from_file() on windows; icon is compositor-determined
