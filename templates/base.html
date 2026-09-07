@@ -4,6 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PlayDate</title>
+    {# First load from the startup splash (/__splash__). QtWebEngine doesn't
+       hold the splash's painted frame across the navigation, so carry the same
+       logo-on-blue into this page and keep it painted until the app is ready --
+       the handoff then looks continuous no matter what the engine does mid-nav.
+       Also skip body's opacity-0 -> .loaded reveal (Chromium doesn't count a
+       paint of a transparent body, which delayed first paint ~500ms). #}
+    {% set _from_splash = '/__splash__' in (request.referrer or '') %}
+    {% if _from_splash %}
+    <style>
+    html.pd-splash-instant body { opacity: 1 !important; transition: none !important; }
+    #pd-boot {
+        position: fixed; inset: 0; z-index: 2147483647; background: #1b2838;
+        display: flex; align-items: center; justify-content: center;
+    }
+    #pd-boot img { width: 132px; height: 132px; animation: pd-boot-p 1.6s ease-in-out infinite; }
+    #pd-boot.pd-boot-off { opacity: 0; visibility: hidden; transition: opacity .25s ease, visibility 0s .25s; }
+    @keyframes pd-boot-p { 0%,100% { opacity: .5 } 50% { opacity: 1 } }
+    </style>
+    <script>document.documentElement.classList.add('pd-splash-instant');</script>
+    {% endif %}
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ app_version }}">
     {% if theme_vars %}
@@ -213,6 +233,21 @@
     </script>
 </head>
 <body>
+    {% if _from_splash %}
+    <div id="pd-boot">{% if splash_logo_uri() %}<img src="{{ splash_logo_uri() }}" alt="PlayDate">{% endif %}</div>
+    <script>
+    (function () {
+        var el = document.getElementById('pd-boot'), off = false;
+        function hide() {
+            if (off) return; off = true;
+            el.classList.add('pd-boot-off');
+            setTimeout(function () { el.remove(); }, 300);
+        }
+        window.addEventListener('load', function () { setTimeout(hide, 100); });
+        setTimeout(hide, 4000);  // hard cap if 'load' never fires
+    })();
+    </script>
+    {% endif %}
     <div class="nav-header">
         <div class="nav-links">
             <div class="hamburger-wrap" id="hamburger-wrap">

@@ -1663,8 +1663,15 @@ if __name__ == '__main__':
     _fullscreen = _ws.get('fullscreen', False)
 
     from config import load_state
+    from urllib.parse import quote
     _startup_paths = {'home': '/', 'library': '/library', 'pick': '/pick'}
-    start_url = URL.rstrip('/') + _startup_paths.get(load_state().get('startup_page', 'home'), '/')
+    _real_path = _startup_paths.get(load_state().get('startup_page', 'home'), '/')
+    # Point the window at /__splash__ rather than straight at the real page:
+    # that route renders the branded logo instantly (no DB, no CSS/JS), then
+    # replace()s to the real page. The first real render can take 1-2s at
+    # startup with the sync threads busy, and the browser keeps the splash
+    # painted across the navigation -- so no blank/white/grey window in between.
+    start_url = URL.rstrip('/') + '/__splash__?to=' + quote(_real_path, safe='')
 
     window = webview.create_window(
         title            = "PlayDate",

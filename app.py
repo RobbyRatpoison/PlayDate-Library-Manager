@@ -223,6 +223,41 @@ def create_app(template_folder=None, static_folder=None):
             return '', 404
         return send_from_directory(badges_dir, filename, max_age=_BADGE_IMG_MAX_AGE)
 
+    # ── Startup splash ────────────────────────────────────────────────────────
+    # main.py points the window here on launch. This renders instantly (no DB,
+    # no context processor, no external CSS/JS), so the branded logo is on
+    # screen within a few ms while the first real page render -- which can take
+    # 1-2s at startup with the sync threads hammering the DB -- happens behind
+    # it. The browser keeps this document painted until the replace() target
+    # commits its first paint, so there's no blank gap in between.
+    _SPLASH_TARGETS = {'/', '/library', '/pick'}
+
+    @app.route('/__splash__')
+    def _startup_splash():
+        to = request.args.get('to', '/')
+        if to not in _SPLASH_TARGETS:
+            to = '/'
+        logo = _splash_logo_uri()
+        img = f'<img src="{logo}" alt="PlayDate">' if logo else ''
+        html = (
+            '<!doctype html><html><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<style>'
+            'html,body{margin:0;height:100%;overflow:hidden;background:#1b2838}'
+            '.s{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}'
+            '.s img{width:132px;height:132px;animation:pdp 1.6s ease-in-out infinite}'
+            '@keyframes pdp{0%,100%{opacity:.5}50%{opacity:1}}'
+            '</style></head><body>'
+            f'<div class="s">{img}</div>'
+            '<script>requestAnimationFrame(function(){requestAnimationFrame(function(){'
+            f'location.replace({to!r});}});}});</script>'
+            f'<noscript><meta http-equiv="refresh" content="0;url={to}"></noscript>'
+            '</body></html>'
+        )
+        resp = app.make_response(html)
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
+
     # ── Inject background timestamp and builtin filters into every template ──────
     @app.context_processor
     def inject_globals():
@@ -452,6 +487,47 @@ def create_app(template_folder=None, static_folder=None):
     app.jinja_env.globals['plugin_home_widgets']    = _plugins.home_widgets
     app.jinja_env.globals['plugin_widget_fragment'] = _plugins.widget_fragment
     app.jinja_env.globals['pagywosg_op_table'] = pagywosg.js_op_table
+
+    # base64 data URI for the startup splash logo, inlined so it paints with
+    # the HTML rather than costing a request on first launch. Downscaled and
+    # WebP-encoded first: the raw 250px favicon is ~77KB of base64, and a blob
+    # that size bloats the inline <style> enough to visibly delay CSSOM parse
+    # (the logo lands a beat after the blue ground). ~9KB WebP parses and
+    # decodes fast enough to paint together with it. Read/encoded once, cached.
+    _splash_logo_cache = {}
+
+    def _splash_logo_uri():
+        if 'uri' not in _splash_logo_cache:
+            uri = ''
+            for _d in (app.static_folder, os.path.join(BASE_DIR, 'static')):
+                _p = os.path.join(_d, 'img', 'favicon.png')
+                try:
+                    if not os.path.isfile(_p):
+                        continue
+                    import base64, io
+                    from PIL import Image
+                    im = Image.open(_p).convert('RGBA').resize((264, 264), Image.LANCZOS)
+                    buf = io.BytesIO()
+                    # method=6 is ~1s for this image; method=4 is ~10ms, same size.
+                    im.save(buf, format='WEBP', quality=90, method=4)
+                    uri = 'data:image/webp;base64,' + base64.b64encode(buf.getvalue()).decode('ascii')
+                    break
+                except Exception:
+                    # PIL missing / decode failure — fall back to the raw PNG.
+                    try:
+                        import base64
+                        with open(_p, 'rb') as _f:
+                            uri = 'data:image/png;base64,' + base64.b64encode(_f.read()).decode('ascii')
+                        break
+                    except Exception:
+                        pass
+            _splash_logo_cache['uri'] = uri
+        return _splash_logo_cache['uri']
+
+    app.jinja_env.globals['splash_logo_uri'] = _splash_logo_uri
+    # Warm the cache off-thread (the PIL resize/encode is ~200ms) -- it finishes
+    # well before the webview engine is up and makes its first /__splash__ hit.
+    threading.Thread(target=_splash_logo_uri, daemon=True).start()
 
     return app
 
