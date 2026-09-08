@@ -590,7 +590,14 @@ document.addEventListener('DOMContentLoaded', () => {
         </p>
 
         <div class="cb-corner-grid" id="cb-corner-grid"></div>
-        <div style="font-size:0.75rem; color:#8f98a0; margin:0.5rem 0 1.25rem;">A feature can only occupy one corner — assigning it elsewhere clears its old spot.</div>
+        <div style="font-size:0.75rem; color:#8f98a0; margin:0.5rem 0 1rem;">A feature can only occupy one corner — assigning it elsewhere clears its old spot.</div>
+
+        <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1.25rem;">
+            <label for="cb-scale-slider" style="font-size:0.8rem; color:#e2eaf0; white-space:nowrap;">Badge size</label>
+            <input type="range" id="cb-scale-slider" class="cb-slider" data-modal-row="1.5"
+                   min="0.6" max="1.8" step="0.1" value="1" oninput="_cbSetScale(this.value)">
+            <span id="cb-scale-val" style="font-size:0.78rem; color:#8f98a0; font-family:monospace; min-width:2.75rem; text-align:right;">100%</span>
+        </div>
 
         <!-- Installed icon -->
         <div id="cb-installed-section" style="display:none; margin-bottom:1.25rem; padding:0.875rem; background:#1a2332; border-radius:0.5rem; border:1px solid #2a3f55;">
@@ -721,6 +728,23 @@ document.addEventListener('DOMContentLoaded', () => {
     flex-shrink: 0;
     object-fit: contain;
 }
+/* Matches the shared slider pattern (.hltb-slider / #bg-opacity-slider):
+   gradient fill on ::-webkit-slider-runnable-track, transparent input bg,
+   negative thumb margin to centre it on the 4px track. */
+.cb-slider {
+    flex: 1; min-width: 0; cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+    height: 4px; background: transparent; outline: none;
+}
+.cb-slider::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(to right, var(--accent) var(--slider-pct, 33%), var(--bg-raised, #555) var(--slider-pct, 33%));
+}
+.cb-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px; margin-top: -5px;
+    border-radius: 50%; background: var(--accent); cursor: pointer;
+}
 .cb-plat-preview-circle { border-radius: 50%; object-fit: cover; }
 .cb-plat-tag {
     margin-left: 0.4rem;
@@ -788,8 +812,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Card Badges Modal ──────────────────────────────────────────────────────
 
 let _cbSlots = {top_left: null, top_right: null, bottom_left: null, bottom_right: null};
-let _cbFallback = 'label';
+let _cbFallback = 'default';
 let _cbIcons = {installed: null, platform: {}};
+let _cbScale = 1;        // working badge-size multiplier (live-previewed on cards)
+let _cbScaleSaved = 1;   // last persisted value, to revert an unsaved preview on close
 let _cbAvailablePlatforms = null; // platforms actually in the library -- fetched once per modal open, not every platform_labels() knows about
 
 // Threshold bands for the two text badges: {min, color} lists. Index 0 is
@@ -815,7 +841,24 @@ function openCardBadgesModal() {
 }
 
 function closeCardBadgesModal() {
+    // Revert an unsaved badge-size preview (matches how the threshold edits in
+    // this modal only take effect on Save).
+    if (_cbScale !== _cbScaleSaved) {
+        _cbScale = _cbScaleSaved;
+        document.documentElement.style.setProperty('--card-badge-scale', _cbScaleSaved);
+    }
     document.getElementById('cardBadgesModal').style.display = 'none';
+}
+
+function _cbSetScale(v) {
+    _cbScale = parseFloat(v) || 1;
+    document.documentElement.style.setProperty('--card-badge-scale', _cbScale);
+    document.getElementById('cb-scale-val').textContent = Math.round(_cbScale * 100) + '%';
+    const sl = document.getElementById('cb-scale-slider');
+    if (sl) {
+        const pct = (_cbScale - parseFloat(sl.min)) / (parseFloat(sl.max) - parseFloat(sl.min)) * 100;
+        sl.style.setProperty('--slider-pct', pct.toFixed(1) + '%');
+    }
 }
 
 async function _cbLoad() {
@@ -830,6 +873,7 @@ async function _cbLoad() {
         _cbThresholds.review_score = ((cfg.review_score && cfg.review_score.thresholds) || _CB_DEFAULT_THRESHOLDS.review_score).map(b => ({...b}));
         _cbReviewMode = (cfg.review_score && cfg.review_score.mode) || 'weighted';
         _cbHltbMode = (cfg.hltb && cfg.hltb.mode) || 'main';
+        _cbScale = _cbScaleSaved = (typeof cfg.scale === 'number' && cfg.scale > 0) ? cfg.scale : 1;
     } catch (e) { /* ignore */ }
     try {
         const r2 = await fetch('/api/available-platforms').then(r => r.json());
@@ -841,6 +885,9 @@ async function _cbLoad() {
     } catch (e) { _cbEditButtonCorner = 'top_right'; }
     _cbRenderCornerGrid();
     _cbRenderSections();
+    const scaleSlider = document.getElementById('cb-scale-slider');
+    if (scaleSlider) scaleSlider.value = _cbScale;
+    _cbSetScale(_cbScale);
 }
 
 // Rebuilt fresh every time the modal opens -- which corner is reserved
@@ -1115,6 +1162,7 @@ async function _cbSave() {
         const badges = current.card_badges || {};
         badges.slots = _cbSlots;
         badges.platform_fallback = _cbFallback;
+        badges.scale = _cbScale;
         badges.achievement_percent = {thresholds: _cbThresholds.achievement_percent};
         badges.review_score = {mode: _cbReviewMode, thresholds: _cbThresholds.review_score};
         badges.hltb = {mode: _cbHltbMode};
@@ -1124,6 +1172,7 @@ async function _cbSave() {
             body: JSON.stringify({card_badges: badges}),
         });
         if ((await res.json()).status === 'success') {
+            _cbScaleSaved = _cbScale;
             closeCardBadgesModal();
             location.reload();
         } else {

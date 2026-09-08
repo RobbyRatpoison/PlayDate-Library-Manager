@@ -189,6 +189,16 @@ function renderCardBadges(game, cfg) {
     return html;
 }
 
+// Card-badge size is a global CSS scale factor (like the card-size slider's
+// --card-min-width), read once on load from whichever page set CARD_BADGES.
+// The Card Badges modal's slider drives the same variable for live preview.
+document.addEventListener('DOMContentLoaded', () => {
+    const s = window.CARD_BADGES && window.CARD_BADGES.scale;
+    if (typeof s === 'number' && s > 0) {
+        document.documentElement.style.setProperty('--card-badge-scale', s);
+    }
+});
+
 // Shared edit-button overlay renderer for Library/Home/Pick 6 (see
 // EDIT_BUTTON config, GET/POST /api/edit-button). cfg is null/falsy when
 // this page's edit_button.pages.<page> is off, matching how CARD_BADGES is

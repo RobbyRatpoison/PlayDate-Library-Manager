@@ -1265,6 +1265,11 @@ def save_card_badges():
             badges['slots'][corner] = None
         elif feature:
             seen.add(feature)
+    # Clamp the badge-size multiplier to the slider's range.
+    try:
+        badges['scale'] = min(1.8, max(0.6, float(badges.get('scale', 1.0))))
+    except (TypeError, ValueError):
+        badges['scale'] = 1.0
     with _state_lock:
         state = _load_state_unlocked()
         # The edit button's corner always wins -- defensively clear a badge

@@ -288,6 +288,7 @@ DEFAULT_CARD_BADGES = {
     #   "label"   -> the platform's text label
     #   "none"    -> nothing
     "platform_fallback": "default",
+    "scale": 1.0,  # size multiplier for every card badge (0.6-1.8); 1.0 == the 32px base
     "icons": {
         "installed": None,  # filename under static/img/badges/, or None if not uploaded
         "platform": {},     # {platform_id: filename}
@@ -889,6 +890,22 @@ def _load_state_unlocked():
             import copy
             state['card_badges'][_cb_key] = copy.deepcopy(DEFAULT_CARD_BADGES[_cb_key])
             dirty = True
+
+    # One-time: the "platform" badge slot used to fall back to a text label; it
+    # now falls back to a bundled default icon. Move installs still on the old
+    # implicit "label" default over to "default" once, leaving a marker so a
+    # user who then deliberately re-picks "label" isn't flipped back. "none" is
+    # left alone -- that's an explicit "keep it clean" choice.
+    if not state['card_badges'].get('_default_fallback_migrated'):
+        if state['card_badges'].get('platform_fallback') == 'label':
+            state['card_badges']['platform_fallback'] = 'default'
+        state['card_badges']['_default_fallback_migrated'] = True
+        dirty = True
+
+    # Badge scale factor (added after card_badges; backfill for older installs).
+    if 'scale' not in state['card_badges']:
+        state['card_badges']['scale'] = DEFAULT_CARD_BADGES['scale']
+        dirty = True
 
     # Seed edit_button with defaults on first run
     if 'edit_button' not in state:

@@ -751,8 +751,10 @@ button.btn-save.gamepad-focus {
    visible in the (accepted, unreserved) top-right corner. */
 .card-badge {
     position: absolute;
-    width: 32px;
-    height: 32px;
+    /* --card-badge-scale is a global size multiplier set from CARD_BADGES.scale
+       (playdate.js on load, Card Badges modal slider for live preview). */
+    width: calc(32px * var(--card-badge-scale, 1));
+    height: calc(32px * var(--card-badge-scale, 1));
     z-index: 5;
     pointer-events: none;
     object-fit: contain;
@@ -773,7 +775,7 @@ button.btn-save.gamepad-focus {
     padding: 2px 5px;
     background: rgba(0, 0, 0, 0.7);
     color: #fff;
-    font-size: 0.65rem;
+    font-size: calc(0.65rem * var(--card-badge-scale, 1));
     line-height: 1.4;
     border-radius: 3px;
     white-space: nowrap;
