@@ -43,11 +43,16 @@ plugins/
   "version":  "1.0.0",
   "platform": "myplugin",
   "author":   "",
-  "source":   "github:owner/myplugin-repo"
+  "source":   "github:owner/myplugin-repo",
+  "icon":     "icon.png"
 }
 ```
 
 The `id` and `platform` values must be unique across all plugins and must match the string you store in the `platform` column of the `games` table.
+
+### `icon` field (optional)
+
+A platform badge, shown in the Plugins modal (and reused elsewhere as a game-card platform badge). Point it at a file in the plugin directory (`.png`, `.webp`, `.jpg`, or `.svg`). Use a **square, edge-to-edge image** — the store's own app icon is ideal — because the UI circle-masks it; a transparent wordmark will be mostly clipped away. Served verbatim as an `<img>` source (never inlined), so an SVG here cannot run script. Recommended size 128x128.
 
 ### `launcher` field (optional)
 

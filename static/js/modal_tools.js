@@ -4481,8 +4481,9 @@ async function _manageLoadLauncherConfig(id) {
 // in place -- otherwise the card behind the sub-modal keeps a stale status
 // until the Plugins modal is closed and reopened).
 function _launcherBadgeInner(ls) {
-    if (!ls) return `<span style="color:#ffa500;">&#9888; Launcher not yet checked</span>`;
-    if (ls.available) return `<span style="color:#6dc46d;">&#10003; Launcher ready</span>`;
+    // Only surface the launcher line when it needs the user's attention. A
+    // "ready" or "not yet checked" badge is just noise on an otherwise-fine row.
+    if (!ls || ls.available) return '';
     return `<span style="color:#ffa500;">&#9888; ${escHtml(ls.detail || 'Launcher unavailable')}</span>`;
 }
 
@@ -4981,6 +4982,14 @@ function _toggleGithubInput() {
     if (!visible) document.getElementById('plugin-github-url').focus();
 }
 
+// Circle-masked platform badge for a plugin row. Falls back to a monogram
+// circle (first letter of the name) when the plugin ships no icon.
+function _pluginIconHtml(p) {
+    if (p && p.icon) return `<img src="${escHtml(p.icon)}" alt="" class="plugin-icon">`;
+    const ch = ((p && p.name) || '?').trim().charAt(0).toUpperCase() || '?';
+    return `<div class="plugin-icon plugin-icon-mono">${escHtml(ch)}</div>`;
+}
+
 async function _renderPluginsList() {
     const body = document.getElementById('plugins-list-body');
     body.innerHTML = '<div style="color:var(--text-secondary);font-size:0.85rem;">Loading...</div>';
@@ -5002,9 +5011,9 @@ async function _renderPluginsList() {
             return `
             <div class="hub-section" id="plugin-row-${escHtml(p.id)}">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                    <div>
-                        <div style="font-size:0.95rem;color:var(--text-primary);font-weight:600;">${escHtml(p.name)}</div>
-                        <div style="font-size:0.75rem;color:#8f98a0;margin-top:2px;">v${escHtml(p.version)} &middot; platform: ${escHtml(p.platform)}${p.game_count ? ` &middot; ${p.game_count} game${p.game_count !== 1 ? 's' : ''}` : ''}</div>
+                    <div style="display:flex;gap:10px;align-items:center;min-width:0;">
+                        ${_pluginIconHtml(p)}
+                        <div style="min-width:0;font-size:0.95rem;color:var(--text-primary);font-weight:600;">${escHtml(p.name)}<span style="font-size:0.75rem;color:#8f98a0;font-weight:400;margin-left:7px;">v${escHtml(p.version)}</span></div>
                     </div>
                     <div style="display:flex;flex-shrink:0;margin-left:12px;gap:6px;">
                         <button class="nav-btn" id="plugin-uninstall-btn-${escHtml(p.id)}" style="font-size:0.78rem;"
@@ -5041,16 +5050,16 @@ async function _renderPluginsList() {
             }
             if (p.manage_ui) _manageSpecs[p.id] = {name: p.name, spec: p.manage_ui};
             const manageBtn = p.manage_ui
-                ? `<button class="nav-btn" style="font-size:0.78rem;flex-shrink:0;margin-left:8px;" data-modal-row="${pluginRow}" onclick="_openManageModal('${escHtml(p.id)}')">Manage</button>`
+                ? `<button class="nav-btn" style="font-size:0.78rem;flex-shrink:0;" data-modal-row="${pluginRow}" onclick="_openManageModal('${escHtml(p.id)}')">Manage</button>`
                 : '';
             return `
             <div class="hub-section" id="plugin-row-${escHtml(p.id)}">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                    <div>
-                        <div style="font-size:0.95rem;color:var(--text-primary);font-weight:600;">${escHtml(p.name)}</div>
-                        <div style="font-size:0.75rem;color:#8f98a0;margin-top:2px;">v${escHtml(p.version)} &middot; platform: ${escHtml(p.platform)} &middot; ${p.game_count} game${p.game_count !== 1 ? 's' : ''}${p.source ? `<span id="plugin-update-${escHtml(p.id)}"></span>` : ''}</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                    <div style="display:flex;gap:10px;align-items:center;min-width:0;">
+                        ${_pluginIconHtml(p)}
+                        <div style="min-width:0;font-size:0.95rem;color:var(--text-primary);font-weight:600;">${escHtml(p.name)}<span id="plugin-ver-${escHtml(p.id)}" style="font-size:0.75rem;color:#8f98a0;font-weight:400;margin-left:7px;">v${escHtml(p.version)}</span>${p.source ? `<span id="plugin-update-${escHtml(p.id)}" data-plugin-row="${pluginRow}"></span>` : ''}</div>
                     </div>
-                    <div style="display:flex;flex-shrink:0;margin-left:12px;gap:6px;">
+                    <div style="display:flex;flex-shrink:0;gap:6px;align-items:center;">
                         ${manageBtn}
                         <button class="nav-btn" id="plugin-uninstall-btn-${escHtml(p.id)}" style="font-size:0.78rem;"
                                 data-modal-row="${pluginRow}"
@@ -5286,7 +5295,7 @@ async function _installPluginFromGithub() {
 
 async function _updatePlugin(id, source) {
     const updateEl = document.getElementById(`plugin-update-${id}`);
-    if (updateEl) updateEl.textContent = ' · updating...';
+    if (updateEl) updateEl.innerHTML = `<span style="font-size:0.75rem;color:#8f98a0;font-weight:400;margin-left:7px;">updating&hellip;</span>`;
     await _doGithubInstall(source.replace('github:', ''));
     await _renderPluginsList();
     _checkPluginUpdates();
@@ -5310,10 +5319,15 @@ async function _checkPluginUpdates() {
             window._pendingPluginUpdates.push({ id: u.id, source: u.source, latest_version: u.latest_version, requires_core: u.requires_core || null });
             const el = document.getElementById(`plugin-update-${u.id}`);
             if (!el) continue;
+            const mr  = el.dataset.pluginRow ? ` data-modal-row="${escHtml(el.dataset.pluginRow)}"` : '';
+            const ver = document.getElementById(`plugin-ver-${u.id}`);
             if (u.requires_core) {
-                el.innerHTML = ` &middot; <span style="color:#ffa500;" title="Update PlayDate to at least ${escHtml(u.requires_core)} to get this. The &quot;Update PlayDate &amp; Plugins&quot; button on the update prompt does both at once.">v${escHtml(u.latest_version)} &middot; needs PlayDate ${escHtml(u.requires_core)}</span>`;
+                // Keep the installed version visible, append an amber gated note.
+                el.innerHTML = ` <span style="font-size:0.75rem;color:#ffa500;font-weight:400;" title="Update PlayDate to at least ${escHtml(u.requires_core)} first. &quot;Update PlayDate &amp; Plugins&quot; on the update prompt does both at once.">&middot; needs PlayDate ${escHtml(u.requires_core)}</span>`;
             } else {
-                el.innerHTML = ` &middot; <a href="#" style="color:var(--accent);" onclick="event.preventDefault();_updatePlugin('${escHtml(u.id)}','${escHtml(u.source || '')}')">v${escHtml(u.latest_version)} available</a>`;
+                // Replace the plain installed version with a compact update link.
+                if (ver) ver.hidden = true;
+                el.innerHTML = `<button${mr} style="font:inherit;font-size:0.75rem;font-weight:400;background:none;border:none;padding:0;margin-left:7px;color:var(--accent);cursor:pointer;vertical-align:baseline;" onclick="_updatePlugin('${escHtml(u.id)}','${escHtml(u.source || '')}')">v${escHtml(u.latest_version)} available &#8595;</button>`;
             }
         }
         if (anyStandalone || anyGated) {

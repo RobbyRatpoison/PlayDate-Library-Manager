@@ -591,6 +591,29 @@ def plugin_manifest(plugin_id: str) -> dict:
     return _plugin_manifests.get(plugin_id, {})
 
 
+# Icon files a plugin may ship (plugin.json "icon" key), served verbatim as an
+# <img> source -- never inlined, so an SVG here can't execute script. The badge
+# is meant to be a square, edge-to-edge platform mark (the store's app icon);
+# the UI circle-masks it.
+_ICON_EXTS = {'.png', '.webp', '.jpg', '.jpeg', '.svg'}
+
+
+def plugin_icon_rel(plugin_id: str) -> str | None:
+    """The manifest's declared icon filename, if it resolves to a real file of an
+    allowed type inside the plugin's own directory. None otherwise."""
+    name = (plugin_manifest(plugin_id).get('icon') or '').strip()
+    root = _plugin_paths.get(plugin_id)
+    if not name or not root:
+        return None
+    from werkzeug.security import safe_join
+    full = safe_join(root, name)
+    if not full or not os.path.isfile(full):
+        return None
+    if os.path.splitext(full)[1].lower() not in _ICON_EXTS:
+        return None
+    return name
+
+
 def plugin_js_api() -> dict:
     """Return JS API descriptors for all plugins that provide them."""
     return {p.platform: p.js_api() for p in _plugins.values() if hasattr(p, 'js_api')}
@@ -648,9 +671,21 @@ def list_plugins():
             'game_count': row[0] if row else 0,
             'source':     manifest.get('source', ''),
             'launcher':   manifest.get('launcher', {}),
+            'icon':       (f'/api/plugins/{pid}/icon?v={manifest.get("version", "0")}'
+                           if plugin_icon_rel(pid) else None),
             'manage_ui':  p.manage_ui() if hasattr(p, 'manage_ui') else None,
         })
     return jsonify(result)
+
+
+@plugins_bp.route('/api/plugins/<plugin_id>/icon')
+def plugin_icon(plugin_id):
+    from flask import send_from_directory
+    rel  = plugin_icon_rel(plugin_id)
+    root = _plugin_paths.get(plugin_id)
+    if not rel or not root:
+        return ('', 404)
+    return send_from_directory(root, rel, max_age=86400)
 
 @plugins_bp.route('/api/plugins/incompatible')
 def list_incompatible_plugins():
