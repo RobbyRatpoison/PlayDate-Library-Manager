@@ -272,16 +272,22 @@ DEFAULT_CARD_OUTLINES = {
 # Corner badges for Library/Home/Pick 6 game cards. Unlike card outlines,
 # 'installed' and 'platform' are fixed known columns (not arbitrary filter
 # trees), so badge state is computed entirely client-side from data already
-# present on every game object -- no server-side evaluation needed. Icons are
-# user-uploaded (not bundled) to avoid shipping trademarked platform logos;
-# see images.py's badge-icon routes and static/img/badges/.
+# present on every game object -- no server-side evaluation needed. Users can
+# upload their own platform/installed icons (images.py's badge-icon routes,
+# static/img/badges/); the "platform" slot also falls back to a bundled default
+# badge per platform (Steam ships with core, plugins ship their own -- see
+# plugins.platform_badge_defaults()).
 DEFAULT_CARD_BADGES = {
     "enabled": {"library": True, "home": True, "pick6": True},
     "slots": {
         "top_left": None, "top_right": None,
         "bottom_left": None, "bottom_right": None,
     },
-    "platform_fallback": "label",  # "label" | "none" -- for the "platform" slot when no icon is uploaded for a value
+    # For the "platform" slot when no custom icon is uploaded for a platform:
+    #   "default" -> the bundled default badge (falls to the text label if none)
+    #   "label"   -> the platform's text label
+    #   "none"    -> nothing
+    "platform_fallback": "default",
     "icons": {
         "installed": None,  # filename under static/img/badges/, or None if not uploaded
         "platform": {},     # {platform_id: filename}

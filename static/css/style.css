@@ -757,6 +757,10 @@ button.btn-save.gamepad-focus {
     pointer-events: none;
     object-fit: contain;
 }
+/* Bundled default platform icons are square/edge-to-edge by spec, so a circle
+   mask is safe and keeps them consistent. User-uploaded badges are left as-is
+   (object-fit:contain, no mask) since many are transparent wordmarks. */
+.card-badge-circle { border-radius: 50%; object-fit: cover; }
 .card-badge-top_left     { top: 6px; left: 6px; }
 .card-badge-top_right    { top: 6px; right: 6px; }
 .card-badge-bottom_left  { bottom: 6px; left: 6px; }

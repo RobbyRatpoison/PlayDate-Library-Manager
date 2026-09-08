@@ -150,12 +150,18 @@ function renderCardBadges(game, cfg) {
             if (icon) html += `<img class="card-badge card-badge-${corner} card-badge-installed" src="/static/img/badges/${icon}" alt="">`;
         } else if (feature === 'platform') {
             const plat = (game && game.platform) || 'steam';
-            const icon = cfg.icons && cfg.icons.platform && cfg.icons.platform[plat];
-            if (icon) {
-                html += `<img class="card-badge card-badge-${corner}" src="/static/img/badges/${icon}" alt="">`;
-            } else if (cfg.platform_fallback !== 'none') {
-                const label = (window._PLAT_LABELS && window._PLAT_LABELS[plat]) || plat;
-                html += `<span class="card-badge card-badge-${corner} card-badge-text">${escHtml(label)}</span>`;
+            const custom = cfg.icons && cfg.icons.platform && cfg.icons.platform[plat];
+            const fb = cfg.platform_fallback || 'label';
+            if (custom) {
+                html += `<img class="card-badge card-badge-${corner}" src="/static/img/badges/${custom}" alt="">`;
+            } else {
+                const dft = fb === 'default' && window._PLAT_BADGE_DEFAULTS && window._PLAT_BADGE_DEFAULTS[plat];
+                if (dft) {
+                    html += `<img class="card-badge card-badge-circle card-badge-${corner}" src="${escHtml(dft)}" alt="">`;
+                } else if (fb !== 'none') {
+                    const label = (window._PLAT_LABELS && window._PLAT_LABELS[plat]) || plat;
+                    html += `<span class="card-badge card-badge-${corner} card-badge-text">${escHtml(label)}</span>`;
+                }
             }
         } else if (feature === 'achievement_percent') {
             const total = Number(game && game.total_achievements) || 0;

@@ -619,6 +619,25 @@ def plugin_js_api() -> dict:
     return {p.platform: p.js_api() for p in _plugins.values() if hasattr(p, 'js_api')}
 
 
+# Bundled default platform badges (card-badge "platform" slot). Steam ships with
+# core; every loaded plugin that declares an "icon" contributes its own. The
+# client falls back to these when the user hasn't uploaded a custom badge, and
+# the Card Badges modal offers "revert to the included default".
+_CORE_PLATFORM_BADGES = {
+    'steam': '/static/img/platform/steam.png',
+}
+
+
+def platform_badge_defaults() -> dict:
+    """{platform_id: url} for every platform with a bundled badge image."""
+    out = dict(_CORE_PLATFORM_BADGES)
+    for pid, p in _plugins.items():
+        if plugin_icon_rel(pid):
+            ver = plugin_manifest(pid).get('version', '0')
+            out[p.platform] = f'/api/plugins/{pid}/icon?v={ver}'
+    return out
+
+
 def platform_labels() -> dict:
     """Return display labels for all known platforms (core + plugins + emulation)."""
     from known_emulators import PLATFORM_NAMES

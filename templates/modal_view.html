@@ -586,7 +586,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     <div style="flex:1; min-height:0; overflow-y:auto; padding:1.25rem 1.5rem;">
         <p style="color:#8f98a0; font-size:0.8rem; margin:0 0 1rem;">
-            Show small badges in a card's corners. Installed/Platform use your own uploaded icons; Achievement %, Review Score, and HLTB Time are text badges — the first two are color-coded by thresholds you set below, HLTB Time just shows the duration.
+            Show small badges in a card's corners. Platform badges use a bundled default icon per platform (or your own uploaded one); the Installed badge is an icon you upload. Achievement %, Review Score, and HLTB Time are text badges — the first two are color-coded by thresholds you set below, HLTB Time just shows the duration.
         </p>
 
         <div class="cb-corner-grid" id="cb-corner-grid"></div>
@@ -607,8 +607,12 @@ document.addEventListener('DOMContentLoaded', () => {
         <!-- Platform icons -->
         <div id="cb-platform-section" style="display:none; margin-bottom:1rem; padding:0.875rem; background:#1a2332; border-radius:0.5rem; border:1px solid #2a3f55;">
             <div style="font-size:0.85rem; color:#e2eaf0; margin-bottom:0.25rem;">Platform icons</div>
-            <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:0.5rem;">If a platform below has no icon uploaded:</div>
-            <div style="display:flex; gap:1rem; margin-bottom:0.75rem;">
+            <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:0.5rem;">If a platform below has no custom icon uploaded:</div>
+            <div style="display:flex; gap:1rem; margin-bottom:0.75rem; flex-wrap:wrap;">
+                <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--text-primary); cursor:pointer;">
+                    <input type="radio" name="cb-fallback" id="cb-fallback-default" data-modal-row="3" onclick="_cbSetFallback('default')" style="width:auto; margin:0;">
+                    Use the included default icon
+                </label>
                 <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--text-primary); cursor:pointer;">
                     <input type="radio" name="cb-fallback" id="cb-fallback-label" data-modal-row="3" onclick="_cbSetFallback('label')" style="width:auto; margin:0;">
                     Show its text label
@@ -717,6 +721,18 @@ document.addEventListener('DOMContentLoaded', () => {
     flex-shrink: 0;
     object-fit: contain;
 }
+.cb-plat-preview-circle { border-radius: 50%; object-fit: cover; }
+.cb-plat-tag {
+    margin-left: 0.4rem;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #8f98a0;
+    border: 1px solid #2a3f55;
+    border-radius: 3px;
+    padding: 0 4px;
+    vertical-align: middle;
+}
 .cb-plat-label {
     flex: 1;
     color: #c7d5e0;
@@ -807,7 +823,7 @@ async function _cbLoad() {
         const r = await fetch('/api/card-badges').then(r => r.json());
         const cfg = r.card_badges || {};
         _cbSlots = Object.assign({top_left: null, top_right: null, bottom_left: null, bottom_right: null}, cfg.slots || {});
-        _cbFallback = cfg.platform_fallback || 'label';
+        _cbFallback = cfg.platform_fallback || 'default';
         _cbIcons = cfg.icons || {installed: null, platform: {}};
         if (!_cbIcons.platform) _cbIcons.platform = {};
         _cbThresholds.achievement_percent = ((cfg.achievement_percent && cfg.achievement_percent.thresholds) || _CB_DEFAULT_THRESHOLDS.achievement_percent).map(b => ({...b}));
@@ -929,8 +945,9 @@ function _cbRenderSections() {
     }
     document.getElementById('cb-installed-clear-btn').style.opacity = _cbIcons.installed ? '1' : '0.4';
 
-    document.getElementById('cb-fallback-label').checked = _cbFallback !== 'none';
-    document.getElementById('cb-fallback-none').checked  = _cbFallback === 'none';
+    document.getElementById('cb-fallback-default').checked = _cbFallback === 'default';
+    document.getElementById('cb-fallback-label').checked   = _cbFallback === 'label';
+    document.getElementById('cb-fallback-none').checked    = _cbFallback === 'none';
 
     if (hasPlatform) {
         const list = document.getElementById('cb-platform-list');
@@ -940,16 +957,28 @@ function _cbRenderSections() {
         if (!ids.length) {
             list.innerHTML = '<div style="color:#8f98a0; font-size:0.8rem; padding:0.375rem 0;">No games in your library yet.</div>';
         }
+        const defaults = window._PLAT_BADGE_DEFAULTS || {};
         ids.slice().sort((a, b) => (labels[a] || a).localeCompare(labels[b] || b)).forEach((pid, i) => {
             const icon = _cbIcons.platform[pid];
+            const dft  = defaults[pid];
+            // Preview: the custom upload if there is one, else the bundled
+            // default (dimmed + circle-masked, matching how it renders on a
+            // card), else nothing.
+            let previewSrc = '', previewCls = 'cb-plat-preview', previewStyle = 'display:none;', tag = '';
+            if (icon) {
+                previewSrc = '/static/img/badges/' + icon; previewStyle = '';
+            } else if (dft) {
+                previewSrc = dft; previewStyle = 'opacity:0.75;'; previewCls += ' cb-plat-preview-circle';
+                tag = '<span class="cb-plat-tag">default</span>';
+            }
             const row = document.createElement('div');
             row.className = 'cb-plat-row';
             row.dataset.modalRow = 4 + i;
             row.innerHTML = `
-                <img class="cb-plat-preview" src="${icon ? '/static/img/badges/' + icon : ''}" alt="" style="${icon ? '' : 'display:none;'}">
-                <span class="cb-plat-label">${escHtml(labels[pid] || pid)}</span>
-                <button class="nav-btn cb-mini-btn" data-modal-row="${4 + i}" onclick="_cbChooseFile('platform', '${pid}')">Upload</button>
-                <button class="nav-btn cb-mini-btn" data-modal-row="${4 + i}" style="opacity:${icon ? '1' : '0.4'};" onclick="_cbClearPlatform('${pid}')">Clear</button>
+                <img class="${previewCls}" src="${escHtml(previewSrc)}" alt="" style="${previewStyle}">
+                <span class="cb-plat-label">${escHtml(labels[pid] || pid)}${tag}</span>
+                <button class="nav-btn cb-mini-btn" data-modal-row="${4 + i}" onclick="_cbChooseFile('platform', '${pid}')">${icon ? 'Replace' : 'Upload'}</button>
+                <button class="nav-btn cb-mini-btn" data-modal-row="${4 + i}" style="opacity:${icon ? '1' : '0.4'};" title="${dft ? 'Revert to the included default icon' : 'Remove this icon'}" onclick="_cbClearPlatform('${pid}')">${icon && dft ? 'Use default' : 'Clear'}</button>
                 <input type="file" id="cb-plat-file-${pid}" accept="image/*" style="display:none" onchange="_cbFileSelected('platform', '${pid}', this)">
             `;
             list.appendChild(row);

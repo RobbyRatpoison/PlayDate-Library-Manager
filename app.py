@@ -485,6 +485,7 @@ def create_app(template_folder=None, static_folder=None):
     app.jinja_env.globals['plugin_fragments']  = _plugins.fragments
     app.jinja_env.globals['plugin_fragment_js'] = _plugins.fragment_js
     app.jinja_env.globals['platform_labels']   = _plugins.platform_labels
+    app.jinja_env.globals['platform_badge_defaults'] = _plugins.platform_badge_defaults
     app.jinja_env.globals['plugin_js_api']     = _plugins.plugin_js_api
     app.jinja_env.globals['plugin_home_widgets']    = _plugins.home_widgets
     app.jinja_env.globals['plugin_widget_fragment'] = _plugins.widget_fragment
