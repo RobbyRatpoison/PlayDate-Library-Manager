@@ -1,5 +1,11 @@
 # Release Notes
 
+## v1.10.5 - Pending
+### Improvements
+
+- Game cards can now show a **platform badge** using each store's icon (Steam, GOG, Epic, and every other official plugin) instead of a plain text label. Turn it on, resize it, or swap in your own icon from View > Card Badges.
+- The Plugins window is tidier: each plugin shows its platform logo, and an available update now appears right next to the version.
+
 ## v1.10.4 - 2026-09-07
 ### Improvements
 
