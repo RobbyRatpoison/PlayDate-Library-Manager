@@ -619,18 +619,26 @@ def plugin_js_api() -> dict:
     return {p.platform: p.js_api() for p in _plugins.values() if hasattr(p, 'js_api')}
 
 
-# Bundled default platform badges (card-badge "platform" slot). Steam ships with
-# core; every loaded plugin that declares an "icon" contributes its own. The
-# client falls back to these when the user hasn't uploaded a custom badge, and
-# the Card Badges modal offers "revert to the included default".
-_CORE_PLATFORM_BADGES = {
-    'steam': '/static/img/platform/steam.png',
-}
-
-
 def platform_badge_defaults() -> dict:
-    """{platform_id: url} for every platform with a bundled badge image."""
-    out = dict(_CORE_PLATFORM_BADGES)
+    """{platform_id: url} for every platform with a bundled badge image.
+
+    Core ships badges for Steam and every official plugin's platform in
+    static/img/platform/<platform>.png (keyed by the `platform` column value,
+    which equals the plugin id for all first-party plugins). A loaded plugin
+    that ships its own plugin.json "icon" overrides its entry -- mainly for
+    third-party plugins, or a first-party plugin that wants newer branding
+    before the next core release.
+    """
+    from config import _BUNDLE_DIR
+    out = {}
+    badge_dir = os.path.join(_BUNDLE_DIR, 'static', 'img', 'platform')
+    try:
+        for fn in os.listdir(badge_dir):
+            stem, ext = os.path.splitext(fn)
+            if ext.lower() in _ICON_EXTS:
+                out[stem] = f'/static/img/platform/{fn}'
+    except OSError:
+        pass
     for pid, p in _plugins.items():
         if plugin_icon_rel(pid):
             ver = plugin_manifest(pid).get('version', '0')
@@ -676,6 +684,7 @@ def get_platform_priority() -> list:
 def list_plugins():
     from database import get_db
     db = get_db()
+    badges = platform_badge_defaults()
     result = []
     for pid, p in loaded().items():
         manifest = plugin_manifest(pid)
@@ -690,8 +699,9 @@ def list_plugins():
             'game_count': row[0] if row else 0,
             'source':     manifest.get('source', ''),
             'launcher':   manifest.get('launcher', {}),
-            'icon':       (f'/api/plugins/{pid}/icon?v={manifest.get("version", "0")}'
-                           if plugin_icon_rel(pid) else None),
+            # plugin-shipped icon wins (already merged in by platform_badge_defaults),
+            # else the core-bundled badge for this platform, else None.
+            'icon':       badges.get(p.platform),
             'manage_ui':  p.manage_ui() if hasattr(p, 'manage_ui') else None,
         })
     return jsonify(result)
@@ -713,12 +723,14 @@ def list_incompatible_plugins():
     (loaded plugins only) stays stable for existing callers."""
     from database import get_db
     db = get_db()
+    badges = platform_badge_defaults()
     result = []
     for pid, entry in _incompatible_plugins.items():
         row = db.execute(
             'SELECT COUNT(*) FROM games WHERE platform = ?', (entry['platform'],)
         ).fetchone() if entry['platform'] else None
-        result.append({**entry, 'game_count': row[0] if row else 0})
+        result.append({**entry, 'game_count': row[0] if row else 0,
+                       'icon': badges.get(entry.get('platform'))})
     db.close()
     return jsonify(result)
 

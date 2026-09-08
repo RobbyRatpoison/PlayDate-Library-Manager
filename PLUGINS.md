@@ -52,7 +52,9 @@ The `id` and `platform` values must be unique across all plugins and must match 
 
 ### `icon` field (optional)
 
-A platform badge, shown in the Plugins modal (and reused elsewhere as a game-card platform badge). Point it at a file in the plugin directory (`.png`, `.webp`, `.jpg`, or `.svg`). Use a **square, edge-to-edge image** — the store's own app icon is ideal — because the UI circle-masks it; a transparent wordmark will be mostly clipped away. Served verbatim as an `<img>` source (never inlined), so an SVG here cannot run script. Recommended size 128x128.
+A platform badge, shown in the Plugins modal and as a game-card platform badge. Point it at a file in the plugin directory (`.png`, `.webp`, `.jpg`, or `.svg`). Use a **square, edge-to-edge image** — the store's own app icon is ideal — because the UI circle-masks it; a transparent wordmark will be mostly clipped away. Served verbatim as an `<img>` source (never inlined), so an SVG here cannot run script. Recommended size 128x128.
+
+Core already bundles badges for Steam and every official plugin's platform (`static/img/platform/<platform>.png`), so first-party plugins don't need this field. Set it if you're a third-party plugin, or a first-party one shipping updated branding ahead of the next core release — a plugin-shipped icon overrides the bundled one for its platform.
 
 ### `launcher` field (optional)
 

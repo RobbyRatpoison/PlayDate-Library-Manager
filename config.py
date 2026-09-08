@@ -275,8 +275,9 @@ DEFAULT_CARD_OUTLINES = {
 # present on every game object -- no server-side evaluation needed. Users can
 # upload their own platform/installed icons (images.py's badge-icon routes,
 # static/img/badges/); the "platform" slot also falls back to a bundled default
-# badge per platform (Steam ships with core, plugins ship their own -- see
-# plugins.platform_badge_defaults()).
+# badge per platform -- core ships static/img/platform/<platform>.png for Steam
+# and every official plugin, and a plugin may override its own with a
+# plugin.json "icon" (see plugins.platform_badge_defaults()).
 DEFAULT_CARD_BADGES = {
     "enabled": {"library": True, "home": True, "pick6": True},
     "slots": {
