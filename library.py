@@ -1749,13 +1749,8 @@ def library_junk_deep_scan():
 @library_bp.route('/api/detect-duplicates', methods=['POST'])
 def detect_duplicates():
     try:
-        from database import auto_detect_duplicates, invalidate_dup_cache
-        from plugins import get_platform_priority
-        saved    = load_state().get('platform_priority') or []
-        dynamic  = get_platform_priority()
-        priority = saved + [p for p in dynamic if p not in saved]
-        count = auto_detect_duplicates(platform_priority=priority)
-        invalidate_dup_cache()
+        from database import refresh_duplicate_detection
+        count = refresh_duplicate_detection()
         return jsonify({'status': 'ok', 'detected': count})
     except Exception as e:
         log.error(f"detect-duplicates failed: {e}", exc_info=True)

@@ -1594,6 +1594,15 @@ if __name__ == '__main__':
                 _p.on_startup()
             except Exception as e:
                 log.warning(f"Plugin on_startup failed for {getattr(_p, 'NAME', _p)}: {e}")
+        # Pick up cross-platform duplicates from any library sync done in a
+        # previous session (plugin syncs have no core completion hook, so this
+        # is where a non-Steam sync's duplicates first get auto-hidden).
+        try:
+            from database import refresh_duplicate_detection
+            n = refresh_duplicate_detection()
+            log.info(f"Duplicate auto-detection on startup: {n} hidden")
+        except Exception as e:
+            log.warning(f"Startup duplicate auto-detection failed: {e}")
 
     threading.Thread(target=_run_plugin_on_startup, daemon=True).start()
 

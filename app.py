@@ -419,6 +419,12 @@ def create_app(template_folder=None, static_folder=None):
             invalidate_unique_cache()
             import plugins as _plugins
             _plugins.notify_library_updated()
+            try:
+                from database import refresh_duplicate_detection
+                n = refresh_duplicate_detection()
+                log.info("Duplicate auto-detection after populate: %d hidden", n)
+            except Exception:
+                log.exception("Duplicate auto-detection after populate failed")
         return jsonify(result)
 
     @app.route('/api/cancel-populate', methods=['POST'])

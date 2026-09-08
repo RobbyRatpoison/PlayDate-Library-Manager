@@ -198,7 +198,7 @@
             </a>
         </p>
 
-        <!-- Duplicate linking row (non-Steam games only) -->
+        <!-- Duplicate linking row -->
         <div id="duplicate-row" style="display:none; margin-bottom: 12px; font-size: 0.85rem; color: #8f98a0; border-bottom: 1px solid #2a475e; padding-bottom: 10px;">
             <span style="margin-right: 8px;">Duplicate of:</span>
             <span id="dup-linked-name" style="display:none; color: var(--text-bright); margin-right: 8px;"></span>
@@ -207,7 +207,7 @@
                 Unlink
             </button>
             <span id="dup-search-wrap" style="display:inline-block; position:relative;">
-                <input id="dup-search" type="text" placeholder="Search Steam library…" data-modal-row="1"
+                <input id="dup-search" type="text" placeholder="Search your library…" data-modal-row="1"
                        style="font-size:0.8rem; padding:3px 8px; width:220px; background:#1b2838; border:1px solid #2a475e; color:var(--text-bright); border-radius:3px;"
                        autocomplete="off" oninput="dupSearchInput(this.value)">
                 <div id="dup-results" style="display:none; position:absolute; left:0; top:100%; z-index:9999; background:#1b2838; border:1px solid #2a475e; border-radius:3px; min-width:260px; max-height:180px; overflow-y:auto;"></div>
@@ -900,7 +900,7 @@ const achLink = document.getElementById('achievements-link');
             if (pdb) pdb.style.display = 'none';
         }
 
-        // Duplicate row: only for non-Steam games
+        // Duplicate row: any game can be linked to any other
         _initDupRow(game);
 
         const modal = document.getElementById('editModal');
@@ -909,11 +909,12 @@ const achLink = document.getElementById('achievements-link');
 
     // ── Duplicate linking ────────────────────────────────────────────────────
     let _dupSearchTimer = null;
+    let _dupGame = null;   // {appid, platform} of the game being edited, for search filtering
 
     function _initDupRow(game) {
         const row = document.getElementById('duplicate-row');
         if (!row) return;
-        if (game.platform === 'steam') { row.style.display = 'none'; return; }
+        _dupGame = { appid: String(game.appid), platform: game.platform };
         row.style.display = '';
 
         const linkedName  = document.getElementById('dup-linked-name');
@@ -957,15 +958,23 @@ const achLink = document.getElementById('achievements-link');
         if (!q.trim()) { if (results) results.style.display = 'none'; return; }
         _dupSearchTimer = setTimeout(async () => {
             try {
-                const data = await fetch(`/api/games/search?q=${encodeURIComponent(q)}&platform=steam`).then(r => r.json());
+                const raw = await fetch(`/api/games/search?q=${encodeURIComponent(q)}`).then(r => r.json());
                 if (!results) return;
+                // A "duplicate of" link means "I own this on another platform, hide
+                // this copy" -- so exclude the game itself and its own platform
+                // (same-platform copies are the Find Duplicate Entries tool's job).
+                const labels = window._PLAT_LABELS || {};
+                const data = raw.filter(g =>
+                    String(g.appid) !== (_dupGame && _dupGame.appid) &&
+                    g.platform !== (_dupGame && _dupGame.platform)
+                );
                 results.innerHTML = '';
                 if (!data.length) {
                     results.innerHTML = '<div style="padding:6px 10px; color:#8f98a0; font-size:0.8rem;">No matches</div>';
                 } else {
                     data.forEach(g => {
                         const item = document.createElement('div');
-                        item.textContent = g.name;
+                        item.innerHTML = `${escHtml(g.name)} <span style="color:#8f98a0;">&middot; ${escHtml(labels[g.platform] || g.platform)}</span>`;
                         Object.assign(item.style, { padding:'5px 10px', cursor:'pointer', fontSize:'0.82rem', color:'var(--text-bright)' });
                         item.onmouseenter = () => item.style.background = '#2a475e';
                         item.onmouseleave = () => item.style.background = '';

@@ -2243,6 +2243,14 @@ def bulk_rescrape_games(appids, cancel_event, progress_cb):
             except Exception as e:
                 log.error(f"[bulk_rescrape] resync_installed failed for {platform}: {e}")
 
+    # A rescrape can refine names enough to create/break a cross-platform match.
+    try:
+        from database import refresh_duplicate_detection
+        n = refresh_duplicate_detection()
+        log.info(f"[bulk_rescrape] duplicate auto-detection: {n} hidden")
+    except Exception as e:
+        log.error(f"[bulk_rescrape] duplicate auto-detection failed: {e}")
+
     counts['aborted'] = backoff.aborted
     return counts
 

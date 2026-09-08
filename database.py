@@ -392,3 +392,27 @@ def auto_detect_duplicates(platform_priority=None):
         return updated
     finally:
         conn.close()
+
+
+def refresh_duplicate_detection():
+    """Re-run cross-platform duplicate auto-detection with the user's saved
+    platform priority (plus any newly registered plugin platforms), refresh the
+    art-redirect cache, and return the new total number of auto-detected
+    duplicates. Safe to call repeatedly -- auto_detect_duplicates() clears its
+    own prior results first. Called after a Steam populate / bulk rescrape and
+    once at startup so a plugin library sync done in a previous session gets
+    picked up without the user having to click "Detect Duplicates".
+    """
+    try:
+        from config import load_state
+        from plugins import get_platform_priority
+        saved   = load_state().get('platform_priority') or []
+        dynamic = get_platform_priority()
+        priority = saved + [p for p in dynamic if p not in saved]
+    except Exception:
+        priority = None
+    # auto_detect_duplicates() clears its prior auto-marks first, so its return
+    # value is the full current auto-detected total, not just newly-added ones.
+    count = auto_detect_duplicates(platform_priority=priority)
+    invalidate_dup_cache()
+    return count
