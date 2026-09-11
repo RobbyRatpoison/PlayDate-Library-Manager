@@ -371,3 +371,56 @@ def perform_update():
 @updater_bp.route('/api/update-dl-status')
 def update_dl_status():
     return jsonify(_update_dl_state)
+
+
+def _relaunch():
+    """Spawn a fresh PlayDate process; the caller then exits this one. Same
+    relaunch strategy as perform_update()'s _do_update() (Flatpak `flatpak run`
+    / Steam rungameid, frozen exe, source launcher/interpreter), minus the
+    update step -- used by /api/restart to pick up a downloaded plugin update.
+
+    Every branch delays the child ~2s so this process fully exits and releases
+    port 5000 first; otherwise the new process's own _port_in_use() check
+    (main.py) can fire early and land on the 'already running' fallback screen
+    (confirmed live via the same pattern in the updater's own relaunch)."""
+    if IN_FLATPAK:
+        from config import _is_steam_deck_session
+        app_id = _running_flatpak_app_id()
+        _sgid = os.environ.get('SteamGameId', '')
+        if _is_steam_deck_session() and _sgid.isdigit():
+            log.info("Restart: relaunching via Steam (rungameid %s)", _sgid)
+            host_popen(['sh', '-c', f'sleep 2; exec steam "steam://rungameid/{_sgid}"'],
+                       start_new_session=True)
+        else:
+            log.info("Restart: relaunching via flatpak run %s", app_id)
+            host_popen(['sh', '-c', f'sleep 2; exec flatpak run {app_id}'],
+                       start_new_session=True)
+    elif getattr(sys, 'frozen', False):
+        log.info("Restart: relaunching frozen exe %s", sys.executable)
+        subprocess.Popen(
+            f'ping -n 3 127.0.0.1 >nul & "{sys.executable}"', shell=True,
+            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+    else:
+        launcher = os.path.join(BASE_DIR, 'playdate-launch.sh')
+        target = f'"{launcher}"' if os.path.exists(launcher) \
+            else f'"{sys.executable}" "{os.path.join(BASE_DIR, "main.py")}"'
+        log.info("Restart: relaunching %s", target)
+        subprocess.Popen(['sh', '-c', f'sleep 2; exec {target}'], start_new_session=True)
+
+
+@updater_bp.route('/api/restart', methods=['POST'])
+def restart():
+    """Relaunch PlayDate in place. No update, no download -- just a clean
+    process restart so a freshly-downloaded plugin update gets loaded."""
+    def _do_restart():
+        time.sleep(0.5)  # let the HTTP response send first
+        try:
+            _relaunch()
+        except Exception as e:
+            log.error("restart: relaunch failed: %s", e, exc_info=True)
+            return  # don't kill the running process if we couldn't start a new one
+        os._exit(0)
+
+    threading.Thread(target=_do_restart, daemon=True).start()
+    return jsonify({'status': 'ok'})

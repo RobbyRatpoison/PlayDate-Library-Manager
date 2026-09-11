@@ -5184,7 +5184,7 @@ async function _installCatalogPlugin(source, btn) {
         const d = await r.json();
         if (d.status === 'success') {
             btn.textContent = 'Installed — restart to activate';
-            document.getElementById('plugins-restart-notice').style.display = '';
+            _showPluginRestartNotice();
         } else {
             btn.disabled = false;
             btn.textContent = 'Install';
@@ -5220,7 +5220,7 @@ async function _doUninstallPlugin(id, gameCount) {
         if (d.status === 'success') {
             const row = document.getElementById(`plugin-row-${id}`);
             if (row) row.innerHTML = `<div style="font-size:0.85rem;color:#8f98a0;">${escHtml(id)} uninstalled.</div>`;
-            document.getElementById('plugins-restart-notice').style.display = '';
+            _showPluginRestartNotice();
         } else {
             alert(d.message || 'Uninstall failed.');
         }
@@ -5241,7 +5241,7 @@ async function _installPluginFromFile(input) {
         const d = await r.json();
         if (d.status === 'success') {
             _showPluginStatus(`${escHtml(d.name)} installed. Restart to load it.`, 'success');
-            document.getElementById('plugins-restart-notice').style.display = '';
+            _showPluginRestartNotice();
         } else {
             _showPluginStatus(d.message || 'Install failed.', 'error');
         }
@@ -5276,7 +5276,7 @@ async function _doGithubInstall(url) {
         const d = await r.json();
         if (d.status === 'success') {
             _showPluginStatus(`${escHtml(d.name)} (${escHtml(d.tag)}) installed. Restart to load it.`, 'success');
-            document.getElementById('plugins-restart-notice').style.display = '';
+            _showPluginRestartNotice();
         } else {
             _showPluginStatus(d.message || 'Install failed.', 'error');
         }
@@ -5293,10 +5293,49 @@ async function _installPluginFromGithub() {
     await _doGithubInstall(url);
 }
 
+// Shown only once a plugin has actually been installed/updated/uninstalled this
+// session -- there's nothing to restart for otherwise, and an always-present
+// restart button in this modal is an easy mis-click (more so on gamepad).
+function _showPluginRestartNotice() {
+    const el = document.getElementById('plugins-restart-notice');
+    if (el) el.style.display = 'flex';
+}
+
+async function _restartPlayDate(btn) {
+    if (btn) { btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none'; btn.textContent = 'Restarting…'; }
+    try {
+        await fetch('/api/restart', { method: 'POST' });
+    } catch (e) { /* the server exits mid-response; a fetch error here is expected */ }
+    document.body.innerHTML = '<div style="color:#c7d5e0;text-align:center;margin-top:20%;font-family:sans-serif;font-size:1.2rem;">Restarting PlayDate…<br><small>This window will reappear in a few seconds.</small></div>';
+}
+
+// Space out the api.github.com calls each plugin install makes so a bulk update
+// doesn't trip GitHub's unauthenticated secondary rate limit.
+const _PLUGIN_UPDATE_GAP_MS = 500;
+
+function _markPluginUpdating(id) {
+    const el = document.getElementById(`plugin-update-${id}`);
+    if (el) el.innerHTML = `<span style="font-size:0.75rem;color:#8f98a0;font-weight:400;margin-left:7px;">updating&hellip;</span>`;
+}
+
 async function _updatePlugin(id, source) {
-    const updateEl = document.getElementById(`plugin-update-${id}`);
-    if (updateEl) updateEl.innerHTML = `<span style="font-size:0.75rem;color:#8f98a0;font-weight:400;margin-left:7px;">updating&hellip;</span>`;
+    _markPluginUpdating(id);
     await _doGithubInstall(source.replace('github:', ''));
+    await _renderPluginsList();
+    _checkPluginUpdates();
+}
+
+async function _updateAllPlugins() {
+    const pending = (window._pendingPluginUpdates || []).filter(p => !p.requires_core && p.source);
+    if (!pending.length) return;
+    const btn = document.getElementById('plugin-update-all-btn');
+    if (btn) { btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none'; btn.textContent = 'Updating…'; }
+    for (let i = 0; i < pending.length; i++) {
+        _markPluginUpdating(pending[i].id);
+        await _doGithubInstall(pending[i].source.replace('github:', ''));
+        if (i < pending.length - 1) await new Promise(r => setTimeout(r, _PLUGIN_UPDATE_GAP_MS));
+    }
+    if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; }
     await _renderPluginsList();
     _checkPluginUpdates();
 }
@@ -5332,6 +5371,16 @@ async function _checkPluginUpdates() {
         }
         if (anyStandalone || anyGated) {
             document.getElementById('plugin-update-dot')?.style.setProperty('visibility', 'visible');
+        }
+        // "Update All" button: shown whenever >=1 plugin has a standalone
+        // (non-core-gated) update available.
+        const _uaBtn = document.getElementById('plugin-update-all-btn');
+        if (_uaBtn) {
+            const _n = window._pendingPluginUpdates.filter(p => !p.requires_core).length;
+            _uaBtn.style.display = _n ? '' : 'none';
+            _uaBtn.textContent = _n > 1 ? `Update All (${_n})` : 'Update Plugin';
+            _uaBtn.style.opacity = '';
+            _uaBtn.style.pointerEvents = '';
         }
         // The global hamburger dot only for updates the user can act on directly.
         // A gated plugin update is surfaced through the PlayDate-update prompt

@@ -553,6 +553,8 @@
                    onchange="_installPluginFromFile(this)">
             <button class="nav-btn" style="font-size:0.78rem;" data-modal-row="0"
                     onclick="_toggleGithubInput()">Install from GitHub</button>
+            <button class="nav-btn" id="plugin-update-all-btn" style="font-size:0.78rem;display:none;color:var(--accent);border-color:var(--accent);margin-left:auto;" data-modal-row="0"
+                    onclick="_updateAllPlugins()">Update All</button>
         </div>
         <div id="plugin-github-row" style="display:none;margin-bottom:12px;">
             <div style="display:flex;gap:8px;">
@@ -569,8 +571,10 @@
         <div id="plugin-catalog-section" style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
             <div id="plugin-catalog-body"></div>
         </div>
-        <div id="plugins-restart-notice" style="display:none; margin-top:16px; padding:10px 12px; background:rgba(255,165,0,0.12); border:1px solid rgba(255,165,0,0.35); border-radius:4px; font-size:0.82rem; color:#ffa500;">
-            Restart required for changes to take effect.
+        <div id="plugins-restart-notice" style="display:none; margin-top:16px; padding:10px 12px; background:rgba(255,165,0,0.12); border:1px solid rgba(255,165,0,0.35); border-radius:4px; font-size:0.82rem; color:#ffa500; align-items:center; justify-content:space-between; gap:12px;">
+            <span>Restart required for changes to take effect.</span>
+            <button class="nav-btn" id="plugins-restart-btn" style="font-size:0.78rem; flex-shrink:0; color:#ffa500; border-color:rgba(255,165,0,0.5);" data-modal-row="0"
+                    onclick="_restartPlayDate(this)">Restart Now</button>
         </div>
         </div>
     </div>

@@ -945,6 +945,10 @@
                     lines[i] = `${p.id}: failed (network error)`;
                 }
                 render();
+                // Space out GitHub requests -- each plugin install is 1-2 api.github.com
+                // calls, and the core check/download bracket this loop; a burst can trip
+                // GitHub's unauthenticated secondary rate limit.
+                if (i < pending.length - 1) await new Promise(r => setTimeout(r, 500));
             }
             await new Promise(r => setTimeout(r, 800)); // let the last line be readable before the takeover switches to the core update
             await _doInstallUpdate();
