@@ -24,6 +24,12 @@
         font-size: 1.1vh; font-weight: bold; letter-spacing: 1px;
         color: var(--accent); text-align: center; margin-bottom: 4px; flex-shrink: 0;
     }
+    /* Sizes/positions exactly like .shelf-grid used to on its own (flex:1;
+       min-height:0) -- .shelf-grid itself now just fills this via height:100%
+       so .shelf-scroll-hint overlays have a non-scrolling box to anchor to.
+       An overlay positioned on .shelf-grid directly would scroll away with
+       its own content, since it'd share the same scrolling box. */
+    .shelf-grid-wrap { flex: 1; min-height: 0; position: relative; }
     .shelf-grid {
         display: flex; flex-direction: row; flex-wrap: nowrap;
         /* Always start-aligned, never centered -- justify-content:center (even
@@ -37,7 +43,7 @@
            what's visible) now left-align rather than center -- a visible, but
            deliberate, tradeoff for reliability. */
         justify-content: flex-start; gap: 6px;
-        flex: 1; min-height: 0;
+        height: 100%;
         /* Horizontal scroll for pools bigger than what fits. When the pool
            is <= what's visible (the default) there's nothing to overflow,
            so this is a no-op and looks identical to the old overflow:visible. */
@@ -55,6 +61,22 @@
        Both animations compute already-card-aligned targets on their own, so
        nothing is lost by turning native snap off just for their duration. */
     .shelf-grid.no-snap { scroll-snap-type: none; }
+    /* Edge hint that a shelf scrolls further in that direction -- purely a
+       decorative affordance (pointer-events:none, no click behavior), toggled
+       by JS based on scroll position. A gradient-behind-a-glyph rather than a
+       full background-matching fade, since .shelf's own background is a
+       semi-transparent overlay composited over whatever's behind it (theme,
+       or a custom background image) and can't be matched reliably. */
+    .shelf-scroll-hint {
+        position: absolute; top: 0; bottom: 0; width: 26px;
+        display: none; align-items: center; justify-content: center;
+        pointer-events: none; z-index: 3;
+        font-size: 1rem; color: #fff; opacity: 0.75;
+    }
+    .shelf-scroll-hint.visible { display: flex; }
+    .shelf-scroll-hint.left  { left: 0;  background: linear-gradient(to left, transparent, rgba(0,0,0,0.45) 65%); }
+    .shelf-scroll-hint.right { right: 0; background: linear-gradient(to right, transparent, rgba(0,0,0,0.45) 65%); }
+    body.edit-mode .shelf-scroll-hint { display: none !important; }
     .shelf-capsule-wrap {
         flex-shrink: 0; height: 100%; aspect-ratio: 2/3;
         border-radius: 8px; cursor: pointer;
@@ -483,6 +505,7 @@
             {% elif shelf.label %}
             <div class="shelf-label" id="label-{{ shelf.id }}">{{ shelf.label }}</div>
             {% endif %}
+            <div class="shelf-grid-wrap">
             <div class="shelf-grid">
                 {% for game in shelf.games %}
                 <div class="shelf-capsule-wrap" data-appid="{{ game.appid }}" data-installed="{{ game.installed or 0 }}" data-name="{{ game.name | e }}" data-status="{{ game.completion_status or "" }}" data-platform="{{ game.platform or 'steam' }}" data-total-achievements="{{ game.total_achievements or 0 }}" data-unlocked-achievements="{{ game.unlocked_achievements or 0 }}" data-review-percentage="{{ game.review_percentage if game.review_percentage is not none else '' }}" data-weighted-percentage="{{ game.weighted_percentage if game.weighted_percentage is not none else '' }}" data-total-reviews="{{ game.total_reviews or 0 }}" data-hltb-main="{{ game.hltb_main or 0 }}" data-hltb-extras="{{ game.hltb_extras or 0 }}" data-hltb-completionist="{{ game.hltb_completionist or 0 }}" {{ 'ondblclick' if state.get('require_double_click_launch') else 'onclick' }}="launchGame({{ game.appid }})"{% if outline_colors is defined and outline_colors.get(game.appid | string) %} style="--outline-color:{{ outline_colors[game.appid | string] }}"{% endif %}>
@@ -494,6 +517,9 @@
                     </div>
                 </div>
                 {% endfor %}
+            </div>
+            <div class="shelf-scroll-hint left" aria-hidden="true">‹</div>
+            <div class="shelf-scroll-hint right" aria-hidden="true">›</div>
             </div>
             {% endif %}
         </div>
@@ -532,6 +558,7 @@
         {% if shelf.label %}<span class="shuffle-link" onclick="shuffleShelf('{{ shelf.id }}', this)">
             <div class="shelf-label" id="label-{{ shelf.id }}">{{ shelf.label }}</div>
         </span>{% endif %}
+        <div class="shelf-grid-wrap">
         <div class="shelf-grid">
             {% for game in shelf.games %}
             <div class="shelf-capsule-wrap" data-appid="{{ game.appid }}" data-installed="{{ game.installed or 0 }}" data-name="{{ game.name | e }}" data-status="{{ game.completion_status or "" }}" data-platform="{{ game.platform or 'steam' }}" data-total-achievements="{{ game.total_achievements or 0 }}" data-unlocked-achievements="{{ game.unlocked_achievements or 0 }}" data-review-percentage="{{ game.review_percentage if game.review_percentage is not none else '' }}" data-weighted-percentage="{{ game.weighted_percentage if game.weighted_percentage is not none else '' }}" data-total-reviews="{{ game.total_reviews or 0 }}" data-hltb-main="{{ game.hltb_main or 0 }}" data-hltb-extras="{{ game.hltb_extras or 0 }}" data-hltb-completionist="{{ game.hltb_completionist or 0 }}" {{ 'ondblclick' if state.get('require_double_click_launch') else 'onclick' }}="launchGame({{ game.appid }})"{% if outline_colors is defined and outline_colors.get(game.appid | string) %} style="--outline-color:{{ outline_colors[game.appid | string] }}"{% endif %}>
@@ -544,8 +571,12 @@
             </div>
             {% endfor %}
         </div>
+        <div class="shelf-scroll-hint left" aria-hidden="true">‹</div>
+        <div class="shelf-scroll-hint right" aria-hidden="true">›</div>
+        </div>
         {% else %}
         {% if shelf.label %}<div class="shelf-label" id="label-{{ shelf.id }}">{{ shelf.label }}</div>{% endif %}
+        <div class="shelf-grid-wrap">
         <div class="shelf-grid">
             {% for game in shelf.games %}
             <div class="shelf-capsule-wrap" data-appid="{{ game.appid }}" data-installed="{{ game.installed or 0 }}" data-name="{{ game.name | e }}" data-status="{{ game.completion_status or "" }}" data-platform="{{ game.platform or 'steam' }}" data-total-achievements="{{ game.total_achievements or 0 }}" data-unlocked-achievements="{{ game.unlocked_achievements or 0 }}" data-review-percentage="{{ game.review_percentage if game.review_percentage is not none else '' }}" data-weighted-percentage="{{ game.weighted_percentage if game.weighted_percentage is not none else '' }}" data-total-reviews="{{ game.total_reviews or 0 }}" data-hltb-main="{{ game.hltb_main or 0 }}" data-hltb-extras="{{ game.hltb_extras or 0 }}" data-hltb-completionist="{{ game.hltb_completionist or 0 }}" {{ 'ondblclick' if state.get('require_double_click_launch') else 'onclick' }}="launchGame({{ game.appid }})"{% if outline_colors is defined and outline_colors.get(game.appid | string) %} style="--outline-color:{{ outline_colors[game.appid | string] }}"{% endif %}>
@@ -557,6 +588,9 @@
                 </div>
             </div>
             {% endfor %}
+        </div>
+        <div class="shelf-scroll-hint left" aria-hidden="true">‹</div>
+        <div class="shelf-scroll-hint right" aria-hidden="true">›</div>
         </div>
         {% endif %}
     </div>
@@ -634,6 +668,8 @@ async function _reloadLastPlayedShelves() {
                 </div>`;
             }).join('');
             _observeShelfImages(grid);
+            grid.scrollLeft = 0;
+            _updateScrollHints(grid);
         } catch (_) {}
     }
 }
@@ -670,6 +706,8 @@ async function shuffleShelf(shelfId, labelEl) {
             </div>`;
         }).join('');
         _observeShelfImages(grid);
+        grid.scrollLeft = 0;
+        _updateScrollHints(grid);
     } finally {
         labelEl.style.opacity = '';
     }
@@ -856,6 +894,29 @@ function _observeShelfImages(root) {
 }
 window.addEventListener('load', () => _observeShelfImages(document));
 
+// Edge hints (see the .shelf-scroll-hint CSS) -- shown/hidden based on
+// current scroll position vs. how far the grid can actually scroll. A grid
+// element itself persists across shuffle/refill (only its children get
+// replaced), so the listener attached at load stays valid for the grid's
+// whole lifetime; content-replacing code just needs to call this once
+// afterward too, since scrollWidth can change without a 'scroll' event.
+function _updateScrollHints(grid) {
+    const wrap = grid.parentElement;
+    if (!wrap || !wrap.classList.contains('shelf-grid-wrap')) return;
+    const left  = wrap.querySelector(':scope > .shelf-scroll-hint.left');
+    const right = wrap.querySelector(':scope > .shelf-scroll-hint.right');
+    if (!left || !right) return;
+    const maxScroll = grid.scrollWidth - grid.clientWidth;
+    left.classList.toggle('visible', grid.scrollLeft > 1);
+    right.classList.toggle('visible', grid.scrollLeft < maxScroll - 1);
+}
+window.addEventListener('load', () => {
+    document.querySelectorAll('.shelf-grid').forEach(grid => {
+        _updateScrollHints(grid);
+        grid.addEventListener('scroll', () => _updateScrollHints(grid), { passive: true });
+    });
+});
+
 // Plain mice only send vertical wheel deltas -- convert those to horizontal
 // scroll over a shelf so it's reachable without a trackpad or gamepad.
 // Trackpads/shift-wheel already send real deltaX, which native scrolling
@@ -913,12 +974,16 @@ function computeFitCount(grid) {
 }
 
 // Redraw the completion/achievement pie widgets when their shelf resizes
-// (flex reflow from split-proportion changes, window resize, etc.)
+// (flex reflow from split-proportion changes, window resize, etc.) -- also
+// re-checks scroll hints, since a resize can change whether a grid overflows
+// at all without the grid itself ever firing a 'scroll' event.
 if (window.ResizeObserver) {
     const _pieObserver = new ResizeObserver(entries => {
         entries.forEach(e => {
             const pie = e.target.querySelector('.completion-pie-canvas, .achievement-pie-canvas');
             if (pie) requestAnimationFrame(drawCompletionPies);
+            const grid = e.target.querySelector('.shelf-grid');
+            if (grid) _updateScrollHints(grid);
         });
     });
     function _observeShelfContainers() {
@@ -1134,6 +1199,8 @@ async function _refillShelfGrid(shelfId, grid, limit) {
             </div>`;
         }).join('');
         _observeShelfImages(grid);
+        grid.scrollLeft = 0;
+        _updateScrollHints(grid);
     } catch (_) {}
 }
 
@@ -1820,7 +1887,7 @@ function _makeSplitSideEl(shelf) {
             </div>
         </div>
         <div class="shelf-label" id="label-${shelf.id}"></div>
-        <div class="shelf-grid"><span style="color:var(--text-secondary);font-size:0.8rem;margin:auto;">Set a query and save to populate</span></div>`;
+        <div class="shelf-grid-wrap"><div class="shelf-grid"><span style="color:var(--text-secondary);font-size:0.8rem;margin:auto;">Set a query and save to populate</span></div></div>`;
     return el;
 }
 
@@ -1913,7 +1980,7 @@ function addNewShelf() {
             </div>
         </div>
         <div class="shelf-label" id="label-${id}"></div>
-        <div class="shelf-grid"><span style="color:var(--text-secondary);font-size:0.8rem;margin:auto;">Set a query and save to populate</span></div>
+        <div class="shelf-grid-wrap"><div class="shelf-grid"><span style="color:var(--text-secondary);font-size:0.8rem;margin:auto;">Set a query and save to populate</span></div></div>
     `;
     container.appendChild(el);
     buildAllEditBars(); initDragAndDrop();
@@ -2275,6 +2342,7 @@ setInterval(async () => {
             if (key !== 'installed' && key !== 'not_installed') return;
             const grid = shelf.querySelector('.shelf-grid');
             if (!grid) return;
+            const totalBefore = grid.querySelectorAll('.shelf-capsule-wrap').length;
             let anyRemoved = false;
             grid.querySelectorAll('.shelf-capsule-wrap').forEach(el => {
                 const isInstalled = installedSet.has(el.dataset.appid);
@@ -2286,11 +2354,22 @@ setInterval(async () => {
                 if (!shelfId) return;
                 const presentAppids = Array.from(grid.querySelectorAll('.shelf-capsule-wrap'))
                     .map(el => parseInt(el.dataset.appid, 10));
+                // Only ask for enough new games to replace what was actually
+                // removed -- an unlimited pool is the one exception, where
+                // "enough" means every remaining match. Requesting the
+                // shelf's full configured limit here (as before) could
+                // return far more candidates than were freed and silently
+                // grow the shelf past its configured size every time
+                // anything got uninstalled (this is what caused a 7-game
+                // "installed" shelf to end up fetching 9).
+                const removedCount = totalBefore - presentAppids.length;
+                const shelfCfg = _shelves.find(s => s.id === shelfId);
+                const refillLimit = (shelfCfg && shelfCfg.limit === 0) ? 0 : removedCount;
                 try {
                     const res = await fetch(`/api/refill-shelf/${shelfId}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ exclude_appids: presentAppids })
+                        body: JSON.stringify({ exclude_appids: presentAppids, limit: refillLimit })
                     });
                     const data = await res.json();
                     if (data.status !== 'success' || !data.games.length) return;
@@ -2318,6 +2397,7 @@ setInterval(async () => {
                         grid.appendChild(wrap);
                     });
                     _observeShelfImages(grid);
+                    _updateScrollHints(grid);
                 } catch { /* silently ignore */ }
             }
         });
