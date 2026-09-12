@@ -1092,7 +1092,7 @@
                 if (d.status === 'done') {
                     clearInterval(poll);
                     box.textContent = 'Installed.';
-                    restartNotice.style.display = '';
+                    restartNotice.style.display = 'flex';
                 } else if (d.status === 'error') {
                     clearInterval(poll);
                     if (cb) cb.checked = !cb.checked;
@@ -1132,7 +1132,7 @@
             if (!checked) {
                 fetch('/api/qt-renderer/uninstall', { method: 'POST' }).catch(() => {});
                 box.style.display = 'none';
-                restartNotice.style.display = '';
+                restartNotice.style.display = 'flex';
                 return;
             }
             box.style.display = '';

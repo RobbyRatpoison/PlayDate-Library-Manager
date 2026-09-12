@@ -942,7 +942,11 @@
             </label>
             <div style="font-size:0.75rem; color:#8f98a0; margin-top:3px; padding:0 10px 8px 32px;">Fixes choppy library scrolling on NVIDIA + Wayland. Downloads ~250MB on first enable. Requires restart.</div>
             <div id="qt-renderer-status" style="display:none; margin:0 10px 8px; padding:8px 10px; border-radius:4px; font-size:0.8rem; background:rgba(91,192,222,0.12); border:1px solid rgba(91,192,222,0.35); color:#5bc0de;"></div>
-            <div id="qt-renderer-restart-notice" style="display:none; margin:0 10px 8px; padding:8px 10px; background:rgba(255,165,0,0.12); border:1px solid rgba(255,165,0,0.35); border-radius:4px; font-size:0.8rem; color:#ffa500;">Restart PlayDate for this change to take effect.</div>
+            <div id="qt-renderer-restart-notice" style="display:none; margin:0 10px 8px; padding:8px 10px; background:rgba(255,165,0,0.12); border:1px solid rgba(255,165,0,0.35); border-radius:4px; font-size:0.8rem; color:#ffa500; align-items:center; justify-content:space-between; gap:12px;">
+                <span>Restart PlayDate for this change to take effect.</span>
+                <button class="nav-btn" id="qt-renderer-restart-btn" style="font-size:0.78rem; flex-shrink:0; color:#ffa500; border-color:rgba(255,165,0,0.5);" data-modal-row="9"
+                        onclick="_restartPlayDate(this)">Restart Now</button>
+            </div>
         </div>
         {% endif %}
         <div class="hub-section">
