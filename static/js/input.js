@@ -829,14 +829,20 @@
     }
 
     // Returns the nearest scrollable overflow ancestor of el, or null.
-    function _scrollableAncestor(el) {
+    // With no axis, either direction counts (original behavior, still used by
+    // _nearestInDir's modal scoping below). Pass 'x' or 'y' to restrict the
+    // match to that axis only -- needed once a home shelf's own capsule row
+    // (overflow-x, from horizontal shelf scrolling) can sit between a focused
+    // capsule and the page's vertical scroller, which _animatedScrollIntoView
+    // (a pure scrollTop implementation) must not be handed by mistake.
+    function _scrollableAncestor(el, axis) {
         let p = el.parentElement;
         while (p && p !== document.body) {
             const { overflowY, overflowX } = getComputedStyle(p);
-            if (/(auto|scroll)/.test(overflowY + overflowX) &&
-                (p.scrollHeight > p.clientHeight || p.scrollWidth > p.clientWidth)) {
-                return p;
-            }
+            const scrollableX = /(auto|scroll)/.test(overflowX) && p.scrollWidth > p.clientWidth;
+            const scrollableY = /(auto|scroll)/.test(overflowY) && p.scrollHeight > p.clientHeight;
+            const matches = axis === 'x' ? scrollableX : axis === 'y' ? scrollableY : (scrollableX || scrollableY);
+            if (matches) return p;
             p = p.parentElement;
         }
         return null;
@@ -922,7 +928,11 @@
     // the library grid (window-level scroll) and list view's nested
     // #list-pane (its own overflow container) via _scrollableAncestor.
     function _animatedScrollIntoView(el, block) {
-        const container = _scrollableAncestor(el);
+        // Axis pinned to 'y' -- this function only ever drives scrollTop, so
+        // it must never be handed a horizontally-scrolling shelf-grid (see
+        // _scrollableAncestor's own comment). _animatedScrollIntoViewX below
+        // is the horizontal counterpart for that case.
+        const container = _scrollableAncestor(el, 'y');
         const DURATION = 350;
         const rect = el.getBoundingClientRect();
         let startPos, targetPos;
@@ -981,6 +991,45 @@
         requestAnimationFrame(step);
     }
 
+    // Horizontal counterpart to _animatedScrollIntoView, for capsules inside
+    // a scrollable home shelf (the only horizontally-scrolling container in
+    // the app). Always "nearest" -- there's no vertical-style 'center' mode
+    // here since capsule-by-capsule movement only ever needs to reveal the
+    // next/previous card, never re-center one that's already visible.
+    function _animatedScrollIntoViewX(el) {
+        const container = _scrollableAncestor(el, 'x');
+        if (!container) return;
+        const DURATION = 350;
+        const rect = el.getBoundingClientRect();
+        const cRect = container.getBoundingClientRect();
+        const startPos = container.scrollLeft;
+        let targetPos;
+        if (rect.left < cRect.left) {
+            targetPos = startPos + (rect.left - cRect.left);
+        } else if (rect.right > cRect.right) {
+            targetPos = startPos + (rect.right - cRect.right);
+        } else {
+            return;
+        }
+        targetPos = Math.max(0, targetPos);
+        const delta = targetPos - startPos;
+        if (Math.abs(delta) < 1) return;
+        // Suspend mandatory snap for the animation's duration -- it otherwise
+        // fights every one of these incremental scrollLeft writes (each looks
+        // like a completed scroll to the browser, which tries to snap-correct
+        // it immediately). See the .shelf-grid.no-snap CSS comment.
+        container.classList.add('no-snap');
+        const startTime = performance.now();
+        const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        function step(now) {
+            const t = Math.min(1, (now - startTime) / DURATION);
+            container.scrollLeft = startPos + delta * ease(t);
+            if (t < 1) requestAnimationFrame(step);
+            else container.classList.remove('no-snap');
+        }
+        requestAnimationFrame(step);
+    }
+
     function _syncFocus() {
         if (!_state.active) return;
 
@@ -1015,14 +1064,17 @@
                         const item = row.items[_state.col];
                         _applyFocus(item);
                         // _applyFocus() intentionally skips scrolling for home in
-                        // normal mode -- true for horizontal movement within a
-                        // shelf (each shelf clips via overflow, never scrolls),
-                        // but moving focus up/down *between* shelf rows can still
-                        // land on one off-screen with nothing bringing it into
-                        // view. Edit mode already has its own scrollBy handling
+                        // normal mode, so both axes are driven from here instead:
+                        // vertical for moving focus up/down *between* shelf rows
+                        // (can land one off-screen with nothing to bring it into
+                        // view), and horizontal for shelves whose pool is now
+                        // bigger than what's visible, where left/right movement
+                        // within the row can walk focus past the scrolled-in
+                        // edge. Edit mode already has its own scrollBy handling
                         // in _applyFocus(), so only add this for normal mode.
                         if (!document.body.classList.contains('edit-mode')) {
                             _animatedScrollIntoView(item, 'nearest');
+                            _animatedScrollIntoViewX(item);
                         }
                         break;
                     }

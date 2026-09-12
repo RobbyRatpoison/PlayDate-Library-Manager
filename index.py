@@ -168,7 +168,7 @@ def index():
             shelf_games[shelf['id']] = []
             continue
 
-        limit = int(shelf.get('limit', 10))
+        limit = int(shelf.get('limit', 10))  # 0 = unlimited pool, guarded below
         uses_dedup = shelf.get('dedup', True)
         try:
             rows = db.execute(
@@ -186,7 +186,7 @@ def index():
             games.append(game)
             if uses_dedup:
                 used_ids.add(game['appid'])
-            if len(games) >= limit:
+            if limit and len(games) >= limit:
                 break
         shelf_games[shelf['id']] = games
 
@@ -297,13 +297,15 @@ def shuffle_shelf(shelf_id):
             return jsonify({'status': 'error', 'message': 'Widget shelf'}), 400
 
         limit = shelf.get('limit', 10)
+        # 0 = unlimited pool; SQLite treats a negative LIMIT as "no limit".
+        sql_limit = limit if limit else -1
         db = get_db()
         rows = db.execute(
             f"SELECT appid, name, installed, completion_status, platform, "
             f"total_achievements, unlocked_achievements, review_percentage, weighted_percentage, total_reviews, "
             f"hltb_main, hltb_extras, hltb_completionist "
             f"FROM games WHERE {where} ORDER BY RANDOM() LIMIT ?",
-            (*params, limit)
+            (*params, sql_limit)
         ).fetchall()
         db.close()
         games = [_shelf_row_to_game(r) for r in rows]
@@ -340,8 +342,14 @@ def refill_shelf(shelf_id):
 
         # Optional client-supplied override -- lets the layout editor's live
         # drag-resize auto-adjust ask for more/fewer games than are currently
-        # saved, before the new limit has actually been persisted.
-        limit = max(1, min(200, int(data.get('limit') or shelf.get('limit', 10))))
+        # saved, before the new limit has actually been persisted. `or` can't
+        # be used here since a deliberate 0 (unlimited) is falsy too.
+        raw_limit = data.get('limit')
+        if raw_limit is None:
+            raw_limit = shelf.get('limit', 10)
+        limit = max(0, min(200, int(raw_limit)))
+        # 0 = unlimited pool; SQLite treats a negative LIMIT as "no limit".
+        sql_limit = limit if limit else -1
         _cols = ("appid, name, installed, completion_status, platform, "
                  "total_achievements, unlocked_achievements, review_percentage, weighted_percentage, total_reviews, "
                  "hltb_main, hltb_extras, hltb_completionist")
@@ -351,13 +359,13 @@ def refill_shelf(shelf_id):
             rows = db.execute(
                 f"SELECT {_cols} FROM games "
                 f"WHERE ({where}) AND appid NOT IN ({placeholders}) ORDER BY {order} LIMIT ?",
-                (*params, *exclude_appids, limit)
+                (*params, *exclude_appids, sql_limit)
             ).fetchall()
         else:
             rows = db.execute(
                 f"SELECT {_cols} FROM games "
                 f"WHERE {where} ORDER BY {order} LIMIT ?",
-                (*params, limit)
+                (*params, sql_limit)
             ).fetchall()
         db.close()
         games = [_shelf_row_to_game(r) for r in rows]
