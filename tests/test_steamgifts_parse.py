@@ -186,9 +186,17 @@ def test_classify_unmatched_offline_branches(monkeypatch):
     reason, base_appid, base_name = sg._classify_unmatched({'steam_ref': None}, None, {})
     assert 'gift card' in reason.lower()
     assert base_appid is None and base_name is None
-    # package whose apps we can see, none owned
+    # package whose apps we can see, none owned, none of them DLC either --
+    # cache entries so the package-DLC-scan loop below doesn't hit the
+    # network (it would otherwise try, fail, and sleep 1s per uncached app)
     monkeypatch.setattr(sg, '_package_apps', lambda sid, s: [10, 20])
-    reason, base_appid, base_name = sg._classify_unmatched({'steam_ref': 'sub/900'}, None, {})
+    cache = {
+        '10': {'ok': True, 'type': 'game', 'name': 'Some Game',
+               'fullgame_name': None, 'fullgame_appid': None},
+        '20': {'ok': True, 'type': 'game', 'name': 'Another Game',
+               'fullgame_name': None, 'fullgame_appid': None},
+    }
+    reason, base_appid, base_name = sg._classify_unmatched({'steam_ref': 'sub/900'}, None, cache)
     assert 'package' in reason.lower() and 'library' in reason.lower()
     assert base_appid is None and base_name is None
     # appdetails says DLC -> reason names the base game, plus its appid (from
@@ -206,6 +214,26 @@ def test_classify_unmatched_offline_branches(monkeypatch):
     reason, base_appid, base_name = sg._classify_unmatched({'steam_ref': 'app/888'}, None, cache)
     assert 'Delisted' in reason or 'removed' in reason
     assert base_appid is None and base_name is None
+
+
+def test_classify_unmatched_package_bundling_only_dlc(monkeypatch):
+    # A package (e.g. a "Story Pack"/season pass) that bundles only DLC
+    # appids, never a base game of its own -- those never show up as their
+    # own library row, so the plain membership check always misses even when
+    # the base game is owned. _classify_unmatched's package branch scans each
+    # bundled app's own `fullgame` field the same way a single-app DLC win
+    # does, so this can still offer "adopt base game" instead of a dead end.
+    monkeypatch.setattr(sg, '_package_apps', lambda sid, s: [501, 502])
+    cache = {
+        '501': {'ok': True, 'type': 'dlc', 'name': 'Story Pack Part 1',
+                'fullgame_name': 'Base Game', 'fullgame_appid': 100010},
+        '502': {'ok': True, 'type': 'dlc', 'name': 'Story Pack Part 2',
+                'fullgame_name': 'Base Game', 'fullgame_appid': 100010},
+    }
+    reason, base_appid, base_name = sg._classify_unmatched({'steam_ref': 'sub/900'}, None, cache)
+    assert reason == 'Steam package (DLC for Base Game)'
+    assert base_appid == 100010
+    assert base_name == 'Base Game'
 
 
 def test_pending_pass2_pages_targets_only_unknown_pages():

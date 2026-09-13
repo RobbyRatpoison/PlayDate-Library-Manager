@@ -414,6 +414,22 @@ def _classify_unmatched(rec: dict, session, cache: dict) -> tuple[str, int | Non
         apps = _package_apps(sid, session)
         if not apps:
             return 'Steam package could not be read (likely delisted)', None, None
+        # Some packages (e.g. a "Story Pack"/season pass) bundle only DLC
+        # appids, never the base game itself -- those never show up as their
+        # own library row, so the membership check above always misses even
+        # when the base game is owned. Check each app's `fullgame` field the
+        # same way a single-app DLC win does, so this can offer "adopt base
+        # game" too instead of a dead-end message.
+        for a in apps:
+            info = _appdetails_lite(a, session, cache)
+            if not info.get('ok'):
+                continue
+            t = (info.get('type') or '').lower()
+            base = info.get('fullgame_name')
+            if t and t != 'game' and base:
+                label = {'dlc': 'DLC', 'music': 'Soundtrack', 'demo': 'Demo',
+                         'application': 'Application'}.get(t, t.title())
+                return f'Steam package ({label} for {base})', info.get('fullgame_appid'), base
         return 'Steam package — none of its games are in your library', None, None
     info = _appdetails_lite(sid, session, cache)
     if info.get('error'):
