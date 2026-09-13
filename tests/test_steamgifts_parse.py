@@ -216,6 +216,46 @@ def test_classify_unmatched_offline_branches(monkeypatch):
     assert base_appid is None and base_name is None
 
 
+def test_appdetails_lite_refetches_pre_fullgame_appid_cache_entry(monkeypatch):
+    # A cache entry from before fullgame_appid tracking existed is missing
+    # that key entirely (not just null) -- confirmed live: every real
+    # persisted entry predated it, which silently blocked DLC-base-adopt for
+    # every DLC win whose appdetails had ever been queried before this fix,
+    # since the plain `key in cache` check treated the stale entry as a
+    # permanent hit and never re-fetched it.
+    cache = {'777': {'ok': True, 'type': 'dlc', 'name': 'X DLC', 'fullgame_name': 'Base Game'}}
+
+    class FakeResponse:
+        def json(self):
+            return {'777': {'success': True, 'data': {
+                'type': 'dlc', 'name': 'X DLC',
+                'fullgame': {'name': 'Base Game', 'appid': 100010},
+            }}}
+
+    class FakeSession:
+        def get(self, url, timeout=10):
+            return FakeResponse()
+
+    monkeypatch.setattr(sg.time, 'sleep', lambda s: None)
+    info = sg._appdetails_lite(777, FakeSession(), cache)
+    assert info['fullgame_appid'] == 100010
+    assert cache['777']['fullgame_appid'] == 100010
+
+
+def test_appdetails_lite_keeps_fresh_cache_entry(monkeypatch):
+    # A cache entry that already carries fullgame_appid (even as None) must
+    # NOT be refetched -- this is the whole point of the cache.
+    cache = {'777': {'ok': True, 'type': 'dlc', 'name': 'X DLC',
+                      'fullgame_name': 'Base Game', 'fullgame_appid': 100010}}
+
+    class ExplodingSession:
+        def get(self, url, timeout=10):
+            raise AssertionError('should not be called for a fresh cache entry')
+
+    info = sg._appdetails_lite(777, ExplodingSession(), cache)
+    assert info['fullgame_appid'] == 100010
+
+
 def test_classify_unmatched_package_bundling_only_dlc(monkeypatch):
     # A package (e.g. a "Story Pack"/season pass) that bundles only DLC
     # appids, never a base game of its own -- those never show up as their

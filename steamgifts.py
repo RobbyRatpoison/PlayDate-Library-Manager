@@ -367,7 +367,15 @@ def _appdetails_lite(appid: int, session, cache: dict) -> dict:
     didn't match. Returns {ok, type, name, fullgame_name, fullgame_appid};
     ok=False means the store page is gone (delisted/removed)."""
     key = str(appid)
-    if key in cache:
+    # 'fullgame_appid' in the cached entry, not just key in cache -- this
+    # cache is persisted in the wins file indefinitely, so an entry cached
+    # before fullgame_appid tracking existed would otherwise short-circuit
+    # forever and never pick up the new field (confirmed live: 14 of 14 real
+    # entries predated it, which is why DLC-base-adopt silently never showed
+    # up except for a package whose bundled apps had never been queried
+    # before at all). Self-heals on the next call for each stale key instead
+    # of needing a one-off migration pass.
+    if key in cache and 'fullgame_appid' in cache[key]:
         return cache[key]
     out = {'ok': False, 'type': None, 'name': None,
            'fullgame_name': None, 'fullgame_appid': None}
