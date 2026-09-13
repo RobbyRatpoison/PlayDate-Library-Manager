@@ -29,6 +29,7 @@ SORT_COLUMNS = {
     "achievement_percent":   "Achievement %",
     "achievement_remaining": "Achievements Remaining",
     "total_reviews":       "Total Reviews",
+    "tag_similarity":      "Tag Similarity",
     "RANDOM()":            "Random",
 }
 

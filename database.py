@@ -150,6 +150,7 @@ def init_db():
         'duplicate_of': 'TEXT',          # appid of preferred version of this game (e.g. Steam appid for a GOG duplicate); NULL = canonical
         'duplicate_auto': 'INT',         # 1 = set by auto-detection; 0/NULL = manually set
         'name_from_store': 'INT',        # 1 = name confirmed from Steam store API; 0/NULL = from GetOwnedGames or local files
+        'tag_similarity': 'REAL',        # Cosine similarity to the Beaten/Completed taste profile; see recalculate_tag_similarity()
     }
 
     for column_name, column_type in required_columns.items():
@@ -416,3 +417,57 @@ def refresh_duplicate_detection():
     count = auto_detect_duplicates(platform_priority=priority)
     invalidate_dup_cache()
     return count
+
+
+def recalculate_tag_similarity():
+    """Recompute the tag_similarity column for every game, scoring each one's
+    cosine similarity against the same playtime-weighted taste profile Pick 6
+    builds from Beaten/Completed games (same fallback too: top-50-most-played
+    if nothing is marked Beaten/Completed yet). Duplicated from pick.py's own
+    tag_similarity() rather than shared -- that one is a request-scoped
+    closure over an already-filtered candidate pool with no DB writes, this
+    one is a whole-library recompute-and-persist pass, so sharing would mean
+    threading a cache-vs-live-request distinction through both call sites.
+
+    Cheap enough (~130ms even at 30,000 games, measured) to just run inline
+    on every call -- no daemon-thread/cancellation machinery needed the way
+    bulk_rescrape_games() needs it. Returns the number of games scored.
+    """
+    conn = get_db()
+    try:
+        profile_rows = conn.execute(
+            "SELECT tags, playtime_forever FROM games "
+            "WHERE completion_status IN ('Beaten', 'Completed') "
+            "AND tags IS NOT NULL AND tags != ''"
+        ).fetchall()
+        if not profile_rows:
+            profile_rows = conn.execute(
+                "SELECT tags, playtime_forever FROM games "
+                "WHERE tags IS NOT NULL AND tags != '' "
+                "ORDER BY playtime_forever DESC LIMIT 50"
+            ).fetchall()
+
+        tag_weights: dict[str, float] = {}
+        for row in profile_rows:
+            weight = max(float(row['playtime_forever'] or 0), 1.0)
+            for tag in [t.strip() for t in (row['tags'] or '').split(',') if t.strip()]:
+                tag_weights[tag] = tag_weights.get(tag, 0.0) + weight
+        profile_norm = sum(v * v for v in tag_weights.values()) ** 0.5 or 1.0
+
+        rows = conn.execute("SELECT appid, tags FROM games").fetchall()
+        updates = []
+        for row in rows:
+            candidate_tags = [t.strip() for t in (row['tags'] or '').split(',') if t.strip()]
+            if not candidate_tags:
+                sim = 0.0
+            else:
+                dot    = sum(tag_weights.get(t, 0.0) for t in candidate_tags)
+                c_norm = len(candidate_tags) ** 0.5
+                sim    = dot / (profile_norm * c_norm) if (profile_norm * c_norm) else 0.0
+            updates.append((sim, row['appid']))
+
+        conn.executemany("UPDATE games SET tag_similarity = ? WHERE appid = ?", updates)
+        conn.commit()
+        return len(updates)
+    finally:
+        conn.close()

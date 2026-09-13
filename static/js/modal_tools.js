@@ -5508,6 +5508,18 @@ async function detectDuplicates() {
         status.textContent = '✘ Error: ' + e.message;
     }
 }
+
+async function recalculateTagSimilarity() {
+    const status = document.getElementById('tag-similarity-status');
+    status.textContent = 'Recalculating…';
+    try {
+        const r = await fetch('/api/recalculate-tag-similarity', { method: 'POST' });
+        const d = await r.json();
+        status.textContent = r.ok ? `${d.scored ?? 0} games scored` : '✘ Recalculation failed';
+    } catch (e) {
+        status.textContent = '✘ Error: ' + e.message;
+    }
+}
 async function runPopSync(confirmCleanup) {
     const status = document.getElementById('pop-sync-status');
     status.textContent = confirmCleanup === undefined ? 'Syncing…' : 'Updating…';

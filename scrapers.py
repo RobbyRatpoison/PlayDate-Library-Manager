@@ -2251,6 +2251,14 @@ def bulk_rescrape_games(appids, cancel_event, progress_cb):
     except Exception as e:
         log.error(f"[bulk_rescrape] duplicate auto-detection failed: {e}")
 
+    # A rescrape refreshes tag data for every game it touched.
+    try:
+        from database import recalculate_tag_similarity
+        n = recalculate_tag_similarity()
+        log.info(f"[bulk_rescrape] tag similarity recalculated: {n} games scored")
+    except Exception as e:
+        log.error(f"[bulk_rescrape] tag similarity recalculation failed: {e}")
+
     counts['aborted'] = backoff.aborted
     return counts
 

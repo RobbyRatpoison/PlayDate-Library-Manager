@@ -764,6 +764,14 @@
             </div>
             <button class="settings-item" data-modal-row="26" onclick="openHltbModal()">HLTB Data</button>
         </div>
+        <div class="hub-section">
+            <div class="hub-section-label">Tag Similarity</div>
+            <div style="padding:8px 10px;">
+                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Scores every game by tag similarity to your Beaten/Completed games (the same taste profile Pick 6 uses), so it can be used as a sort option in Library and Home. Recalculates automatically after a sync, rescrape, or a relevant edit — this forces it right away.</div>
+                <button class="nav-btn" style="font-size:0.8rem;" data-modal-row="27" onclick="recalculateTagSimilarity()">Recalculate Now</button>
+                <div id="tag-similarity-status" style="font-size:0.78rem; color:#8f98a0; margin-top:4px; min-height:1em;"></div>
+            </div>
+        </div>
         </div>
     </div>
 </div>

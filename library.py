@@ -96,6 +96,7 @@ SAFE_COLUMNS = frozenset({
     'protondb_tier', 'protondb_confidence',
     'hltb_main', 'hltb_extras', 'hltb_completionist',
     'platform', 'platform_id', 'duplicate_of',
+    'tag_similarity',
 })
 
 # Columns the bulk-edit route is allowed to write. A frozenset of literals so
@@ -141,6 +142,12 @@ VIRTUAL_SORT_COLS = {
     'hltb_max': _HLTB_MAX_EXPR,
     'achievement_percent': _ACHIEVEMENT_PERCENT_EXPR,
     'achievement_remaining': _ACHIEVEMENT_REMAINING_EXPR,
+    # Bare column, not NULLIF(tag_similarity, 0) -- 0.0 is a real "no tag
+    # overlap" score here, unlike HLTB's 0 which means "no data at all".
+    # Still routed through here (rather than left as a plain SAFE_COLUMNS
+    # sort) so an unscored game (NULL, before the first recalculation) sorts
+    # last regardless of direction instead of ASC dumping it first.
+    'tag_similarity': 'tag_similarity',
 }
 
 import re as _re
@@ -577,6 +584,13 @@ def update_game():
                 data.setdefault('steam_appid', None)
         update_game_data(appid, **data)
         invalidate_unique_cache()
+        # Either this game's own tags changed, or its completion_status may
+        # have moved it into/out of the Beaten/Completed taste profile --
+        # either way every game's tag_similarity score is now stale. Cheap
+        # enough (~130ms even at 30k games) to just do inline.
+        if 'tags' in data or 'completion_status' in data:
+            from database import recalculate_tag_similarity
+            recalculate_tag_similarity()
         if 'groups' in data:
             _track_manual_groups(int(appid), old_groups_str, data['groups'] or '')
         db = get_db()
@@ -617,6 +631,10 @@ def bulk_edit_games(data):
 
     if column not in _BULK_EDIT_COLUMNS:
         return jsonify({"status": "error", "message": "Column is not editable."}), 400
+    # Either changes tags directly or can move games into/out of the
+    # Beaten/Completed taste profile -- either way tag_similarity is stale
+    # for the whole library, not just the edited rows.
+    needs_tag_resim = column in ('tags', 'completion_status')
     if not value and mode not in ('replace', 'remove'):
         return jsonify({"status": "error", "message": "Value cannot be empty."}), 400
 
@@ -678,6 +696,9 @@ def bulk_edit_games(data):
                 updated = db.execute("SELECT changes()").fetchone()[0]
                 db.commit()
                 db.close()
+            if needs_tag_resim:
+                from database import recalculate_tag_similarity
+                recalculate_tag_similarity()
             return jsonify({"status": "success", "updated": updated})
 
         elif mode == 'append':
@@ -703,6 +724,9 @@ def bulk_edit_games(data):
                     updated += 1
             db.commit()
             db.close()
+            if needs_tag_resim:
+                from database import recalculate_tag_similarity
+                recalculate_tag_similarity()
             return jsonify({"status": "success", "updated": updated})
 
         elif mode == 'remove':
@@ -722,6 +746,9 @@ def bulk_edit_games(data):
                     updated += 1
             db.commit()
             db.close()
+            if needs_tag_resim:
+                from database import recalculate_tag_similarity
+                recalculate_tag_similarity()
             return jsonify({"status": "success", "updated": updated})
 
         db.close()
@@ -1754,6 +1781,16 @@ def detect_duplicates():
         return jsonify({'status': 'ok', 'detected': count})
     except Exception as e:
         log.error(f"detect-duplicates failed: {e}", exc_info=True)
+        return api_error('Something went wrong on the server. Check playdate.log for details.', 500, exc=e)
+
+@library_bp.route('/api/recalculate-tag-similarity', methods=['POST'])
+def recalculate_tag_similarity_route():
+    try:
+        from database import recalculate_tag_similarity
+        count = recalculate_tag_similarity()
+        return jsonify({'status': 'ok', 'scored': count})
+    except Exception as e:
+        log.error(f"recalculate-tag-similarity failed: {e}", exc_info=True)
         return api_error('Something went wrong on the server. Check playdate.log for details.', 500, exc=e)
 
 

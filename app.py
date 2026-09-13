@@ -425,6 +425,12 @@ def create_app(template_folder=None, static_folder=None):
                 log.info("Duplicate auto-detection after populate: %d hidden", n)
             except Exception:
                 log.exception("Duplicate auto-detection after populate failed")
+            try:
+                from database import recalculate_tag_similarity
+                n = recalculate_tag_similarity()
+                log.info("Tag similarity recalculated after populate: %d games scored", n)
+            except Exception:
+                log.exception("Tag similarity recalculation after populate failed")
         return jsonify(result)
 
     @app.route('/api/cancel-populate', methods=['POST'])

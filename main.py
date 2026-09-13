@@ -1603,6 +1603,15 @@ if __name__ == '__main__':
             log.info(f"Duplicate auto-detection on startup: {n} hidden")
         except Exception as e:
             log.warning(f"Startup duplicate auto-detection failed: {e}")
+        # Picks up any completion_status/tags changes from a previous session
+        # (e.g. a plugin sync's games, or achievement-sweep promotions) that
+        # would otherwise leave tag_similarity stale until the next edit/sync.
+        try:
+            from database import recalculate_tag_similarity
+            n = recalculate_tag_similarity()
+            log.info(f"Tag similarity recalculated on startup: {n} games scored")
+        except Exception as e:
+            log.warning(f"Startup tag similarity recalculation failed: {e}")
 
     threading.Thread(target=_run_plugin_on_startup, daemon=True).start()
 
