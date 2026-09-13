@@ -140,6 +140,35 @@ def test_merge_keeps_resolved_appid_on_refresh():
     assert next(w for w in store['wins'] if w['code'] == 'AAAA1')['appid'] == 100010
 
 
+def test_full_refresh_tags_seen_records_not_stale_ones():
+    # Regression for github.com/RobbyRatpoison/PlayDate-Library-Manager/issues/3:
+    # merge_public_page() only ever adds/updates by key, so a bad record (e.g.
+    # scraped once under a mistyped username) used to persist in the wins file
+    # forever with no way to ever remove it. apply_wins() now drops anything a
+    # full_refresh run didn't re-confirm; this only checks the tagging half
+    # that decision depends on (apply_wins itself needs a live DB).
+    store = {'version': 1, 'wins': []}
+    stale = {'code': 'ZZZZZ', 'name': 'Bogus Game', 'steam_ref': 'app/999999',
+             'won_ts': 1, 'gifter': 'nobody', 'points': 1, 'received': True,
+             'appid': None}
+    store['wins'].append(stale)
+
+    p1 = sg.parse_won_public(_fx('won_public_page1.html'))
+    sg.merge_public_page(store, p1['wins'], full_refresh=True)
+
+    stale_rec = next(w for w in store['wins'] if w['code'] == 'ZZZZZ')
+    assert '_seen_this_run' not in stale_rec
+    touched_rec = next(w for w in store['wins'] if w['code'] == 'AAAA1')
+    assert touched_rec.get('_seen_this_run') is True
+
+
+def test_incremental_merge_never_tags_seen_this_run():
+    store = {'version': 1, 'wins': []}
+    p1 = sg.parse_won_public(_fx('won_public_page1.html'))
+    sg.merge_public_page(store, p1['wins'])  # full_refresh defaults to False
+    assert all('_seen_this_run' not in w for w in store['wins'])
+
+
 def test_resolve_ref_parses_stored_slashless_format():
     # steam_ref is stored as "app/N" / "sub/N" (no leading slash); the resolver
     # must parse that form, not re-run a URL regex against it.

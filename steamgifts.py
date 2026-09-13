@@ -252,8 +252,17 @@ def _win_key(rec: dict):
     return ('anon', rec.get('steam_ref'), rec.get('won_ts'))
 
 
-def merge_public_page(store: dict, parsed_wins: list) -> tuple[int, int]:
-    """Merge one public page into the store. Returns (new, changed)."""
+def merge_public_page(store: dict, parsed_wins: list, *, full_refresh: bool = False) -> tuple[int, int]:
+    """Merge one public page into the store. Returns (new, changed).
+
+    On a full refresh, every record this page actually re-confirms gets
+    tagged `_seen_this_run` -- apply_wins() uses that to drop anything that
+    used to be in the file but is no longer part of the account's real won
+    list at all (e.g. it was scraped once under a mistyped username, or the
+    win's page later disappeared). A plain incremental sync never sees every
+    page (it stops at the first already-known page), so it can't tell "not
+    seen this run" apart from "just wasn't re-scanned" -- only full_refresh's
+    exhaustive scan makes that distinction safe to act on."""
     index = {_win_key(w): w for w in store['wins']}
     new = changed = 0
     for rec in parsed_wins:
@@ -261,6 +270,8 @@ def merge_public_page(store: dict, parsed_wins: list) -> tuple[int, int]:
         cur = index.get(k)
         if cur is None:
             rec.setdefault('appid', None)
+            if full_refresh:
+                rec['_seen_this_run'] = True
             store['wins'].append(rec)
             index[k] = rec
             new += 1
@@ -273,6 +284,8 @@ def merge_public_page(store: dict, parsed_wins: list) -> tuple[int, int]:
             'won_ts': rec['won_ts'], 'gifter': rec['gifter'],
             'points': rec['points'], 'received': rec['received'],
         })
+        if full_refresh:
+            cur['_seen_this_run'] = True
         if (cur.get('received'), cur.get('gifter'), cur.get('points')) != before:
             changed += 1
     return new, changed
@@ -422,7 +435,19 @@ def apply_wins(store: dict, *, full_refresh: bool) -> dict:
     """Resolve refs to appids and write the "Won on SteamGifts" group for every
     game with at least one *received* win. Additive unless full_refresh, which
     also prunes games this source added that no longer qualify (respecting
-    other group sources via gs_is_protected)."""
+    other group sources via gs_is_protected), AND drops any win record the
+    scan didn't re-confirm this run -- e.g. one scraped once under a mistyped
+    username, or whose giveaway page no longer shows up at all. A plain
+    incremental sync stops at the first already-known page, so it can't tell
+    "gone for real" apart from "just not re-scanned"; only full_refresh's
+    exhaustive scan (see merge_public_page's _seen_this_run tag) makes that
+    call safely. Without this, a bad record was permanent -- merge_public_page
+    only ever adds/updates by key, it never had a removal path at all."""
+    if full_refresh:
+        store['wins'] = [w for w in store['wins'] if w.get('_seen_this_run')]
+        for w in store['wins']:
+            w.pop('_seen_this_run', None)
+
     session = requests.Session()
     session.headers['User-Agent'] = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
 
@@ -581,7 +606,8 @@ def sg_page():
 
     if phase == 'public':
         parsed = parse_won_public(html)
-        new, changed = merge_public_page(store, parsed['wins'])
+        new, changed = merge_public_page(store, parsed['wins'],
+                                          full_refresh=bool(_sg_state.get('full_refresh')))
         store['last_sync_public'] = _now_iso()
         if parsed['total']:
             store['total'] = parsed['total']
