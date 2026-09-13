@@ -154,26 +154,33 @@ def pick_game():
                 "ORDER BY playtime_forever DESC LIMIT 50"
             ).fetchall()
 
-        # "Won't Play" is this project's explicit terrible/broken marker (never
-        # just "not interested"), so its tags are a real negative signal, not
-        # noise -- see database.recalculate_tag_similarity() for the same
-        # formula, shared in spirit though not in code (that one persists a
-        # whole-library column; this one is a request-scoped closure over an
-        # already-filtered candidate pool).
-        disliked_rows = db.execute(
-            "SELECT tags FROM games WHERE completion_status = \"Won't Play\" "
-            "AND platform = 'steam' AND tags IS NOT NULL AND tags != ''"
+        # Whole-Steam-library baseline for the negative side, not just "Won't
+        # Play" -- a tag you finish proportionally *less* than it shows up in
+        # your library at all is a real avoidance signal, whether that's
+        # active dislike or just a genre that never rises out of the backlog.
+        # An earlier version used "Won't Play" (this project's explicit
+        # terrible/broken marker) as the sole negative pool instead; live
+        # comparison found both independently surfaced the same core pattern,
+        # but this version was judged to track actual avoided tags more
+        # strongly, and doesn't depend on there being enough "Won't Play"
+        # games to form a pool at all. See database.recalculate_tag_similarity()
+        # for the same formula, shared in spirit though not in code (that one
+        # persists a whole-library column; this one is a request-scoped
+        # closure over an already-filtered candidate pool).
+        library_rows = db.execute(
+            "SELECT tags FROM games WHERE platform = 'steam' AND tags IS NOT NULL AND tags != ''"
         ).fetchall()
 
         db.close()
 
         def _tag_pool_rate(rows):
             """{tag: fraction of these rows carrying it}. A tag common to both
-            the liked and disliked pools cancels toward neutral on its own --
-            no separate IDF/rarity correction needed, unlike the playtime-
-            weighted-sum approach this replaced, where ubiquitous tags like
-            'Action' or 'Singleplayer' dominated every score regardless of
-            whether they said anything distinctive about taste."""
+            the liked and library-wide pools cancels toward neutral on its
+            own -- no separate IDF/rarity correction needed, unlike the
+            playtime-weighted-sum approach this replaced, where ubiquitous
+            tags like 'Action' or 'Singleplayer' dominated every score
+            regardless of whether they said anything distinctive about
+            taste."""
             n = len(rows)
             if not n:
                 return {}
@@ -184,9 +191,18 @@ def pick_game():
             return {t: c / n for t, c in counts.items()}
 
         liked_rate = _tag_pool_rate(liked_rows)
-        disliked_rate = _tag_pool_rate(disliked_rows)
-        tag_affinity = {t: liked_rate.get(t, 0.0) - disliked_rate.get(t, 0.0)
-                        for t in set(liked_rate) | set(disliked_rate)}
+        library_rate = _tag_pool_rate(library_rows)
+        # A tag in only a handful of library games can swing wildly on one or
+        # two data points -- not enough sample to trust either direction, so
+        # it's excluded rather than treated as a real signal (falls back to
+        # 0.0/neutral wherever it's looked up, same as an unknown tag).
+        MIN_LIBRARY_RATE = 0.02
+        library_rate = {t: r for t, r in library_rate.items() if r >= MIN_LIBRARY_RATE}
+        # Iterate library_rate's (already-filtered) keys only, not the union
+        # with liked_rate -- a tag the floor above excluded must default to a
+        # clean 0.0/neutral affinity, not fall through to whatever its
+        # unfiltered liked_rate alone happens to be.
+        tag_affinity = {t: liked_rate.get(t, 0.0) - library_rate[t] for t in library_rate}
 
         # Smoothing pseudo-count: without it, a game with one strongly-liked
         # tag and nothing else beats one with several matching tags, purely

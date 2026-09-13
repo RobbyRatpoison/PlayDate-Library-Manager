@@ -421,22 +421,32 @@ def refresh_duplicate_detection():
 
 def recalculate_tag_similarity():
     """Recompute the tag_similarity column for every game against a
-    liked-minus-disliked tag affinity profile, same formula as pick.py's own
+    liked-vs-library tag affinity profile, same formula as pick.py's own
     tag_similarity() (duplicated rather than shared -- that one is a request-
     scoped closure over an already-filtered candidate pool with no DB writes,
     this one is a whole-library recompute-and-persist pass, so sharing would
     mean threading a cache-vs-live-request distinction through both call
-    sites). For each tag, `affinity = liked_rate - disliked_rate` (fraction of
-    the Beaten/Completed pool carrying it, minus fraction of the "Won't Play"
-    pool carrying it -- "Won't Play" is this project's explicit terrible/
-    broken marker, never just "not interested", so it's a real negative
-    signal). A tag common to both pools cancels toward neutral on its own, no
+    sites). For each tag, `affinity = liked_rate - library_rate` (fraction of
+    the Beaten/Completed pool carrying it, minus fraction of the whole Steam
+    library carrying it) -- a tag you finish proportionally *more* than it
+    shows up in your library at all is a real preference; one you finish
+    proportionally *less* than its library presence is a real avoidance,
+    whether that's active dislike or just a genre that never rises out of the
+    backlog. A tag common to both pools cancels toward neutral on its own, no
     separate IDF/rarity correction needed -- unlike the old playtime-weighted-
     sum approach this replaced, where ubiquitous tags like "Action" or
     "Singleplayer" dominated every score regardless of whether they said
     anything distinctive about taste (confirmed live against a real 548-game
     profile: those two tags alone carried 35-40% of the old profile vector's
     total magnitude).
+
+    An earlier version of this formula used "Won't Play" (this project's
+    explicit terrible/broken marker) as the negative pool instead of the whole
+    library. Replaced after live comparison: both independently surfaced the
+    same core pattern (confirming it's real signal, not an artifact of
+    either method), but the library-wide version was judged to track actual
+    avoided tags more strongly, and doesn't depend on there being enough
+    "Won't Play" games to form a pool at all.
 
     Unlike pick.py's version, this one keeps the raw signed score rather than
     rescaling to [0,1] -- there's no downstream `1.0 - s` direction-flip
@@ -475,15 +485,23 @@ def recalculate_tag_similarity():
                 "WHERE platform = 'steam' AND tags IS NOT NULL AND tags != '' "
                 "ORDER BY playtime_forever DESC LIMIT 50"
             ).fetchall()
-        disliked_rows = conn.execute(
-            "SELECT tags FROM games WHERE completion_status = \"Won't Play\" "
-            "AND platform = 'steam' AND tags IS NOT NULL AND tags != ''"
+        library_rows = conn.execute(
+            "SELECT tags FROM games WHERE platform = 'steam' AND tags IS NOT NULL AND tags != ''"
         ).fetchall()
 
         liked_rate = _tag_pool_rate(liked_rows)
-        disliked_rate = _tag_pool_rate(disliked_rows)
-        tag_affinity = {t: liked_rate.get(t, 0.0) - disliked_rate.get(t, 0.0)
-                        for t in set(liked_rate) | set(disliked_rate)}
+        library_rate = _tag_pool_rate(library_rows)
+        # A tag in only a handful of library games can swing wildly on one or
+        # two data points -- not enough sample to trust either direction, so
+        # it's excluded rather than treated as a real signal (falls back to
+        # 0.0/neutral wherever it's looked up, same as an unknown tag).
+        MIN_LIBRARY_RATE = 0.02
+        library_rate = {t: r for t, r in library_rate.items() if r >= MIN_LIBRARY_RATE}
+        # Iterate library_rate's (already-filtered) keys only, not the union
+        # with liked_rate -- a tag the floor above excluded must default to a
+        # clean 0.0/neutral affinity, not fall through to whatever its
+        # unfiltered liked_rate alone happens to be.
+        tag_affinity = {t: liked_rate.get(t, 0.0) - library_rate[t] for t in library_rate}
 
         # Smoothing pseudo-count: without it, a game with one strongly-liked
         # tag and nothing else beats one with several matching tags, purely
