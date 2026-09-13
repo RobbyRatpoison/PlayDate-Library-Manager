@@ -18,6 +18,7 @@
 - Duplicate games are now hidden automatically after a library sync.
 - Duplicate games can now be linked even if the game is not owned on Steam.
 - Switching renderers also offers a direct restart, instead of just a reminder to do it yourself.
+- Improved "Tag Similarity" formula to weigh common tags less strongly and treat tags rare among your finished games as disliked.
 
 ### Fixes
 
