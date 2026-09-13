@@ -1545,9 +1545,21 @@ const achLink = document.getElementById('achievements-link');
     }
 
     function _pagLabel(pool, game, sgGroup) {
-        if (pool === 'wins') return '(win)';
+        // sg_dlc_win: this game's SG win group membership traces only to an
+        // adopted DLC win, not a direct win of the base game -- PAGYWOSG
+        // requires mentioning that when logging the win, so mark it here
+        // rather than at each call site. See _pagDlcNoteHtml for the footnote.
+        const winLabel = game && game.sg_dlc_win ? '(win)*' : '(win)';
+        if (pool === 'wins') return winLabel;
         if (!sgGroup) return '(backlog)';
-        return _pagCsvContains(game.groups, sgGroup) ? '(win)' : '(backlog)';
+        return _pagCsvContains(game.groups, sgGroup) ? winLabel : '(backlog)';
+    }
+
+    function _pagDlcNoteHtml(results) {
+        if (!results.some(r => r.label && r.label.endsWith('*'))) return '';
+        return `<div style="margin-top:6px; padding-top:6px; border-top:1px solid var(--border); color:var(--text-secondary); font-size:0.72rem;">
+            * Won via a DLC, not the base game itself — mention that when logging this win on SteamGifts.
+        </div>`;
     }
 
     function _pagExtractConds(tree) {
@@ -2137,22 +2149,23 @@ const achLink = document.getElementById('achievements-link');
     }
 
     function _pagQualResultsHtml(results) {
-        return results.length
-            ? results.map(r => {
-                const sgu = (_serverSgUsername || '').toLowerCase();
-                // verifiers is only ever set on mod-verified entries — gate on r.verified
-                // so auto-classified (non-verified) results don't crash on undefined.
-                const isSelf = r.verified && sgu && r.verifiers.some(v => v.toLowerCase() === sgu);
-                const verifText = r.verified
-                    ? ` — mod verified${r.verifiers.length ? (isSelf ? ' — already submitted' : ` — see ${escHtml(r.verifiers[0])}'s entry`) : ''}`
-                    : '';
-                return `<div style="color:var(--text-primary);">
-                    <span style="color:var(--accent-positive);">&#x2713;</span>
-                    ${escHtml(r.desc)}
-                    <span style="color:var(--text-secondary); font-size:0.76rem;">${escHtml(r.label)}${verifText}</span>
-                </div>`;
-            }).join('')
-            : `<div style="color:var(--text-secondary);">No qualifying categories found for this game.</div>`;
+        if (!results.length)
+            return `<div style="color:var(--text-secondary);">No qualifying categories found for this game.</div>`;
+        const rows = results.map(r => {
+            const sgu = (_serverSgUsername || '').toLowerCase();
+            // verifiers is only ever set on mod-verified entries — gate on r.verified
+            // so auto-classified (non-verified) results don't crash on undefined.
+            const isSelf = r.verified && sgu && r.verifiers.some(v => v.toLowerCase() === sgu);
+            const verifText = r.verified
+                ? ` — mod verified${r.verifiers.length ? (isSelf ? ' — already submitted' : ` — see ${escHtml(r.verifiers[0])}'s entry`) : ''}`
+                : '';
+            return `<div style="color:var(--text-primary);">
+                <span style="color:var(--accent-positive);">&#x2713;</span>
+                ${escHtml(r.desc)}
+                <span style="color:var(--text-secondary); font-size:0.76rem;">${escHtml(r.label)}${verifText}</span>
+            </div>`;
+        }).join('');
+        return rows + _pagDlcNoteHtml(results);
     }
 
     function _pagRenderQuals(game) {

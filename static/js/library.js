@@ -1756,6 +1756,7 @@ async function stopBulkDateImport() {
                 : '';
             return `<div><span style="color:var(--accent-positive);">✓</span> ${r.desc} <span style="color:var(--text-secondary);">${r.label}${verifPart}</span></div>`;
         }).join('');
+        html += _pagDlcNoteHtml(results);
 
         if (hltbMin !== null) {
             if (results.length) html += `<div style="margin-top:5px; border-top:1px solid var(--border); padding-top:5px;">`;
