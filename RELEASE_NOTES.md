@@ -1,6 +1,6 @@
 # Release Notes
 
-## v1.10.5 - Pending
+## v1.10.5 - 2026-09-13
 ### New
 
 - New "Update All" button in the Plugins window.
