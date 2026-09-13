@@ -508,6 +508,18 @@ def apply_wins(store: dict, *, full_refresh: bool) -> dict:
         # this it would keep reappearing in "wins not in your library" on
         # every sync even after the thing it actually stood for was handled.
         if rec.get('dlc_base_adopted'):
+            # dlc_base_appid was only started being persisted once the
+            # dlc_derived folding above existed -- anything adopted before
+            # that has dlc_base_adopted but no dlc_base_appid, so it can
+            # never be picked up by that folding (confirmed live: every
+            # pre-fix adoption, e.g. Redout's soundtrack/artbook wins, sat
+            # at dlc_base_appid=None). Self-heal it here the same way
+            # _appdetails_lite backfills a stale cache entry, rather than
+            # needing a one-off migration pass.
+            if not rec.get('dlc_base_appid'):
+                _, backfilled_appid, _ = _classify_unmatched(rec, session, det_cache)
+                if backfilled_appid:
+                    rec['dlc_base_appid'] = backfilled_appid
             continue
         reason, dlc_base_appid, dlc_base_name = _classify_unmatched(rec, session, det_cache)
         unmatched.append({
