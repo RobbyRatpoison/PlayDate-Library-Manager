@@ -502,6 +502,13 @@ def apply_wins(store: dict, *, full_refresh: bool) -> dict:
     for rec in store['wins']:
         if rec.get('appid') in lib_appids:
             continue
+        # A DLC/etc. win the user already chose to credit toward its base
+        # game (POST /adopt-dlc-base sets this) stays permanently unmatched
+        # by appid -- DLC is never given its own library row -- so without
+        # this it would keep reappearing in "wins not in your library" on
+        # every sync even after the thing it actually stood for was handled.
+        if rec.get('dlc_base_adopted'):
+            continue
         reason, dlc_base_appid, dlc_base_name = _classify_unmatched(rec, session, det_cache)
         unmatched.append({
             'code': rec.get('code'), 'name': rec.get('name'),
@@ -928,11 +935,11 @@ def sg_adopt_dlc_base():
         return jsonify({'status': 'error', 'message': 'Missing giveaway code'}), 400
 
     store = load_wins()
-    rec = next((w for w in store.get('unmatched', []) if w.get('code') == code), None)
-    if not rec:
+    unmatched_rec = next((w for w in store.get('unmatched', []) if w.get('code') == code), None)
+    if not unmatched_rec:
         return jsonify({'status': 'error', 'message': 'Unknown win'}), 404
 
-    base_appid = rec.get('dlc_base_appid')
+    base_appid = unmatched_rec.get('dlc_base_appid')
     if not base_appid:
         return jsonify({'status': 'error', 'message': 'This win has no known base game'}), 400
 
@@ -943,9 +950,26 @@ def sg_adopt_dlc_base():
                             'message': 'Base game is not in your library'}), 400
         group_added = _adopt_into_group(base_appid, db)
         db.commit()
-        return jsonify({'status': 'ok', 'appid': base_appid, 'group_added': group_added})
     finally:
         db.close()
+
+    # `unmatched_rec` is a snapshot built by apply_wins(), not the actual win
+    # record -- mark the real one in store['wins'] so this DLC win stops
+    # reappearing in "wins not in your library" on every future sync. It's
+    # never given the base game's appid directly: that would fold it into
+    # apply_wins()'s received_by_appid aggregation and risk a later full
+    # refresh un-adopting the base game if this DLC win's own received state
+    # ever reads as anything but confirmed-received.
+    win_rec = next((w for w in store['wins'] if w.get('code') == code), None)
+    if win_rec is not None:
+        win_rec['dlc_base_adopted'] = True
+    # Also drop it from the already-computed unmatched snapshot so it
+    # disappears from the list immediately, instead of only after the next
+    # sync regenerates store['unmatched'] via apply_wins().
+    store['unmatched'] = [w for w in store.get('unmatched', []) if w.get('code') != code]
+    save_wins(store)
+
+    return jsonify({'status': 'ok', 'appid': base_appid, 'group_added': group_added})
 
 
 @steamgifts_bp.route('/api/steamgifts/wins/cancel', methods=['POST', 'OPTIONS'])
