@@ -687,6 +687,31 @@
             const base      = origin + session.public_url;   // /user/<name>/giveaways/won
             const onPage1   = window.location.pathname === session.public_url && !sgParams.get('page');
 
+            // Early (possibly stale) estimate of how many private-pass pages are
+            // waiting, from wins already on record before this sync's public
+            // pass adds/changes anything -- used only to weight how much of the
+            // bar pass 1 gets. Without this, pass 1 always claimed a fixed 45%
+            // and pass 2 a fixed 40% regardless of the real page counts, so a
+            // sync with many public pages but only one (or zero, in degraded
+            // mode) private page looked like it filled halfway then jumped
+            // straight to done once pass 2 blew through its own oversized swath
+            // in a single page.
+            let pass2PagesEstimate = 0;
+            if (session.mode === 'full' && session.pass2) {
+                try {
+                    const early = await pd('GET', '/api/steamgifts/wins/pass2-plan');
+                    pass2PagesEstimate = (early && early.pages && early.pages.length) || 0;
+                } catch (e) { /* fall back to the public-only split below */ }
+            }
+            // Share of the 0-90% band pass 1 gets, proportional to its own page
+            // count vs. the pass 2 estimate — degraded mode (no pass 2 at all)
+            // and a pass 2 estimate of 0 both correctly collapse to the full 90%.
+            function pass1Share(totalPublicPages) {
+                if (!totalPublicPages) return 45;   // unknown yet — old default
+                const total = totalPublicPages + pass2PagesEstimate;
+                return total > 0 ? (totalPublicPages / total) * 90 : 45;
+            }
+
             // ── Public pass ──────────────────────────────────────────────────
             // SteamGifts' pagination nav never carries the true last page, so
             // the backend decides when to stop (res.more) from the total count
@@ -695,7 +720,7 @@
             const SAFETY_MAX = 400;
             while (page <= SAFETY_MAX) {
                 setStatus(`Reading won giveaways… page ${page}${pages ? ' / ' + pages : ''}`,
-                          pages ? (page / pages) * 45 : 5);
+                          pages ? (page / pages) * pass1Share(pages) : 5);
                 let html;
                 try {
                     html = (page === 1 && onPage1)
@@ -724,18 +749,19 @@
                 let plan;
                 try { plan = await pd('GET', '/api/steamgifts/wins/pass2-plan'); }
                 catch (e) { plan = { pages: [] }; }
-                const pages = (plan && plan.pages) || [];
-                for (let i = 0; i < pages.length; i++) {
-                    setStatus(`Verifying received status… (${i + 1}/${pages.length})`,
-                              50 + (i / Math.max(1, pages.length)) * 40);
+                const pass2Pages = (plan && plan.pages) || [];
+                const startPct = pass1Share(pages);
+                for (let i = 0; i < pass2Pages.length; i++) {
+                    setStatus(`Verifying received status… (${i + 1}/${pass2Pages.length})`,
+                              startPct + (i / Math.max(1, pass2Pages.length)) * (90 - startPct));
                     let html;
-                    try { html = await fetchPage(`${origin}/giveaways/won/search?page=${pages[i]}`); }
+                    try { html = await fetchPage(`${origin}/giveaways/won/search?page=${pass2Pages[i]}`); }
                     catch (e) { continue; }
                     try {
                         await pd('POST', '/api/steamgifts/wins/page',
-                                 { phase: 'private', page: pages[i], html });
+                                 { phase: 'private', page: pass2Pages[i], html });
                     } catch (e) { /* keep going */ }
-                    if (i < pages.length - 1) await sleep(PAGE_DELAY);
+                    if (i < pass2Pages.length - 1) await sleep(PAGE_DELAY);
                 }
             } else if (session.mode === 'degraded') {
                 document.getElementById('pd-sg-note').textContent =
