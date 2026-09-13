@@ -132,10 +132,17 @@ def pick_game():
     bounded_pool_size = len(games)
 
     if mode in ('smart', 'weighted'):
+        # Steam only -- other platforms' plugins don't all populate `tags`
+        # with a real community-tag vocabulary. Confirmed live: PlayDate's
+        # Epic Games plugin stores Epic's own review-attribute checkboxes
+        # ("Windows", "Recommend this Game", "Extremely Fun", "Amazing
+        # Storytelling") in this same column, which isn't genre/style data at
+        # all and would otherwise poison both pools with noise unrelated to
+        # actual taste.
         liked_rows = db.execute(
             "SELECT tags FROM games "
             "WHERE completion_status IN ('Beaten', 'Completed') "
-            "AND tags IS NOT NULL AND tags != ''"
+            "AND platform = 'steam' AND tags IS NOT NULL AND tags != ''"
         ).fetchall()
 
         using_fallback = False
@@ -143,7 +150,7 @@ def pick_game():
             using_fallback = True
             liked_rows = db.execute(
                 "SELECT tags FROM games "
-                "WHERE tags IS NOT NULL AND tags != '' "
+                "WHERE platform = 'steam' AND tags IS NOT NULL AND tags != '' "
                 "ORDER BY playtime_forever DESC LIMIT 50"
             ).fetchall()
 
@@ -155,7 +162,7 @@ def pick_game():
         # already-filtered candidate pool).
         disliked_rows = db.execute(
             "SELECT tags FROM games WHERE completion_status = \"Won't Play\" "
-            "AND tags IS NOT NULL AND tags != ''"
+            "AND platform = 'steam' AND tags IS NOT NULL AND tags != ''"
         ).fetchall()
 
         db.close()

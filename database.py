@@ -458,20 +458,26 @@ def recalculate_tag_similarity():
                     counts[tag] = counts.get(tag, 0) + 1
             return {t: c / n for t, c in counts.items()}
 
+        # Steam only -- other platforms' plugins don't all populate `tags` with
+        # a real community-tag vocabulary. Confirmed live: PlayDate's Epic
+        # Games plugin stores Epic's own review-attribute checkboxes ("Windows",
+        # "Recommend this Game", "Extremely Fun", "Amazing Storytelling") in
+        # this same column, which isn't genre/style data at all and would
+        # otherwise poison both pools with noise unrelated to actual taste.
         liked_rows = conn.execute(
             "SELECT tags FROM games "
             "WHERE completion_status IN ('Beaten', 'Completed') "
-            "AND tags IS NOT NULL AND tags != ''"
+            "AND platform = 'steam' AND tags IS NOT NULL AND tags != ''"
         ).fetchall()
         if not liked_rows:
             liked_rows = conn.execute(
                 "SELECT tags FROM games "
-                "WHERE tags IS NOT NULL AND tags != '' "
+                "WHERE platform = 'steam' AND tags IS NOT NULL AND tags != '' "
                 "ORDER BY playtime_forever DESC LIMIT 50"
             ).fetchall()
         disliked_rows = conn.execute(
             "SELECT tags FROM games WHERE completion_status = \"Won't Play\" "
-            "AND tags IS NOT NULL AND tags != ''"
+            "AND platform = 'steam' AND tags IS NOT NULL AND tags != ''"
         ).fetchall()
 
         liked_rate = _tag_pool_rate(liked_rows)
