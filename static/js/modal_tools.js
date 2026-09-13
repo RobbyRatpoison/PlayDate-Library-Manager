@@ -526,7 +526,7 @@ async function syncSteamGiftsWins() {
 
     s.innerHTML = 'Opened SteamGifts in a new tab. Keep it open — it closes itself when done.'
         + '<div style="font-size:0.76rem;color:var(--text-secondary);margin-top:4px;">'
-        + 'Needs the PlayDate Date Importer userscript, and you signed in to SteamGifts.</div>';
+        + 'Needs the PlayDate Companion userscript, and you signed in to SteamGifts.</div>';
     _sgWinsAttachPoll({ waitingForScript: true });
 }
 
@@ -545,11 +545,11 @@ function _sgWinsAttachPoll(opts) {
 
         if (st.script_connected || st.active) sawScript = true;
 
-        if (!sawScript && opts.waitingForScript && Date.now() - started > 30000) {
+        if (!sawScript && opts.waitingForScript && Date.now() - started > 15000) {
             clearInterval(_sgWinsPoll); _sgWinsPoll = null;
             s.className = 'tool-status error';
             s.innerHTML = '✘ The userscript did not respond. Check that the '
-                + '<a href="https://raw.githubusercontent.com/RobbyRatpoison/PlayDate-Library-Manager/main/steam_date_import.user.js" target="_blank" style="color:inherit;text-decoration:underline;">PlayDate Date Importer</a>'
+                + '<a href="https://raw.githubusercontent.com/RobbyRatpoison/PlayDate-Library-Manager/main/steam_date_import.user.js" target="_blank" style="color:inherit;text-decoration:underline;">PlayDate Companion</a>'
                 + ' is installed and enabled for steamgifts.com.';
             btn.disabled = false;
             return;

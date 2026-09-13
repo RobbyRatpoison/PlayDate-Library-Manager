@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         PlayDate Date Importer
+// @name         PlayDate Companion
 // @namespace    playdate
-// @version      3.0
+// @version      3.1
 // @description  Imports Steam activation dates, GOG/EA purchase dates, and SteamGifts wins into PlayDate
 // @icon         https://raw.githubusercontent.com/RobbyRatpoison/PlayDate-Library-Manager/main/static/img/favicon.png
 // @match        https://help.steampowered.com/*

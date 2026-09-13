@@ -1639,7 +1639,7 @@ async function startBulkDateImport() {
                     stopBtn.style.display = 'none';
                     startBtn.disabled = false;
                     status.className = 'bulk-status-error';
-                    status.textContent = 'Tampermonkey script not detected. Install steam_date_import.user.js and ensure Tampermonkey is enabled.';
+                    status.textContent = 'PlayDate Companion script not detected. Make sure it\'s installed and Tampermonkey is enabled.';
                     document.getElementById('bdi-progress').style.display = 'none';
                 }
             } catch (e) { /* ignore */ }
