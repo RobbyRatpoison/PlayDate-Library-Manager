@@ -434,6 +434,34 @@ async function _sgWinsAdopt(btn, code) {
     }
 }
 
+// A DLC/soundtrack/etc. win never becomes its own library row (PlayDate
+// doesn't track DLC) -- this instead tags the already-owned base game as
+// won on SteamGifts, for when the win itself is DLC for something the user
+// owns rather than a delisted/removed game (that's _sgWinsAdopt's job).
+async function _sgWinsAdoptDlcBase(btn, code) {
+    btn.disabled = true;
+    btn.textContent = 'Adding…';
+    try {
+        const r = await fetch('/api/steamgifts/wins/adopt-dlc-base', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+        });
+        const d = await r.json();
+        if (d.status === 'ok') {
+            const row = btn.closest('div');
+            if (row) row.style.opacity = '0.5';
+            btn.textContent = d.group_added ? 'Added' : 'Already tagged';
+        } else {
+            btn.textContent = 'Failed';
+            btn.title = d.message || '';
+            btn.disabled = false;
+        }
+    } catch (e) {
+        btn.textContent = 'Failed';
+        btn.disabled = false;
+    }
+}
+
 async function _sgWinsToggleUnmatched(el) {
     const box = el.parentElement.querySelector('.sgwins-unmatched');
     if (box.style.display !== 'none') { box.style.display = 'none'; return; }
@@ -450,7 +478,9 @@ async function _sgWinsToggleUnmatched(el) {
                 : escHtml(r.name || '(unknown)');
             const add = r.adoptable && r.code
                 ? ` <button onclick="_sgWinsAdopt(this,'${escHtml(r.code)}')" style="font-size:0.68rem;padding:1px 6px;margin-left:4px;background:#4b6f9c;color:#fff;border:none;border-radius:3px;cursor:pointer;">Add to library</button>`
-                : '';
+                : (r.dlc_base_owned && r.code
+                    ? ` <button onclick="_sgWinsAdoptDlcBase(this,'${escHtml(r.code)}')" style="font-size:0.68rem;padding:1px 6px;margin-left:4px;background:#4b6f9c;color:#fff;border:none;border-radius:3px;cursor:pointer;">Mark "${escHtml(r.dlc_base_name || 'base game')}" won on SG</button>`
+                    : '');
             html += `<div style="font-size:0.76rem;padding:2px 0;line-height:1.35;">`
                 + `${gv}${add}<br><span style="color:var(--text-secondary);">${escHtml(r.reason || '')}</span></div>`;
         }

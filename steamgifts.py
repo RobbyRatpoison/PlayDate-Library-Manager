@@ -364,12 +364,13 @@ def _resolve_ref(ref: str, name: str, lib_appids: set, session):
 
 def _appdetails_lite(appid: int, session, cache: dict) -> dict:
     """Cached, minimal Steam appdetails lookup used only to explain why a win
-    didn't match. Returns {ok, type, name, fullgame_name}; ok=False means the
-    store page is gone (delisted/removed)."""
+    didn't match. Returns {ok, type, name, fullgame_name, fullgame_appid};
+    ok=False means the store page is gone (delisted/removed)."""
     key = str(appid)
     if key in cache:
         return cache[key]
-    out = {'ok': False, 'type': None, 'name': None, 'fullgame_name': None}
+    out = {'ok': False, 'type': None, 'name': None,
+           'fullgame_name': None, 'fullgame_appid': None}
     try:
         r = session.get(
             f'https://store.steampowered.com/api/appdetails?appids={appid}&l=english',
@@ -381,6 +382,11 @@ def _appdetails_lite(appid: int, session, cache: dict) -> dict:
             fg = d.get('fullgame') or {}
             if fg.get('name'):
                 out['fullgame_name'] = fg['name']
+            try:
+                if fg.get('appid') is not None:
+                    out['fullgame_appid'] = int(fg['appid'])
+            except (TypeError, ValueError):
+                pass
     except Exception as e:
         log.warning(f"[steamgifts] appdetails {appid} failed: {e}")
         out['error'] = True
@@ -389,34 +395,39 @@ def _appdetails_lite(appid: int, session, cache: dict) -> dict:
     return out
 
 
-def _classify_unmatched(rec: dict, session, cache: dict) -> str:
-    """One short user-facing reason a win isn't in the library. The library is
-    built from Steam's GetOwnedGames, so 'not there' means Steam no longer
-    reports the game as owned — delisted, or removed from the account."""
+def _classify_unmatched(rec: dict, session, cache: dict) -> tuple[str, int | None, str | None]:
+    """One short user-facing reason a win isn't in the library, plus the base
+    game's (appid, name) when the win is DLC/a soundtrack/etc. for one (from
+    Steam's `fullgame` field) -- regardless of whether that base game is
+    actually owned; the caller checks that against the library. The library
+    is built from Steam's GetOwnedGames, so 'not there' otherwise means Steam
+    no longer reports the game as owned — delisted, or removed from the
+    account."""
     ref = rec.get('steam_ref')
     if not ref:
-        return 'No Steam store page (gift card or non-Steam reward)'
+        return 'No Steam store page (gift card or non-Steam reward)', None, None
     kind, _, sid = ref.partition('/')
     if not sid.isdigit():
-        return 'Unrecognised Steam link'
+        return 'Unrecognised Steam link', None, None
     sid = int(sid)
     if kind == 'sub':
         apps = _package_apps(sid, session)
         if not apps:
-            return 'Steam package could not be read (likely delisted)'
-        return 'Steam package — none of its games are in your library'
+            return 'Steam package could not be read (likely delisted)', None, None
+        return 'Steam package — none of its games are in your library', None, None
     info = _appdetails_lite(sid, session, cache)
     if info.get('error'):
-        return 'Could not check Steam (try again later)'
+        return 'Could not check Steam (try again later)', None, None
     if not info['ok']:
-        return 'Delisted, or removed from your Steam account'
+        return 'Delisted, or removed from your Steam account', None, None
     t = (info.get('type') or '').lower()
     if t and t != 'game':
         label = {'dlc': 'DLC', 'music': 'Soundtrack', 'demo': 'Demo',
                  'application': 'Application'}.get(t, t.title())
         base = info.get('fullgame_name')
-        return f'{label} for {base}' if base else f'{label}, not a base game'
-    return 'Not in your Steam library (delisted, or removed from your account)'
+        reason = f'{label} for {base}' if base else f'{label}, not a base game'
+        return reason, info.get('fullgame_appid'), base
+    return 'Not in your Steam library (delisted, or removed from your account)', None, None
 
 
 _app_name_cache: dict[int, str] = {}
@@ -467,11 +478,19 @@ def apply_wins(store: dict, *, full_refresh: bool) -> dict:
     for rec in store['wins']:
         if rec.get('appid') in lib_appids:
             continue
+        reason, dlc_base_appid, dlc_base_name = _classify_unmatched(rec, session, det_cache)
         unmatched.append({
             'code': rec.get('code'), 'name': rec.get('name'),
             'steam_ref': rec.get('steam_ref'), 'won_ts': rec.get('won_ts'),
             'gifter': rec.get('gifter'), 'received': rec.get('received'),
-            'reason': _classify_unmatched(rec, session, det_cache),
+            'reason': reason,
+            # Set whenever Steam's own `fullgame` field named a base game for
+            # this DLC/soundtrack/etc. win, regardless of whether it's owned
+            # -- sg_unmatched() checks that against the library at read time
+            # (fresher than baking an "owned" bool in here) to decide whether
+            # to offer "add the base game to Won on SteamGifts" in the UI.
+            'dlc_base_appid': dlc_base_appid,
+            'dlc_base_name': dlc_base_name,
         })
     store['unmatched'] = unmatched
     unresolved = len(unmatched)
@@ -704,10 +723,17 @@ def sg_unmatched():
     """The wins from the last apply that aren't in the library, each with a
     one-line reason. Sorted by reason then name for a readable list.
     ``adoptable`` marks a row the user can force-add (a delisted game they may
-    still own) vs. one that's genuinely not a game (DLC, gift card)."""
+    still own) vs. one that's genuinely not a game (DLC, gift card).
+    ``dlc_base_owned`` marks a DLC/soundtrack/etc. win whose base game (Steam's
+    own `fullgame` field) is already in the library -- checked fresh here
+    against the DB rather than baked in at apply time, since owning it can
+    change between an apply and a later page-load of this list. DLC/etc.
+    itself is never added to the library (PlayDate doesn't track DLC as its
+    own row); this just offers to tag the already-owned base game as won."""
     store = load_wins()
     rows = sorted(store.get('unmatched', []),
                   key=lambda r: (r.get('reason', ''), (r.get('name') or '').lower()))
+    lib_appids = None
     for r in rows:
         ref = r.get('steam_ref') or ''
         reason = r.get('reason', '')
@@ -716,6 +742,15 @@ def sg_unmatched():
             and ('Delisted' in reason or 'removed' in reason
                  or reason.startswith('Not in your Steam library'))
         )
+        base_appid = r.get('dlc_base_appid')
+        if base_appid:
+            if lib_appids is None:
+                db = get_db()
+                lib_appids = {row['appid'] for row in db.execute("SELECT appid FROM games").fetchall()}
+                db.close()
+            r['dlc_base_owned'] = base_appid in lib_appids
+        else:
+            r['dlc_base_owned'] = False
     return jsonify({'status': 'ok', 'unmatched': rows,
                     'last_sync_public': store.get('last_sync_public')})
 
@@ -854,6 +889,39 @@ def _adopt_into_group(appid: int, db) -> bool:
         src['members'] = sorted(set(src['members']) | {appid})
     save_group_sources(gs)
     return added
+
+
+@steamgifts_bp.route('/api/steamgifts/wins/adopt-dlc-base', methods=['POST'])
+def sg_adopt_dlc_base():
+    """Tag a DLC/soundtrack/etc. win's *base game* as won on SteamGifts. The
+    win itself is never added to the library (PlayDate doesn't track DLC as
+    its own row) -- this only makes sense when Steam's `fullgame` field says
+    the base game is already owned. Trusts the client's code only as a
+    lookup key; re-derives dlc_base_appid from the stored win record and
+    re-checks it's actually in the library before writing anything."""
+    code = ((request.json or {}).get('code') or '').strip()
+    if not code:
+        return jsonify({'status': 'error', 'message': 'Missing giveaway code'}), 400
+
+    store = load_wins()
+    rec = next((w for w in store.get('unmatched', []) if w.get('code') == code), None)
+    if not rec:
+        return jsonify({'status': 'error', 'message': 'Unknown win'}), 404
+
+    base_appid = rec.get('dlc_base_appid')
+    if not base_appid:
+        return jsonify({'status': 'error', 'message': 'This win has no known base game'}), 400
+
+    db = get_db()
+    try:
+        if not db.execute("SELECT 1 FROM games WHERE appid = ?", (base_appid,)).fetchone():
+            return jsonify({'status': 'error',
+                            'message': 'Base game is not in your library'}), 400
+        group_added = _adopt_into_group(base_appid, db)
+        db.commit()
+        return jsonify({'status': 'ok', 'appid': base_appid, 'group_added': group_added})
+    finally:
+        db.close()
 
 
 @steamgifts_bp.route('/api/steamgifts/wins/cancel', methods=['POST', 'OPTIONS'])

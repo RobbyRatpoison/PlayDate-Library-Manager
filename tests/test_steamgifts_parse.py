@@ -183,20 +183,29 @@ def test_resolve_ref_parses_stored_slashless_format():
 
 def test_classify_unmatched_offline_branches(monkeypatch):
     # no store link
-    assert 'gift card' in sg._classify_unmatched(
-        {'steam_ref': None}, None, {}).lower()
+    reason, base_appid, base_name = sg._classify_unmatched({'steam_ref': None}, None, {})
+    assert 'gift card' in reason.lower()
+    assert base_appid is None and base_name is None
     # package whose apps we can see, none owned
     monkeypatch.setattr(sg, '_package_apps', lambda sid, s: [10, 20])
-    r = sg._classify_unmatched({'steam_ref': 'sub/900'}, None, {})
-    assert 'package' in r.lower() and 'library' in r.lower()
-    # appdetails says DLC -> reason names the base game (cache short-circuits network)
-    cache = {'777': {'ok': True, 'type': 'dlc', 'name': 'X DLC', 'fullgame_name': 'Base Game'}}
-    r = sg._classify_unmatched({'steam_ref': 'app/777'}, None, cache)
-    assert r == 'DLC for Base Game'
+    reason, base_appid, base_name = sg._classify_unmatched({'steam_ref': 'sub/900'}, None, {})
+    assert 'package' in reason.lower() and 'library' in reason.lower()
+    assert base_appid is None and base_name is None
+    # appdetails says DLC -> reason names the base game, plus its appid (from
+    # Steam's own `fullgame` field), so the caller can offer to tag it as won
+    # (cache short-circuits network)
+    cache = {'777': {'ok': True, 'type': 'dlc', 'name': 'X DLC',
+                      'fullgame_name': 'Base Game', 'fullgame_appid': 100010}}
+    reason, base_appid, base_name = sg._classify_unmatched({'steam_ref': 'app/777'}, None, cache)
+    assert reason == 'DLC for Base Game'
+    assert base_appid == 100010
+    assert base_name == 'Base Game'
     # appdetails failed to load (delisted / removed) -> cache marks ok False
-    cache = {'888': {'ok': False, 'type': None, 'name': None, 'fullgame_name': None}}
-    r = sg._classify_unmatched({'steam_ref': 'app/888'}, None, cache)
-    assert 'Delisted' in r or 'removed' in r
+    cache = {'888': {'ok': False, 'type': None, 'name': None,
+                      'fullgame_name': None, 'fullgame_appid': None}}
+    reason, base_appid, base_name = sg._classify_unmatched({'steam_ref': 'app/888'}, None, cache)
+    assert 'Delisted' in reason or 'removed' in reason
+    assert base_appid is None and base_name is None
 
 
 def test_pending_pass2_pages_targets_only_unknown_pages():
