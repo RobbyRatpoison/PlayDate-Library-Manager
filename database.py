@@ -459,7 +459,13 @@ def recalculate_tag_similarity():
         for row in rows:
             candidate_tags = [t.strip() for t in (row['tags'] or '').split(',') if t.strip()]
             if not candidate_tags:
-                sim = 0.0
+                # NULL, not 0.0 -- a game with no tags at all has no signal to
+                # compare, which is different from a tagged game that happens
+                # to share nothing with the taste profile (a real, known 0.0).
+                # NULL sorts last regardless of direction (see VIRTUAL_SORT_COLS
+                # in library.py); a real 0.0 would sort first in ASC, which
+                # would be wrong for a game we simply know nothing about.
+                sim = None
             else:
                 dot    = sum(tag_weights.get(t, 0.0) for t in candidate_tags)
                 c_norm = len(candidate_tags) ** 0.5

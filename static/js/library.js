@@ -190,6 +190,7 @@
         achievement_percent:   'DESC',
         achievement_remaining: 'ASC',
         total_reviews:       'DESC',
+        tag_similarity:      'DESC',
     };
     function updateSort(column) {
         const order = _sortDefaultOrder[column] ?? 'ASC';
