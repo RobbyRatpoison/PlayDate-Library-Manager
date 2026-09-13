@@ -151,7 +151,7 @@ def init_db():
         'duplicate_auto': 'INT',         # 1 = set by auto-detection; 0/NULL = manually set
         'name_from_store': 'INT',        # 1 = name confirmed from Steam store API; 0/NULL = from GetOwnedGames or local files
         'tag_similarity': 'REAL',        # Cosine similarity to the Beaten/Completed taste profile; see recalculate_tag_similarity()
-        'sg_dlc_win': 'INT',             # 1 = this game's "Won on SteamGifts" membership traces only to an adopted DLC win, no direct win of the base game itself; see steamgifts.py's apply_wins()/sg_adopt_dlc_base(). Surfaces a "mention the DLC" note in the PAGYWOSG quals tooltip/panel (PAGYWOSG rule per SG mods).
+        'sg_dlc_win': 'INT',             # 1 = this game's "Won on SteamGifts" membership traces only to an adopted DLC win, no direct win of the base game itself; see steamgifts.py's apply_wins()/sg_adopt_dlc_base(). Surfaces a "mention the DLC" note in the PAGYWOSG quals tooltip/panel -- PAGYWOSG (its own independent site/community, not a SteamGifts-official feature) requires disclosing this when submitting the game there.
     }
 
     for column_name, column_type in required_columns.items():
