@@ -7,6 +7,7 @@
 - New "Restart PlayDate" button in the Plugins window after installing, updating, or removing a plugin.
 - Home page shelves can now scroll horizontally to reveal more games.
 - Home page shelves can now have an unlimited amount of games by setting 'games' value to 0.
+- New "Tag Similarity" sort option in Library and Home, based on the same taste profile Pick 6 uses.
 
 ### Improvements
 
@@ -17,3 +18,7 @@
 - Duplicate games can now be linked even if the game is not owned on Steam.
 - Switching renderers also offers a direct restart, instead of just a reminder to do it yourself.
 - Improved detection of installed games for some plugins.
+
+### Fixes
+
+- Fixed SteamGifts Full Refresh not actually clearing out incorrect win data left over from an earlier bad sync (e.g. a mistyped username). (reported by woutercools)

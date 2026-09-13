@@ -148,3 +148,6 @@ People who've helped make PlayDate better - bug reports, feature suggestions, te
 - Suggested a PAGYWOSG builder shortcut in the filters dialog
 - Suggested filtering by system requirements and by installed storage size (not implemented)
 - Suggested "pygamelauncher," an animal-themed name, or "whattoplay"/"wtp"
+
+**woutercools**
+- SteamGifts Full Refresh not actually clearing out an incorrect win left over from an earlier bad sync (e.g. a mistyped username)
