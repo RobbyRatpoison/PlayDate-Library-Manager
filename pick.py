@@ -132,40 +132,88 @@ def pick_game():
     bounded_pool_size = len(games)
 
     if mode in ('smart', 'weighted'):
-        profile_rows = db.execute(
-            "SELECT tags, playtime_forever FROM games "
+        liked_rows = db.execute(
+            "SELECT tags FROM games "
             "WHERE completion_status IN ('Beaten', 'Completed') "
             "AND tags IS NOT NULL AND tags != ''"
         ).fetchall()
 
         using_fallback = False
-        if not profile_rows:
+        if not liked_rows:
             using_fallback = True
-            profile_rows = db.execute(
-                "SELECT tags, playtime_forever FROM games "
+            liked_rows = db.execute(
+                "SELECT tags FROM games "
                 "WHERE tags IS NOT NULL AND tags != '' "
                 "ORDER BY playtime_forever DESC LIMIT 50"
             ).fetchall()
 
+        # "Won't Play" is this project's explicit terrible/broken marker (never
+        # just "not interested"), so its tags are a real negative signal, not
+        # noise -- see database.recalculate_tag_similarity() for the same
+        # formula, shared in spirit though not in code (that one persists a
+        # whole-library column; this one is a request-scoped closure over an
+        # already-filtered candidate pool).
+        disliked_rows = db.execute(
+            "SELECT tags FROM games WHERE completion_status = \"Won't Play\" "
+            "AND tags IS NOT NULL AND tags != ''"
+        ).fetchall()
+
         db.close()
 
-        tag_weights: dict[str, float] = {}
-        for row in profile_rows:
-            weight = max(float(row['playtime_forever'] or 0), 1.0)
-            for tag in [t.strip() for t in (row['tags'] or '').split(',') if t.strip()]:
-                tag_weights[tag] = tag_weights.get(tag, 0.0) + weight
+        def _tag_pool_rate(rows):
+            """{tag: fraction of these rows carrying it}. A tag common to both
+            the liked and disliked pools cancels toward neutral on its own --
+            no separate IDF/rarity correction needed, unlike the playtime-
+            weighted-sum approach this replaced, where ubiquitous tags like
+            'Action' or 'Singleplayer' dominated every score regardless of
+            whether they said anything distinctive about taste."""
+            n = len(rows)
+            if not n:
+                return {}
+            counts: dict[str, int] = {}
+            for row in rows:
+                for tag in [t.strip() for t in (row['tags'] or '').split(',') if t.strip()]:
+                    counts[tag] = counts.get(tag, 0) + 1
+            return {t: c / n for t, c in counts.items()}
 
-        profile_norm = sum(v * v for v in tag_weights.values()) ** 0.5 or 1.0
+        liked_rate = _tag_pool_rate(liked_rows)
+        disliked_rate = _tag_pool_rate(disliked_rows)
+        tag_affinity = {t: liked_rate.get(t, 0.0) - disliked_rate.get(t, 0.0)
+                        for t in set(liked_rate) | set(disliked_rate)}
+
+        # Smoothing pseudo-count: without it, a game with one strongly-liked
+        # tag and nothing else beats one with several matching tags, purely
+        # for having nothing to dilute its lone lucky tag. Empirically tuned
+        # against a real library, not a principled constant.
+        _TAG_SMOOTHING_K = 4
+
+        def _raw_tag_score(g):
+            candidate_tags = [t.strip() for t in (g.get('tags') or '').split(',') if t.strip()]
+            if not candidate_tags:
+                return None
+            total = sum(tag_affinity.get(t, 0.0) for t in candidate_tags)
+            return total / (len(candidate_tags) + _TAG_SMOOTHING_K)
+
+        # Rescaled to [0,1] across this specific candidate pool (min->0,
+        # max->1) rather than left as a raw signed value: sig() below assumes
+        # every signal lives in [0,1] so its `1.0 - s` direction-flip for a
+        # negative weight stays meaningful. The DB-cached column used for the
+        # Library/Home sort option has no such constraint and keeps the raw
+        # signed score instead -- sorting doesn't care about the scale.
+        _raw_scores = {g['appid']: _raw_tag_score(g) for g in games}
+        _known = [v for v in _raw_scores.values() if v is not None]
+        _raw_min, _raw_max = (min(_known), max(_known)) if _known else (0.0, 0.0)
+        _raw_span = _raw_max - _raw_min
 
         def tag_similarity(g):
             candidate_tags = [t.strip() for t in (g.get('tags') or '').split(',') if t.strip()]
             if not candidate_tags:
                 return 0.0, []
-            dot    = sum(tag_weights.get(t, 0.0) for t in candidate_tags)
-            c_norm = len(candidate_tags) ** 0.5
-            sim    = dot / (profile_norm * c_norm) if (profile_norm * c_norm) else 0.0
-            matched = sorted([t for t in candidate_tags if t in tag_weights],
-                             key=lambda t: tag_weights[t], reverse=True)
+            raw = _raw_scores.get(g['appid'])
+            sim = 0.5 if (raw is None or _raw_span == 0) else (raw - _raw_min) / _raw_span
+            matched = sorted(
+                [t for t in candidate_tags if tag_affinity.get(t, 0.0) > 0],
+                key=lambda t: tag_affinity[t], reverse=True)
             return sim, matched
 
         def review_score(g):

@@ -420,14 +420,27 @@ def refresh_duplicate_detection():
 
 
 def recalculate_tag_similarity():
-    """Recompute the tag_similarity column for every game, scoring each one's
-    cosine similarity against the same playtime-weighted taste profile Pick 6
-    builds from Beaten/Completed games (same fallback too: top-50-most-played
-    if nothing is marked Beaten/Completed yet). Duplicated from pick.py's own
-    tag_similarity() rather than shared -- that one is a request-scoped
-    closure over an already-filtered candidate pool with no DB writes, this
-    one is a whole-library recompute-and-persist pass, so sharing would mean
-    threading a cache-vs-live-request distinction through both call sites.
+    """Recompute the tag_similarity column for every game against a
+    liked-minus-disliked tag affinity profile, same formula as pick.py's own
+    tag_similarity() (duplicated rather than shared -- that one is a request-
+    scoped closure over an already-filtered candidate pool with no DB writes,
+    this one is a whole-library recompute-and-persist pass, so sharing would
+    mean threading a cache-vs-live-request distinction through both call
+    sites). For each tag, `affinity = liked_rate - disliked_rate` (fraction of
+    the Beaten/Completed pool carrying it, minus fraction of the "Won't Play"
+    pool carrying it -- "Won't Play" is this project's explicit terrible/
+    broken marker, never just "not interested", so it's a real negative
+    signal). A tag common to both pools cancels toward neutral on its own, no
+    separate IDF/rarity correction needed -- unlike the old playtime-weighted-
+    sum approach this replaced, where ubiquitous tags like "Action" or
+    "Singleplayer" dominated every score regardless of whether they said
+    anything distinctive about taste (confirmed live against a real 548-game
+    profile: those two tags alone carried 35-40% of the old profile vector's
+    total magnitude).
+
+    Unlike pick.py's version, this one keeps the raw signed score rather than
+    rescaling to [0,1] -- there's no downstream `1.0 - s` direction-flip
+    assumption here, just a sort column, so the scale doesn't matter.
 
     Cheap enough (~130ms even at 30,000 games, measured) to just run inline
     on every call -- no daemon-thread/cancellation machinery needed the way
@@ -435,24 +448,42 @@ def recalculate_tag_similarity():
     """
     conn = get_db()
     try:
-        profile_rows = conn.execute(
-            "SELECT tags, playtime_forever FROM games "
+        def _tag_pool_rate(rows):
+            n = len(rows)
+            if not n:
+                return {}
+            counts: dict[str, int] = {}
+            for row in rows:
+                for tag in [t.strip() for t in (row['tags'] or '').split(',') if t.strip()]:
+                    counts[tag] = counts.get(tag, 0) + 1
+            return {t: c / n for t, c in counts.items()}
+
+        liked_rows = conn.execute(
+            "SELECT tags FROM games "
             "WHERE completion_status IN ('Beaten', 'Completed') "
             "AND tags IS NOT NULL AND tags != ''"
         ).fetchall()
-        if not profile_rows:
-            profile_rows = conn.execute(
-                "SELECT tags, playtime_forever FROM games "
+        if not liked_rows:
+            liked_rows = conn.execute(
+                "SELECT tags FROM games "
                 "WHERE tags IS NOT NULL AND tags != '' "
                 "ORDER BY playtime_forever DESC LIMIT 50"
             ).fetchall()
+        disliked_rows = conn.execute(
+            "SELECT tags FROM games WHERE completion_status = \"Won't Play\" "
+            "AND tags IS NOT NULL AND tags != ''"
+        ).fetchall()
 
-        tag_weights: dict[str, float] = {}
-        for row in profile_rows:
-            weight = max(float(row['playtime_forever'] or 0), 1.0)
-            for tag in [t.strip() for t in (row['tags'] or '').split(',') if t.strip()]:
-                tag_weights[tag] = tag_weights.get(tag, 0.0) + weight
-        profile_norm = sum(v * v for v in tag_weights.values()) ** 0.5 or 1.0
+        liked_rate = _tag_pool_rate(liked_rows)
+        disliked_rate = _tag_pool_rate(disliked_rows)
+        tag_affinity = {t: liked_rate.get(t, 0.0) - disliked_rate.get(t, 0.0)
+                        for t in set(liked_rate) | set(disliked_rate)}
+
+        # Smoothing pseudo-count: without it, a game with one strongly-liked
+        # tag and nothing else beats one with several matching tags, purely
+        # for having nothing to dilute its lone lucky tag. Empirically tuned
+        # against a real library, not a principled constant.
+        SMOOTHING_K = 4
 
         rows = conn.execute("SELECT appid, tags FROM games").fetchall()
         updates = []
@@ -461,15 +492,15 @@ def recalculate_tag_similarity():
             if not candidate_tags:
                 # NULL, not 0.0 -- a game with no tags at all has no signal to
                 # compare, which is different from a tagged game that happens
-                # to share nothing with the taste profile (a real, known 0.0).
+                # to net zero against the affinity profile (a real, known 0.0).
                 # NULL sorts last regardless of direction (see VIRTUAL_SORT_COLS
-                # in library.py); a real 0.0 would sort first in ASC, which
-                # would be wrong for a game we simply know nothing about.
+                # in library.py); a real 0.0 would sort in the middle in either
+                # direction, which would be wrong for a game we simply know
+                # nothing about.
                 sim = None
             else:
-                dot    = sum(tag_weights.get(t, 0.0) for t in candidate_tags)
-                c_norm = len(candidate_tags) ** 0.5
-                sim    = dot / (profile_norm * c_norm) if (profile_norm * c_norm) else 0.0
+                total = sum(tag_affinity.get(t, 0.0) for t in candidate_tags)
+                sim = total / (len(candidate_tags) + SMOOTHING_K)
             updates.append((sim, row['appid']))
 
         conn.executemany("UPDATE games SET tag_similarity = ? WHERE appid = ?", updates)
