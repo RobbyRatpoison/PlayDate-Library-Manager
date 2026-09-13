@@ -533,6 +533,29 @@ def apply_wins(store: dict, *, full_refresh: bool) -> dict:
             continue
         received_by_appid[aid] = received_by_appid.get(aid, False) or (rec.get('received') is True)
 
+    # DLC/soundtrack/etc. wins the user chose to credit toward their base game
+    # (POST /adopt-dlc-base) deliberately don't carry the base game's own
+    # appid on the DLC win record itself (see sg_adopt_dlc_base's comment, to
+    # avoid folding into the direct-win aggregation above and risking an
+    # un-adoption the moment this DLC win's own received state changes) --
+    # fold them in here instead, keyed off the persisted dlc_base_appid, so a
+    # base game adopted this way survives a Full Refresh the same as a real
+    # win instead of being silently dropped (Full Refresh rebuilds `members`
+    # from received_by_appid alone). dlc_derived tracks which appids only
+    # qualify this way (no direct win at all) so the membership loop below
+    # can stamp games.sg_dlc_win -- PAGYWOSG requires mentioning the DLC
+    # specifically when logging a win earned only through it.
+    dlc_derived: set[int] = set()
+    for rec in store['wins']:
+        if not rec.get('dlc_base_adopted') or rec.get('received') is not True:
+            continue
+        base_aid = rec.get('dlc_base_appid')
+        if not base_aid:
+            continue
+        if not received_by_appid.get(base_aid):
+            dlc_derived.add(base_aid)
+        received_by_appid[base_aid] = True
+
     gs = load_group_sources()
     prev_members = set(gs.get('sources', {}).get(SOURCE_ID, {}).get('members', []))
     members = set() if full_refresh else set(prev_members)
@@ -554,12 +577,15 @@ def apply_wins(store: dict, *, full_refresh: bool) -> dict:
                 _set_groups(aid, existing)
                 added += 1
             gs_add_owner(gs, aid, GROUP_NAME, SOURCE_ID)
+            cur.execute("UPDATE games SET sg_dlc_win = ? WHERE appid = ?",
+                        (1 if aid in dlc_derived else None, aid))
         elif full_refresh:
             members.discard(aid)
             if GROUP_NAME in existing and not gs_is_protected(gs, aid, GROUP_NAME, SOURCE_ID):
                 existing.discard(GROUP_NAME)
                 _set_groups(aid, existing)
                 removed += 1
+                cur.execute("UPDATE games SET sg_dlc_win = NULL WHERE appid = ?", (aid,))
             gs_remove_owner(gs, aid, GROUP_NAME, SOURCE_ID)
 
     if full_refresh:
@@ -571,6 +597,7 @@ def apply_wins(store: dict, *, full_refresh: bool) -> dict:
                     existing.discard(GROUP_NAME)
                     _set_groups(aid, existing)
                     removed += 1
+                    cur.execute("UPDATE games SET sg_dlc_win = NULL WHERE appid = ?", (aid,))
             gs_remove_owner(gs, aid, GROUP_NAME, SOURCE_ID)
 
     gs.setdefault('sources', {})[SOURCE_ID] = {
@@ -949,6 +976,13 @@ def sg_adopt_dlc_base():
             return jsonify({'status': 'error',
                             'message': 'Base game is not in your library'}), 400
         group_added = _adopt_into_group(base_appid, db)
+        # Stamp the "won only via a DLC" flag immediately so the PAGYWOSG quals
+        # tooltip/panel note appears right away rather than waiting for the
+        # next sync's apply_wins() pass. Only when this adoption is what
+        # actually put the game in the group -- if it was already a member
+        # (a genuine direct win, or a prior adoption), leave the flag alone.
+        if group_added:
+            db.execute("UPDATE games SET sg_dlc_win = 1 WHERE appid = ?", (base_appid,))
         db.commit()
     finally:
         db.close()
@@ -956,13 +990,17 @@ def sg_adopt_dlc_base():
     # `unmatched_rec` is a snapshot built by apply_wins(), not the actual win
     # record -- mark the real one in store['wins'] so this DLC win stops
     # reappearing in "wins not in your library" on every future sync. It's
-    # never given the base game's appid directly: that would fold it into
-    # apply_wins()'s received_by_appid aggregation and risk a later full
-    # refresh un-adopting the base game if this DLC win's own received state
-    # ever reads as anything but confirmed-received.
+    # never given the base game's appid directly in its own `appid` field --
+    # that would fold it into apply_wins()'s direct-win aggregation and risk a
+    # later full refresh un-adopting the base game the moment this DLC win's
+    # own received state reads as anything but confirmed-received. Instead,
+    # `dlc_base_appid` is persisted here so apply_wins() can fold it in
+    # separately (see its dlc_derived handling), safely re-deriving both the
+    # group membership and the sg_dlc_win note on every future sync.
     win_rec = next((w for w in store['wins'] if w.get('code') == code), None)
     if win_rec is not None:
         win_rec['dlc_base_adopted'] = True
+        win_rec['dlc_base_appid'] = base_appid
     # Also drop it from the already-computed unmatched snapshot so it
     # disappears from the list immediately, instead of only after the next
     # sync regenerates store['unmatched'] via apply_wins().
