@@ -1634,15 +1634,15 @@ if __name__ == '__main__':
 
     threading.Thread(target=_run_emulator_sync, daemon=True).start()
 
-    # 2c. Sync recent playtime from Steam API in background, then fetch any
-    #     unfetched HLTB data and migrate store release dates silently in the same thread.
+    # 2c. Sync Steam collections in background, then fetch any unfetched HLTB
+    #     data and migrate store release dates silently in the same thread.
+    #     (Playtime/last_played itself is synced separately at 3b, blocking.)
     def _run_playtime_sync():
         from config import get_active_account
-        from scrapers import (sync_recent_playtime, sync_hltb_unfetched, sync_store_release_dates,
+        from scrapers import (sync_hltb_unfetched, sync_store_release_dates,
                               sync_store_names, sync_steam_collections, sync_metadata_backfill)
         _account = get_active_account()
         sync_steam_collections((_account or {}).get('steam_id'))
-        sync_recent_playtime()
         sync_hltb_unfetched()
         sync_store_release_dates()
         sync_store_names()
@@ -1657,6 +1657,16 @@ if __name__ == '__main__':
     # 3. Start Flask in a background thread
     flask_thread = threading.Thread(target=_run_flask, args=(flask_app,), daemon=True)
     flask_thread.start()
+
+    # 3b. Run the playtime/last_played sync synchronously here (overlapped with
+    # Flask's own much-faster startup above), not backgrounded like the rest of
+    # 2c -- this is the data the first real page render actually shows, so
+    # backgrounding it meant any playtime/last_played change was invisible
+    # until the user manually refreshed once the thread eventually finished.
+    # sync_recent_playtime() already guards its own body with a top-level
+    # try/except, so nothing further is needed here.
+    from scrapers import sync_recent_playtime
+    sync_recent_playtime()
 
     # 4. Wait for Flask to be ready. Hit a path that doesn't exist so any HTTP
     #    response (including the 404) means "server is listening" -- polling
