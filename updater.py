@@ -65,6 +65,30 @@ def _build_is_newer(a, b):
     return a_pre > b_pre
 
 
+def _asset_this_install_needs_is_missing(installer_url, flatpak_url, zipball_url):
+    """True if the download _do_update() would actually use for this
+    running install isn't attached to the release yet.
+
+    The build-flatpak matrix serializes its two variants (qt, then gtk --
+    see build-windows.yml) and build-windows depends on the whole matrix,
+    so a release can exist on GitHub -- with SOME assets already attached
+    -- for several minutes before the specific asset this install needs
+    (e.g. the non-Qt .flatpak, while only the qt one has uploaded so far)
+    shows up. Reporting that half-uploaded release as "available" sends
+    perform-update after a URL that doesn't exist yet, which fails with
+    "No <x> URL cached" -- and kept failing the same way on every retry
+    until this check, since a plain non-empty `assets` list already
+    looked "ready" to the caller."""
+    from config import IS_PORTABLE
+    if IN_FLATPAK:
+        return not flatpak_url
+    if getattr(sys, 'frozen', False):
+        if IS_PORTABLE:
+            return False  # portable builds never auto-download; see perform_update()
+        return not installer_url
+    return not zipball_url  # source install
+
+
 def _do_update_check():
     """Hit the GitHub releases API and populate _update_cache. Thread-safe."""
     from config import __build__, load_state
@@ -127,13 +151,23 @@ def _do_update_check():
                 else:
                     flatpak_url_other_variant = asset['browser_download_url']
 
+        zipball_url = data.get('zipball_url')
+        if available and _asset_this_install_needs_is_missing(installer_url, flatpak_url, zipball_url):
+            # CI hasn't finished uploading this install's own asset yet --
+            # report not-yet-available rather than pointing perform-update
+            # at a URL that doesn't exist. A later check (the release's CI
+            # run keeps going in the background) will pick it up once it's
+            # actually there.
+            log.info(f"Update check: {latest} exists but this install's asset isn't attached yet — treating as not available")
+            available = False
+
         _update_cache.update({
             'available': available,
             'latest_version': latest,
             'installer_url': installer_url,
             'flatpak_url': flatpak_url,
             'flatpak_url_other_variant': flatpak_url_other_variant,
-            'zipball_url': data.get('zipball_url'),
+            'zipball_url': zipball_url,
             'checked_at': time.time(),
             'error': None
         })
