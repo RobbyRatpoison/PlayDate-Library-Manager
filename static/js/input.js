@@ -399,7 +399,13 @@
         el.classList.add('gamepad-focus');
         // Home edit mode: scroll focused edit-bar buttons into view, accounting for the
         // fixed toolbar that blocks the top of the viewport.
-        if (PAGE === 'home') {
+        // Gated on zone === 'content' too, not just PAGE === 'home' -- PAGE is fixed
+        // per page-load from the URL, so it stays 'home' even once a modal is opened
+        // on top of the home page. Without this the modal branch below (and its
+        // _animatedScrollIntoView call) was unreachable for any modal opened while
+        // sitting on Home, which is the default startup page -- confirmed live via
+        // the Library modal not scrolling to off-screen gamepad focus.
+        if (PAGE === 'home' && _state.zone === 'content') {
             if (document.body.classList.contains('edit-mode')) {
                 const toolbar = document.querySelector('.edit-toolbar');
                 const navH = toolbar ? toolbar.getBoundingClientRect().bottom : 0;
