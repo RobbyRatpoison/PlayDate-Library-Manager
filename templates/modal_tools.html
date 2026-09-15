@@ -1541,7 +1541,7 @@
             <button onclick="closeMiamModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
         </div>
         <div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:14px;">
-            Beat 6 games from the community list. <a href="#" onclick="event.preventDefault();var a=document.createElement('a');a.href='https://docs.google.com/spreadsheets/d/1xBd5rltp8WxQSnG2BVKPzr7quTLJCvCt2MaGCxzs-d8/edit';a.target='_blank';document.body.appendChild(a);a.click();document.body.removeChild(a);" style="color:var(--accent);">View spreadsheet ↗</a>
+            Beat 6 games from the community list. <a href="#" data-modal-row="miam-sheet" onclick="event.preventDefault();var a=document.createElement('a');a.href='https://docs.google.com/spreadsheets/d/1xBd5rltp8WxQSnG2BVKPzr7quTLJCvCt2MaGCxzs-d8/edit';a.target='_blank';document.body.appendChild(a);a.click();document.body.removeChild(a);" style="color:var(--accent);">View spreadsheet ↗</a>
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
@@ -2129,9 +2129,9 @@ window._platPriority = {{ platform_priority | tojson }};
             PAGYWOSG category sorting uses these names, so applying store names ensures your games appear in the correct category.
         </p>
         <div style="margin-bottom:8px;font-size:0.8rem;color:var(--accent);">
-            <a href="#" onclick="storeNamesSelectAll(true);return false;" style="color:var(--accent);">All</a>
+            <a href="#" data-modal-row="all" onclick="storeNamesSelectAll(true);return false;" style="color:var(--accent);">All</a>
             &nbsp;/&nbsp;
-            <a href="#" onclick="storeNamesSelectAll(false);return false;" style="color:var(--accent);">None</a>
+            <a href="#" data-modal-row="none" onclick="storeNamesSelectAll(false);return false;" style="color:var(--accent);">None</a>
         </div>
         <div id="store-names-list" style="overflow-y:auto;flex:1;min-height:0;"></div>
         <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">

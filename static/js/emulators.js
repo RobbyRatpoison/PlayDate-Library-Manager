@@ -85,7 +85,7 @@ function _emuCardHtml(e, expanded) {
     var bodyDisplay = expanded ? 'block' : 'none';
     var chevron = expanded ? '&#9650;' : '&#9660;';
     return '<div class="hub-section" id="emu-card-' + escHtml(e.id) + '" style="padding:0;border:1px solid var(--border);border-radius:6px;background:var(--bg-surface);">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer;border-radius:6px;" onmouseenter="this.style.background=\'var(--hover-bg)\'" onmouseleave="this.style.background=\'\'" onclick="_emuToggleCard(\'' + escHtml(e.id) + '\')">'
+        + '<div data-modal-row="emu-' + escHtml(e.id) + '" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer;border-radius:6px;" onmouseenter="this.style.background=\'var(--hover-bg)\'" onmouseleave="this.style.background=\'\'" onclick="_emuToggleCard(\'' + escHtml(e.id) + '\')">'
         + '<div style="display:flex;align-items:center;gap:8px;">'
         + '<span id="emu-chevron-' + escHtml(e.id) + '" style="font-size:0.6rem;color:var(--text-secondary);">' + chevron + '</span>'
         + '<span style="font-size:0.95rem;font-weight:600;color:var(--text-primary);">' + escHtml(e.name) + '</span>'
@@ -457,7 +457,7 @@ function _renderStoreNamesList() {
     var html = '';
     for (var i = 0; i < _storeNameItems.length; i++) {
         var item = _storeNameItems[i];
-        html += '<div class="sn-row" data-idx="' + i + '" onclick="var cb=this.querySelector(\'.sn-cb\');cb.checked=!cb.checked;" style="display:flex;align-items:flex-start;gap:10px;padding:7px 4px;border-bottom:1px solid var(--border-color,#2a3f55);cursor:pointer;">';
+        html += '<div class="sn-row" data-idx="' + i + '" data-modal-row="' + i + '" onclick="var cb=this.querySelector(\'.sn-cb\');cb.checked=!cb.checked;" style="display:flex;align-items:flex-start;gap:10px;padding:7px 4px;border-bottom:1px solid var(--border-color,#2a3f55);cursor:pointer;">';
         html += '<input type="checkbox" class="sn-cb" style="width:auto;margin:2px 0 0;flex-shrink:0;" onclick="event.stopPropagation()">';
         html += '<div style="min-width:0;">';
         html += '<div style="color:var(--text-secondary);font-size:0.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + escHtml(item.old_name) + '">' + escHtml(item.old_name) + '</div>';

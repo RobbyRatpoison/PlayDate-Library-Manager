@@ -225,13 +225,13 @@ async function _loadBlaeoPreview() {
                 status.className = 'tool-status info';
                 let html = `<div style="margin-bottom:6px;">Review ${total} proposed change${total !== 1 ? 's' : ''}:</div>`;
                 html += _blaeoPreviewSection('sc',  sc,        'status change',  'status changes',
-                    c => `<input type="checkbox" checked data-btype="status" data-appid="${c.appid}"> <label>${escHtml(c.name)}: ${escHtml(c.from)} &#x2192; ${escHtml(c.to)}</label>`);
+                    c => `<input type="checkbox" checked data-btype="status" data-appid="${c.appid}" onclick="event.stopPropagation()"> <label>${escHtml(c.name)}: ${escHtml(c.from)} &#x2192; ${escHtml(c.to)}</label>`);
                 html += _blaeoPreviewSection('rn',  renames,   'group rename',   'group renames',
-                    r => `<input type="checkbox" checked data-btype="rename" data-from="${escHtml(r.from)}" data-to="${escHtml(r.to)}"> <label>&#x201C;${escHtml(r.from)}&#x201D; &#x2192; &#x201C;${escHtml(r.to)}&#x201D;</label>`);
+                    r => `<input type="checkbox" checked data-btype="rename" data-from="${escHtml(r.from)}" data-to="${escHtml(r.to)}" onclick="event.stopPropagation()"> <label>&#x201C;${escHtml(r.from)}&#x201D; &#x2192; &#x201C;${escHtml(r.to)}&#x201D;</label>`);
                 html += _blaeoPreviewSection('add', additions, 'group addition', 'group additions',
-                    a => `<input type="checkbox" checked data-btype="add" data-appid="${a.appid}"> <label>${escHtml(a.name)}: added to ${a.list_names.map(l => `&#x201C;${escHtml(l)}&#x201D;`).join(', ')}</label>`);
+                    a => `<input type="checkbox" checked data-btype="add" data-appid="${a.appid}" onclick="event.stopPropagation()"> <label>${escHtml(a.name)}: added to ${a.list_names.map(l => `&#x201C;${escHtml(l)}&#x201D;`).join(', ')}</label>`);
                 html += _blaeoPreviewSection('rm',  removals,  'group removal',  'group removals',
-                    r => `<input type="checkbox" checked data-btype="rem" data-appid="${r.appid}" data-listname="${escHtml(r.list_name)}"> <label>${escHtml(r.name)}: removed from &#x201C;${escHtml(r.list_name)}&#x201D;</label>`);
+                    r => `<input type="checkbox" checked data-btype="rem" data-appid="${r.appid}" data-listname="${escHtml(r.list_name)}" onclick="event.stopPropagation()"> <label>${escHtml(r.name)}: removed from &#x201C;${escHtml(r.list_name)}&#x201D;</label>`);
                 status.innerHTML = html;
                 _blaeoHasPreview = true;
                 actions.style.display = 'flex';
@@ -252,11 +252,11 @@ function _blaeoPreviewSection(key, items, singular, plural, rowFn) {
     const label = items.length === 1 ? `1 ${singular}` : `${items.length} ${plural}s`;
     let html = `<div class="blaeo-preview-section">`;
     html += `<div class="blaeo-section-header">`;
-    html += `<span class="blaeo-toggle" onclick="var d=document.getElementById('${uid}');d.style.display=d.style.display==='none'?'':'none'">${label} &#x25BE;</span>`;
-    html += ` <span class="blaeo-select-links">(<span onclick="_blaeoSetAll('${uid}',true)">all</span> / <span onclick="_blaeoSetAll('${uid}',false)">none</span>)</span>`;
+    html += `<span class="blaeo-toggle" data-modal-row="${key}-t" onclick="var d=document.getElementById('${uid}');d.style.display=d.style.display==='none'?'':'none'">${label} &#x25BE;</span>`;
+    html += ` <span class="blaeo-select-links">(<span data-modal-row="${key}-a" onclick="_blaeoSetAll('${uid}',true)">all</span> / <span data-modal-row="${key}-n" onclick="_blaeoSetAll('${uid}',false)">none</span>)</span>`;
     html += `</div>`;
     html += `<div id="${uid}">`;
-    items.forEach(item => { html += `<div class="blaeo-item blaeo-details">${rowFn(item)}</div>`; });
+    items.forEach(item => { html += `<div class="blaeo-item blaeo-details" data-modal-row="${key}" onclick="var cb=this.querySelector('input');cb.checked=!cb.checked;">${rowFn(item)}</div>`; });
     html += '</div></div>';
     return html;
 }
@@ -342,7 +342,7 @@ function _blaeoResultHtml(data) {
             grouped[key].names.push(c.name);
         });
         const uid = 'blaeo-r-sc-' + Date.now();
-        html += `<div><span class="blaeo-toggle" onclick="var d=document.getElementById('${uid}');d.style.display=d.style.display==='none'?'':'none'">${sc.length} status change${sc.length !== 1 ? 's' : ''} &#x25BE;</span>`;
+        html += `<div><span class="blaeo-toggle" data-modal-row="r-sc" onclick="var d=document.getElementById('${uid}');d.style.display=d.style.display==='none'?'':'none'">${sc.length} status change${sc.length !== 1 ? 's' : ''} &#x25BE;</span>`;
         html += `<div id="${uid}" class="blaeo-details" style="display:none">`;
         Object.values(grouped).forEach(g => {
             html += `<div>${escHtml(g.from)} &#x2192; ${escHtml(g.to)} (${g.names.length}): ${g.names.map(n => escHtml(n)).join(', ')}</div>`;
@@ -351,21 +351,21 @@ function _blaeoResultHtml(data) {
     }
     if (renames.length) {
         const uid = 'blaeo-r-rn-' + Date.now();
-        html += `<div><span class="blaeo-toggle" onclick="var d=document.getElementById('${uid}');d.style.display=d.style.display==='none'?'':'none'">${renames.length} group${renames.length !== 1 ? 's' : ''} renamed &#x25BE;</span>`;
+        html += `<div><span class="blaeo-toggle" data-modal-row="r-rn" onclick="var d=document.getElementById('${uid}');d.style.display=d.style.display==='none'?'':'none'">${renames.length} group${renames.length !== 1 ? 's' : ''} renamed &#x25BE;</span>`;
         html += `<div id="${uid}" class="blaeo-details" style="display:none">`;
         renames.forEach(r => { html += `<div>&#x201C;${escHtml(r.from)}&#x201D; &#x2192; &#x201C;${escHtml(r.to)}&#x201D;</div>`; });
         html += '</div></div>';
     }
     if (additions.length) {
         const uid = 'blaeo-r-ad-' + Date.now();
-        html += `<div><span class="blaeo-toggle" onclick="var d=document.getElementById('${uid}');d.style.display=d.style.display==='none'?'':'none'">${additions.length} group addition${additions.length !== 1 ? 's' : ''} &#x25BE;</span>`;
+        html += `<div><span class="blaeo-toggle" data-modal-row="r-ad" onclick="var d=document.getElementById('${uid}');d.style.display=d.style.display==='none'?'':'none'">${additions.length} group addition${additions.length !== 1 ? 's' : ''} &#x25BE;</span>`;
         html += `<div id="${uid}" class="blaeo-details" style="display:none">`;
         additions.forEach(a => { html += `<div>${escHtml(a.name)}: added to ${a.list_names.map(l => `&#x201C;${escHtml(l)}&#x201D;`).join(', ')}</div>`; });
         html += '</div></div>';
     }
     if (removals.length) {
         const uid = 'blaeo-r-rm-' + Date.now();
-        html += `<div><span class="blaeo-toggle" onclick="var d=document.getElementById('${uid}');d.style.display=d.style.display==='none'?'':'none'">${removals.length} group removal${removals.length !== 1 ? 's' : ''} &#x25BE;</span>`;
+        html += `<div><span class="blaeo-toggle" data-modal-row="r-rm" onclick="var d=document.getElementById('${uid}');d.style.display=d.style.display==='none'?'':'none'">${removals.length} group removal${removals.length !== 1 ? 's' : ''} &#x25BE;</span>`;
         html += `<div id="${uid}" class="blaeo-details" style="display:none">`;
         removals.forEach(r => { html += `<div>${escHtml(r.name)}: removed from &#x201C;${escHtml(r.list_name)}&#x201D;</div>`; });
         html += '</div></div>';
@@ -405,7 +405,7 @@ async function _sgWinsShowIdle() {
 function _sgWinsUnmatchedHtml(count) {
     if (!count) return '';
     return `<div style="margin-top:5px;">`
-        + `<span onclick="_sgWinsToggleUnmatched(this)" style="cursor:pointer;font-size:0.78rem;color:var(--accent);">`
+        + `<span data-modal-row="sgwins-unmatched" onclick="_sgWinsToggleUnmatched(this)" style="cursor:pointer;font-size:0.78rem;color:var(--accent);">`
         + `${count} win${count === 1 ? '' : 's'} not in your library &#x25BE;</span>`
         + `<div class="sgwins-unmatched" style="display:none;margin-top:4px;"></div></div>`;
 }
@@ -1781,7 +1781,7 @@ function pagRenderPersonalCats() {
         <div style="font-size:0.76rem; color:var(--text-secondary); margin-bottom:8px; line-height:1.4;">Categories where eligibility depends on your own history. Checking one restricts its games to entries verified specifically for your own SG username (set in Settings) — a verified entry for someone else doesn&rsquo;t apply to you.</div>`;
     sorted.forEach((cat, i) => {
         const checked = _pagPersonalCats.has(cat) ? ' checked' : '';
-        html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;" onclick="pagTogglePersonalCat(${i})">
+        html += `<div data-modal-row="pc-${i}" style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;" onclick="pagTogglePersonalCat(${i})">
             <input type="checkbox" style="width:auto;margin:0;flex-shrink:0;"${checked} onclick="event.stopPropagation();pagTogglePersonalCat(${i})">
             <span style="font-size:0.82rem;color:var(--text-primary);">${escHtml(cat)}</span>
         </div>`;
@@ -5057,7 +5057,7 @@ async function _renderPluginsList() {
                 <div id="plugin-confirm-${escHtml(p.id)}" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(199,71,71,0.1);border:1px solid rgba(199,71,71,0.3);border-radius:4px;font-size:0.82rem;">
                     <div style="color:var(--text-primary);margin-bottom:8px;">Delete the <strong>${escHtml(p.name)}</strong> plugin folder?</div>
                     ${p.game_count > 0 ? `
-                    <label style="display:flex;align-items:center;gap:8px;color:var(--text-primary);cursor:pointer;margin-bottom:8px;">
+                    <label data-modal-row="${pluginRow}" style="display:flex;align-items:center;gap:8px;color:var(--text-primary);cursor:pointer;margin-bottom:8px;">
                         <input type="checkbox" id="uninstall-rm-games-${escHtml(p.id)}" style="width:auto;margin:0;">
                         Also remove ${p.game_count} game${p.game_count !== 1 ? 's' : ''} from library
                     </label>` : ''}
@@ -5102,12 +5102,12 @@ async function _renderPluginsList() {
                 <div id="plugin-confirm-${escHtml(p.id)}" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(199,71,71,0.1);border:1px solid rgba(199,71,71,0.3);border-radius:4px;font-size:0.82rem;">
                     <div style="color:var(--text-primary);margin-bottom:8px;">Delete the <strong>${escHtml(p.name)}</strong> plugin folder?</div>
                     ${p.game_count > 0 ? `
-                    <label style="display:flex;align-items:center;gap:8px;color:var(--text-primary);cursor:pointer;margin-bottom:8px;">
+                    <label data-modal-row="${pluginRow}" style="display:flex;align-items:center;gap:8px;color:var(--text-primary);cursor:pointer;margin-bottom:8px;">
                         <input type="checkbox" id="uninstall-rm-games-${escHtml(p.id)}" style="width:auto;margin:0;">
                         Also remove ${p.game_count} game${p.game_count !== 1 ? 's' : ''} from library
                     </label>` : ''}
                     ${p.launcher && p.launcher.required ? `
-                    <label style="display:flex;align-items:center;gap:8px;color:var(--text-primary);cursor:pointer;margin-bottom:8px;">
+                    <label data-modal-row="${pluginRow}" style="display:flex;align-items:center;gap:8px;color:var(--text-primary);cursor:pointer;margin-bottom:8px;">
                         <input type="checkbox" id="uninstall-rm-launcher-${escHtml(p.id)}" style="width:auto;margin:0;" checked>
                         Also delete launcher and installed games
                     </label>` : ''}
