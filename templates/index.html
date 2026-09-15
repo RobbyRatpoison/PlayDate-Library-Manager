@@ -48,19 +48,22 @@
            is <= what's visible (the default) there's nothing to overflow,
            so this is a no-op and looks identical to the old overflow:visible. */
         overflow-x: auto; overflow-y: hidden;
-        scroll-snap-type: x mandatory;
         scrollbar-width: none; -ms-overflow-style: none;
         padding: 3px 0; box-sizing: border-box;
     }
     .shelf-grid::-webkit-scrollbar { display: none; }
-    /* Suspended while a JS-driven scroll animation (wheel or gamepad) is
-       actively writing .scrollLeft frame-by-frame -- mandatory snap otherwise
-       fights those incremental writes (each one looks like a completed scroll
-       to the browser, which tries to snap-correct it immediately), which is
-       what made both the reachable range and the animation itself look broken.
-       Both animations compute already-card-aligned targets on their own, so
-       nothing is lost by turning native snap off just for their duration. */
-    .shelf-grid.no-snap { scroll-snap-type: none; }
+    /* No native scroll-snap here (deliberately removed) -- it doesn't just
+       fight a JS-driven .scrollLeft write mid-animation (the documented
+       reason the old .no-snap toggle-class existed), it also independently
+       re-corrects a write *after* the fact, racing this app's own settle
+       correction (_scheduleSnapCorrection below) for who gets the final
+       say -- confirmed live via an automated scroll harness: the same
+       wheel scroll landed on two different card boundaries depending on
+       unrelated prior scroll state, purely from the two mechanisms
+       disagreeing. One deterministic JS-driven corrector replaces it
+       entirely; card alignment is enforced there for every input source
+       (wheel, trackpad, scrollbar, touch) rather than split between CSS
+       and JS. */
     /* Edge hint that a shelf scrolls further in that direction -- purely a
        decorative affordance (pointer-events:none, no click behavior), toggled
        by JS based on scroll position. A gradient-behind-a-glyph rather than a
@@ -81,7 +84,6 @@
         flex-shrink: 0; height: 100%; aspect-ratio: 2/3;
         border-radius: 8px; cursor: pointer;
         position: relative; overflow: hidden;
-        scroll-snap-align: start;
     }
     .shelf-capsule-inner {
         position: absolute; inset: 0; border-radius: 8px; overflow: hidden;
@@ -669,6 +671,7 @@ async function _reloadLastPlayedShelves() {
             }).join('');
             _observeShelfImages(grid);
             grid.scrollLeft = 0;
+            _clampShelfEdge(grid);
             _updateScrollHints(grid);
         } catch (_) {}
     }
@@ -707,6 +710,7 @@ async function shuffleShelf(shelfId, labelEl) {
         }).join('');
         _observeShelfImages(grid);
         grid.scrollLeft = 0;
+        _clampShelfEdge(grid);
         _updateScrollHints(grid);
     } finally {
         labelEl.style.opacity = '';
@@ -910,10 +914,72 @@ function _updateScrollHints(grid) {
     left.classList.toggle('visible', grid.scrollLeft > 1);
     right.classList.toggle('visible', grid.scrollLeft < maxScroll - 1);
 }
+// Nearest card-boundary scrollLeft to pos, for a shelf-grid whose capsules
+// are cw wide with a fixed 6px gap (matches .shelf-grid's own gap: 6px).
+// Shared by the wheel animation below (which eases toward this directly,
+// so the whole scroll -- not just its raw un-aligned target -- animates
+// onto a real boundary) and _scheduleSnapCorrection (for input this app
+// doesn't animate itself: trackpad/tilt-wheel deltaX, scrollbar drag,
+// touch).
+function _nearestCardBoundary(grid, pos) {
+    const caps = grid.querySelectorAll('.shelf-capsule-wrap');
+    if (!caps.length) return pos;
+    const cw = caps[0].getBoundingClientRect().width;
+    if (!cw) return pos;
+    const GAP = 6;
+    const step = cw + GAP;
+    const maxScroll = grid.scrollWidth - grid.clientWidth;
+    return Math.max(0, Math.min(maxScroll, Math.round(pos / step) * step));
+}
+
+// Correct a shelf's resting scrollLeft onto a real card boundary once
+// scrolling has actually stopped, for input this app doesn't animate
+// itself -- native scrolling from a trackpad/tilt-wheel's real deltaX, a
+// scrollbar drag, touch. (The wheel-deltaY animation below eases directly
+// onto a boundary as it goes, so it never needs a correction after the
+// fact -- see its own comment.) This is the ONLY thing that enforces card
+// alignment for those other inputs -- native CSS scroll-snap was
+// deliberately removed (see .shelf-grid's own comment) rather than paired
+// with this, since the two independently disagreeing on the same resting
+// position (confirmed live via an automated scroll harness) is worse than
+// either alone.
+//
+// Debounced so it only fires once scrolling has genuinely settled (not on
+// every event of a fast scroll), and snaps to the NEAREST boundary from
+// the current resting position: past the halfway point of a card advances
+// to the next one, short of halfway reverts to the current one -- the same
+// rule a native "mandatory" snap-carousel uses. A first version of this
+// snapped from an absolute reference position and broke repeated small
+// scrolls (couldn't get back to the leftmost game); this one always
+// measures from wherever the previous correction actually left off, so
+// repeated corrections in the same direction keep making progress instead
+// of each being judged in isolation -- verified via a Playwright harness
+// driving real synthetic wheel events end to end, including many small
+// scrolls back down to exactly 0.
+//
+// Defers to the wheel animation below (_wheelTargets) while it's still
+// live rather than correcting mid-flight -- the two independently writing
+// scrollLeft around the same time is what caused the fight described in
+// that animation's own comment. Re-schedules itself in that case so it
+// still runs once the animation actually finishes and fires its own final
+// 'scroll' event.
+const _scrollSettleTimers = new WeakMap();
+function _scheduleSnapCorrection(grid) {
+    clearTimeout(_scrollSettleTimers.get(grid));
+    _scrollSettleTimers.set(grid, setTimeout(() => {
+        _scrollSettleTimers.delete(grid);
+        if (_wheelTargets.has(grid)) { _scheduleSnapCorrection(grid); return; }
+        const pos = grid.scrollLeft;
+        const snapped = _nearestCardBoundary(grid, pos);
+        if (Math.abs(snapped - pos) < 0.5) return;
+        grid.scrollLeft = snapped;
+    }, 150));
+}
 window.addEventListener('load', () => {
     document.querySelectorAll('.shelf-grid').forEach(grid => {
+        _clampShelfEdge(grid);
         _updateScrollHints(grid);
-        grid.addEventListener('scroll', () => _updateScrollHints(grid), { passive: true });
+        grid.addEventListener('scroll', () => { _updateScrollHints(grid); _scheduleSnapCorrection(grid); }, { passive: true });
     });
 });
 
@@ -927,9 +993,29 @@ window.addEventListener('load', () => {
 // same reasoning as _animatedScrollIntoView/_animatedScrollIntoViewX in
 // input.js: don't lean on a native smooth-scroll implementation here either.
 // Wheel events arrive in a rapid burst per notch/flick, so this tracks one
-// running target per grid and eases toward it continuously rather than
-// restarting a fixed-duration tween on every event.
-const _wheelTargets = new WeakMap(); // grid -> target scrollLeft
+// running raw (unsnapped) target per grid and eases toward it continuously
+// rather than restarting a fixed-duration tween on every event -- but the
+// actual animated value chases that target's nearest card boundary
+// (_nearestCardBoundary), recomputed fresh every frame, so the whole scroll
+// lands smoothly ON a card rather than animating to the raw target and then
+// jumping the rest of the way after the fact. Recomputing per frame (not
+// once at the start) means a fast burst of several notches still redirects
+// smoothly toward a *further* boundary as more events raise the raw target,
+// instead of committing early to whichever card the first event implied.
+//
+// The eased position is tracked as its own authoritative JS float (`pos`,
+// closed over per animation) rather than re-read from grid.scrollLeft each
+// frame -- reading it back can be a slightly different (rounded) value than
+// what was just written, which made the diff-based convergence stall just
+// short of the target and sit there re-writing the same rounded value every
+// frame forever. _scheduleSnapCorrection's debounced 'scroll' listener saw
+// that as "settled" and corrected mid-animation, but this loop's own
+// _wheelTargets entry was still live, so its next queued frame immediately
+// resumed chasing the original target from the corrected position -- the
+// two fought indefinitely. Found and fixed via a Playwright harness logging
+// every scrollLeft write; see _scheduleSnapCorrection's own comment for the
+// other half of the fix (deferring to this animation while it's running).
+const _wheelTargets = new WeakMap(); // grid -> raw (unsnapped) target scrollLeft
 document.addEventListener('wheel', e => {
     const grid = e.target.closest('.shelf-grid');
     if (!grid || grid.scrollWidth <= grid.clientWidth) return;
@@ -941,29 +1027,28 @@ document.addEventListener('wheel', e => {
     const alreadyAnimating = _wheelTargets.has(grid);
     _wheelTargets.set(grid, target);
     if (alreadyAnimating) return;
-    // Suspend mandatory snap for the animation's duration -- see the
-    // .shelf-grid.no-snap CSS comment for why (it otherwise fights every
-    // one of these incremental scrollLeft writes).
-    grid.classList.add('no-snap');
+    let pos = grid.scrollLeft;
     function step() {
-        const t = _wheelTargets.get(grid);
-        const diff = t - grid.scrollLeft;
+        const t = _nearestCardBoundary(grid, _wheelTargets.get(grid));
+        const diff = t - pos;
         if (Math.abs(diff) < 0.5) {
-            grid.scrollLeft = t;
+            pos = t;
+            grid.scrollLeft = pos;
             _wheelTargets.delete(grid);
-            grid.classList.remove('no-snap');
             return;
         }
-        grid.scrollLeft += diff * 0.25;
+        pos += diff * 0.25;
+        grid.scrollLeft = pos;
         requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
 }, { passive: false });
 
-// How many capsules fit across the grid's current width. Used only to keep
-// shelf.limit in sync while editing (see _autoAdjustGames) -- actual visual
-// clipping is the shelf-grid's own overflow-x:auto now (a pool bigger than
-// what's visible just scrolls instead of needing anything hidden here).
+// How many capsules fit across the grid's current width. Used to keep
+// shelf.limit in sync while editing (see _autoAdjustGames) and to clip the
+// visible edge to whole capsules (see _clampShelfEdge below) -- the actual
+// scrolling itself is the shelf-grid's own overflow-x:auto (a pool bigger
+// than what's visible just scrolls, nothing needs hiding for that part).
 function computeFitCount(grid) {
     const caps = grid.querySelectorAll('.shelf-capsule-wrap');
     if (!caps.length) return null;
@@ -971,6 +1056,43 @@ function computeFitCount(grid) {
     const cw = caps[0].getBoundingClientRect().width;
     if (!cw || !gw) return null;
     return Math.floor((gw + 6) / (cw + 6));
+}
+
+// Clip a shelf's visible width down to a whole number of capsules so the
+// trailing edge never shows a cropped sliver of the next (off-screen) game
+// -- reported live on a Steam Deck: an unlimited/scrolling shelf whose
+// available width didn't divide evenly into whole capsules left a partial
+// card peeking in at the edge. Also centers the now-narrower row -- without
+// it, the leftover space from clipping sits entirely on the right, reading
+// as left-aligned (reported live after the clip-only version shipped).
+// Resets max-width/align-self before measuring so a previous run's own
+// clamp doesn't feed back into the next one (the wrap would otherwise only
+// ever ratchet narrower, never grow back on a resize to something wider).
+//
+// Only applies when the shelf actually overflows (more capsules than fit).
+// An underfull shelf (pool < what's visible) must stay untouched: its own
+// content is already narrower than the available width via .shelf-grid's
+// justify-content:flex-start, and is deliberately left-aligned rather than
+// centered (see that rule's own comment on the reliability tradeoff) --
+// centering it here too would silently override that.
+function _clampShelfEdge(grid) {
+    const wrap = grid.parentElement;
+    if (!wrap || !wrap.classList.contains('shelf-grid-wrap')) return;
+    const caps = grid.querySelectorAll('.shelf-capsule-wrap');
+    if (!caps.length) { wrap.style.maxWidth = ''; wrap.style.alignSelf = ''; return; }
+    wrap.style.maxWidth = 'none';
+    wrap.style.alignSelf = '';
+    const avail = wrap.getBoundingClientRect().width;
+    const cw = caps[0].getBoundingClientRect().width;
+    if (!avail || !cw) return;
+    const GAP = 6; // matches .shelf-grid's gap: 6px
+    const fitCount = Math.max(1, Math.floor((avail + GAP) / (cw + GAP)));
+    if (caps.length <= fitCount) return; // underfull -- leave left-aligned
+    const fitWidth = fitCount * (cw + GAP) - GAP;
+    if (fitWidth < avail - 0.5) {
+        wrap.style.maxWidth = fitWidth + 'px';
+        wrap.style.alignSelf = 'center';
+    }
 }
 
 // Redraw the completion/achievement pie widgets when their shelf resizes
@@ -983,7 +1105,7 @@ if (window.ResizeObserver) {
             const pie = e.target.querySelector('.completion-pie-canvas, .achievement-pie-canvas');
             if (pie) requestAnimationFrame(drawCompletionPies);
             const grid = e.target.querySelector('.shelf-grid');
-            if (grid) _updateScrollHints(grid);
+            if (grid) { _clampShelfEdge(grid); _updateScrollHints(grid); }
         });
     });
     function _observeShelfContainers() {
@@ -1200,6 +1322,7 @@ async function _refillShelfGrid(shelfId, grid, limit) {
         }).join('');
         _observeShelfImages(grid);
         grid.scrollLeft = 0;
+        _clampShelfEdge(grid);
         _updateScrollHints(grid);
     } catch (_) {}
 }
@@ -2397,6 +2520,7 @@ setInterval(async () => {
                         grid.appendChild(wrap);
                     });
                     _observeShelfImages(grid);
+                    _clampShelfEdge(grid);
                     _updateScrollHints(grid);
                 } catch { /* silently ignore */ }
             }

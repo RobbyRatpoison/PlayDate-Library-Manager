@@ -946,6 +946,11 @@
         // is the horizontal counterpart for that case.
         const container = _scrollableAncestor(el, 'y');
         const DURATION = 350;
+        // A focused item landing flush against the container's edge reads as
+        // cut off even when it's technically fully visible -- scroll a few
+        // extra px past it so there's a visible gap. Matches the 8px already
+        // used by _applyFocus()'s home-edit-mode toolbar scroll below.
+        const PAD = 8;
         const rect = el.getBoundingClientRect();
         let startPos, targetPos;
         // .nav-header is position:fixed, always covering the top of the
@@ -970,9 +975,9 @@
                 const visibleMid = topBound + (cRect.bottom - topBound) / 2;
                 targetPos = startPos + rect.top - visibleMid + (rect.height / 2);
             } else if (rect.top < topBound) {
-                targetPos = startPos + (rect.top - topBound);
+                targetPos = startPos + (rect.top - topBound - PAD);
             } else if (rect.bottom > cRect.bottom) {
-                targetPos = startPos + (rect.bottom - cRect.bottom);
+                targetPos = startPos + (rect.bottom - cRect.bottom + PAD);
             } else {
                 return;
             }
@@ -982,9 +987,9 @@
                 const visibleMid = navH + (window.innerHeight - navH) / 2;
                 targetPos = startPos + rect.top - visibleMid + (rect.height / 2);
             } else if (rect.top < navH) {
-                targetPos = startPos + (rect.top - navH);
+                targetPos = startPos + (rect.top - navH - PAD);
             } else if (rect.bottom > window.innerHeight) {
-                targetPos = startPos + rect.bottom - window.innerHeight;
+                targetPos = startPos + rect.bottom - window.innerHeight + PAD;
             } else {
                 return;
             }
@@ -1026,18 +1031,12 @@
         targetPos = Math.max(0, targetPos);
         const delta = targetPos - startPos;
         if (Math.abs(delta) < 1) return;
-        // Suspend mandatory snap for the animation's duration -- it otherwise
-        // fights every one of these incremental scrollLeft writes (each looks
-        // like a completed scroll to the browser, which tries to snap-correct
-        // it immediately). See the .shelf-grid.no-snap CSS comment.
-        container.classList.add('no-snap');
         const startTime = performance.now();
         const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
         function step(now) {
             const t = Math.min(1, (now - startTime) / DURATION);
             container.scrollLeft = startPos + delta * ease(t);
             if (t < 1) requestAnimationFrame(step);
-            else container.classList.remove('no-snap');
         }
         requestAnimationFrame(step);
     }

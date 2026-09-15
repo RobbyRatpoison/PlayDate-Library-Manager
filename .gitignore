@@ -85,3 +85,9 @@ TASKS.md
 PLUGINS_STATUS.md
 release.py
 .aider*
+
+# --- Local Debug Tools ---
+# Ad-hoc scripts for live-testing specific bugs against a running dev
+# server (e.g. Playwright harnesses) -- kept locally for reuse, not part
+# of the shipped app or meant to be reviewed/shipped as source.
+tools/debug/
