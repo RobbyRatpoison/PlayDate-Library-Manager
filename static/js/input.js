@@ -433,7 +433,13 @@
             el.scrollIntoView({ behavior: 'smooth', block: 'end' });
             return;
         }
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        // Modal bodies (and ctx-menu/dropdown lists) scroll via their own
+        // nested overflow-y:auto container, not window-level scroll — native
+        // el.scrollIntoView() reported unreliable there (confirmed: Library
+        // modal), same class of issue the library grid/home shelves above
+        // were already moved off native scrollIntoView for. Route through
+        // the same renderer-agnostic manual-RAF helper for consistency.
+        _animatedScrollIntoView(el, 'nearest');
     }
 
     // ── Focusable item queries ────────────────────────────────────────────────
