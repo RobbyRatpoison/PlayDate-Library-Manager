@@ -1,6 +1,6 @@
 # Release Notes
 
-## v1.10.7
+## v1.10.7 - 2026-09-15
 ### Improvements
 
 - Playtime and last-played times are now updated before the home page loads.
