@@ -582,11 +582,16 @@
 
 <!-- ── APPEARANCE MODAL ── -->
 <div id="appearance-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeAppearanceModal();">
-    <div class="modal-content" style="width:360px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2 style="margin:0; color:var(--text-primary);">Appearance</h2>
-            <button onclick="closeAppearanceModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+    <div class="modal-content" style="width:360px; max-height:90vh; padding:0; display:flex; flex-direction:column; overflow:hidden;">
+        <!-- Fixed header -->
+        <div style="flex-shrink:0; padding:1.875rem 1.875rem 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 style="margin:0; color:var(--text-primary);">Appearance</h2>
+                <button onclick="closeAppearanceModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+            </div>
         </div>
+        <!-- Scrollable body -->
+        <div style="overflow-y:auto; flex:1; min-height:0; padding:0 1.875rem 1.875rem;">
         <div class="hub-section">
             <button class="settings-item" data-modal-row="0" onclick="openBgModal()">Background &amp; Opacity</button>
             <button class="settings-item" data-modal-row="1" onclick="openThemePickerModal()">Theme</button>
@@ -664,6 +669,7 @@
                 </select>
                 <div style="font-size:0.75rem; color:#8f98a0; margin-top:15px;">Whichever corner this is in becomes unavailable for card badges.</div>
             </div>
+        </div>
         </div>
     </div>
 </div>
@@ -778,11 +784,16 @@
 
 <!-- ── COMMUNITY MODAL ── -->
 <div id="community-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeCommunityModal();">
-    <div class="modal-content" style="width:360px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2 style="margin:0; color:var(--text-primary);">Community</h2>
-            <button onclick="closeCommunityModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+    <div class="modal-content" style="width:360px; max-height:90vh; padding:0; display:flex; flex-direction:column; overflow:hidden;">
+        <!-- Fixed header -->
+        <div style="flex-shrink:0; padding:1.875rem 1.875rem 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 style="margin:0; color:var(--text-primary);">Community</h2>
+                <button onclick="closeCommunityModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+            </div>
         </div>
+        <!-- Scrollable body -->
+        <div style="overflow-y:auto; flex:1; min-height:0; padding:0 1.875rem 1.875rem;">
         <div class="hub-section">
             <button class="settings-item" data-modal-row="0" onclick="openPagModal()">PAGYWOSG Filter Builder</button>
             <button class="settings-item" data-modal-row="1" onclick="openMiamModal()">Monthly in a Month Filter Builder</button>
@@ -810,6 +821,7 @@
             <div class="hub-section-label">Play or Pay</div>
             <button id="pop-sync-btn" class="settings-item" data-modal-row="6" onclick="runPopSync()">Sync Play or Pay Picks</button>
             <div id="pop-sync-status" class="tool-status" style="margin-top:4px;padding:0 10px;"></div>
+        </div>
         </div>
     </div>
 </div>
@@ -865,11 +877,16 @@
 
 <!-- ── DATA MODAL ── -->
 <div id="data-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeDataModal();">
-    <div class="modal-content" style="width:360px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2 style="margin:0; color:var(--text-primary);">Data</h2>
-            <button onclick="closeDataModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+    <div class="modal-content" style="width:360px; max-height:90vh; padding:0; display:flex; flex-direction:column; overflow:hidden;">
+        <!-- Fixed header -->
+        <div style="flex-shrink:0; padding:1.875rem 1.875rem 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 style="margin:0; color:var(--text-primary);">Data</h2>
+                <button onclick="closeDataModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+            </div>
         </div>
+        <!-- Scrollable body -->
+        <div style="overflow-y:auto; flex:1; min-height:0; padding:0 1.875rem 1.875rem;">
         <div class="hub-section">
             <button class="settings-item" data-modal-row="0" onclick="openFilterIoModal()">Filter Import / Export</button>
             <button class="settings-item" data-modal-row="1" onclick="openBackupModal()">Backup &amp; Restore</button>
@@ -920,19 +937,25 @@
         <div class="hub-section">
             <button class="settings-item" data-modal-row="14" onclick="openBaseDir()">Open Program Folder</button>
         </div>
+        </div>
     </div>
 </div>
 
 <!-- ── SYSTEM MODAL ── -->
 <div id="system-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeSystemModal();">
-    <div class="modal-content" style="width:360px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2 style="margin:0; color:var(--text-primary);">System</h2>
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span style="font-size:0.78rem; color:var(--text-secondary);">v{{ app_version }}</span>
-                <button onclick="closeSystemModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+    <div class="modal-content" style="width:360px; max-height:90vh; padding:0; display:flex; flex-direction:column; overflow:hidden;">
+        <!-- Fixed header -->
+        <div style="flex-shrink:0; padding:1.875rem 1.875rem 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 style="margin:0; color:var(--text-primary);">System</h2>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:0.78rem; color:var(--text-secondary);">v{{ app_version }}</span>
+                    <button onclick="closeSystemModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+                </div>
             </div>
         </div>
+        <!-- Scrollable body -->
+        <div style="overflow-y:auto; flex:1; min-height:0; padding:0 1.875rem 1.875rem;">
         <div class="hub-section">
             <div class="hub-section-label">Updates</div>
             <button id="autoupdate-toggle-btn" class="settings-item" data-modal-row="0" onclick="toggleAutoUpdate()">Auto-check Updates: ON</button>
@@ -974,6 +997,7 @@
                 <button class="nav-btn" data-modal-row="7" onclick="resizeToSteamDeck()" style="font-size:0.8rem;">Resize to Steam Deck (1280x800)</button>
             </div>
         </div>
+        </div>
     </div>
 </div>
 
@@ -995,14 +1019,17 @@
 
 <!-- ── GAMEPAD REMAP MODAL ── -->
 <div id="gamepad-remap-modal" class="modal-overlay sub-modal" style="display:none;" onclick="if(event.target===this)closeGamepadRemap();">
-    <div class="modal-content" style="width:480px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-            <h2 style="margin:0; color:var(--text-primary);">Gamepad Controls</h2>
-            <button onclick="closeGamepadRemap()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">&#x2715;</button>
+    <div class="modal-content" style="width:480px; max-height:90vh; padding:0; display:flex; flex-direction:column; overflow:hidden;">
+        <!-- Fixed header -->
+        <div style="flex-shrink:0; padding:1.875rem 1.875rem 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <h2 style="margin:0; color:var(--text-primary);">Gamepad Controls</h2>
+                <button onclick="closeGamepadRemap()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">&#x2715;</button>
+            </div>
+            <div id="grm-controller" style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:14px;">No controller detected</div>
         </div>
-
-        <div id="grm-controller" style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:14px;">No controller detected</div>
-
+        <!-- Scrollable body -->
+        <div style="overflow-y:auto; flex:1; min-height:0; padding:0 1.875rem 1.875rem;">
         <div id="grm-rows" style="display:flex; flex-direction:column; gap:4px; margin-bottom:16px;"></div>
 
         <div style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:14px; line-height:1.5;">
@@ -1011,6 +1038,7 @@
 
         <div style="display:flex; justify-content:flex-end;">
             <button class="nav-btn" data-modal-row="99" onclick="grmResetDefaults()" style="font-size:0.82rem;">Reset to Defaults</button>
+        </div>
         </div>
     </div>
 </div>
@@ -1535,11 +1563,16 @@
 
 <!-- ── MONTHLY IN A MONTH MODAL ── -->
 <div id="miam-modal" class="modal-overlay sub-modal" style="display:none;" onclick="if(event.target===this)closeMiamModal();">
-    <div class="modal-content" style="width:min(500px,95vw);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <h2 style="margin:0; color:var(--text-primary);">Monthly in a Month</h2>
-            <button onclick="closeMiamModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+    <div class="modal-content" style="width:min(500px,95vw); max-height:90vh; padding:0; display:flex; flex-direction:column; overflow:hidden;">
+        <!-- Fixed header -->
+        <div style="flex-shrink:0; padding:1.875rem 1.875rem 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h2 style="margin:0; color:var(--text-primary);">Monthly in a Month</h2>
+                <button onclick="closeMiamModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+            </div>
         </div>
+        <!-- Scrollable body -->
+        <div style="overflow-y:auto; flex:1; min-height:0; padding:0 1.875rem 1.875rem;">
         <div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:14px;">
             Beat 6 games from the community list. <a href="#" data-modal-row="miam-sheet" onclick="event.preventDefault();var a=document.createElement('a');a.href='https://docs.google.com/spreadsheets/d/1xBd5rltp8WxQSnG2BVKPzr7quTLJCvCt2MaGCxzs-d8/edit';a.target='_blank';document.body.appendChild(a);a.click();document.body.removeChild(a);" style="color:var(--accent);">View spreadsheet ↗</a>
         </div>
@@ -1590,6 +1623,7 @@
             <button class="nav-btn" data-modal-row="miam-footer" onclick="closeMiamModal()">Close</button>
         </div>
         <div id="miam-save-status" class="tool-status" style="margin-bottom:0;"></div>
+        </div>
     </div>
 </div>
 
