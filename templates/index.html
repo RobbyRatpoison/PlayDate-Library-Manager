@@ -921,13 +921,20 @@ function _updateScrollHints(grid) {
 // onto a real boundary) and _scheduleSnapCorrection (for input this app
 // doesn't animate itself: trackpad/tilt-wheel deltaX, scrollbar drag,
 // touch).
-function _nearestCardBoundary(grid, pos) {
+// A shelf's card width (plus the fixed 6px gap between capsules -- matches
+// .shelf-grid's own `gap: 6px`) varies a lot between shelves: a compact
+// "Shuffle" row's capsules can be under half the width of a normal shelf's.
+// Shared so every consumer of "how wide is one card here" agrees.
+function _cardStep(grid) {
     const caps = grid.querySelectorAll('.shelf-capsule-wrap');
-    if (!caps.length) return pos;
+    if (!caps.length) return null;
     const cw = caps[0].getBoundingClientRect().width;
-    if (!cw) return pos;
-    const GAP = 6;
-    const step = cw + GAP;
+    return cw ? cw + 6 : null;
+}
+
+function _nearestCardBoundary(grid, pos) {
+    const step = _cardStep(grid);
+    if (!step) return pos;
     const maxScroll = grid.scrollWidth - grid.clientWidth;
     return Math.max(0, Math.min(maxScroll, Math.round(pos / step) * step));
 }
@@ -988,6 +995,15 @@ window.addEventListener('load', () => {
 // Trackpads/shift-wheel already send real deltaX, which native scrolling
 // handles on its own, so this only takes over when deltaX is negligible.
 //
+// e.deltaY is a fixed pixel amount per notch, independent of how wide this
+// particular shelf's cards are -- a compact shelf like Shuffle can have
+// cards under half the width of a normal one. Scaling it by this shelf's
+// own card step (relative to an assumed "typical" one-notch distance)
+// means one notch reliably moves about one card everywhere, instead of
+// moving one card on a wide-card shelf but two or more on a narrow one --
+// reported live on the Shuffle shelf specifically.
+const WHEEL_NOTCH_PX = 100; // assumed raw deltaY for one "typical" wheel notch
+//
 // Eased by hand via rAF rather than a plain scrollLeft assignment (which is
 // an instant jump, not a scroll) or native scrollBy({behavior:'smooth'}) --
 // same reasoning as _animatedScrollIntoView/_animatedScrollIntoViewX in
@@ -1022,8 +1038,10 @@ document.addEventListener('wheel', e => {
     if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
     e.preventDefault();
     const maxScroll = grid.scrollWidth - grid.clientWidth;
+    const cardStep = _cardStep(grid);
+    const scaledDelta = cardStep ? e.deltaY * (cardStep / WHEEL_NOTCH_PX) : e.deltaY;
     const current = _wheelTargets.has(grid) ? _wheelTargets.get(grid) : grid.scrollLeft;
-    const target = Math.max(0, Math.min(maxScroll, current + e.deltaY));
+    const target = Math.max(0, Math.min(maxScroll, current + scaledDelta));
     const alreadyAnimating = _wheelTargets.has(grid);
     _wheelTargets.set(grid, target);
     if (alreadyAnimating) return;
