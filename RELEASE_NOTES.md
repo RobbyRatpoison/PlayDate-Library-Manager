@@ -7,5 +7,6 @@
 
 ### Fixes
 
-- Fixed several menu screens (Appearance, Community, Data, System, Gamepad Controls, Monthly in a Month) cutting off content instead of scrolling on smaller screens like Steam Deck.
-- Fixed several checkboxes and toggles, including the BLAEO sync review list, not being selectable with a gamepad.
+- Fixed several menu screens not scrolling when content overflows the window.
+- Fixed several checkboxes and toggles not being selectable with a gamepad.
+- Fixed gamepad focus not scrolling into view inside menus.
