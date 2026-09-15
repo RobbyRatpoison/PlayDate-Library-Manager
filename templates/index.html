@@ -932,6 +932,27 @@ function _cardStep(grid) {
     return cw ? cw + 6 : null;
 }
 
+// Largest card step among every shelf currently on the page. Used as the
+// wheel handler's scaling reference instead of an assumed absolute "typical
+// notch" pixel amount -- that assumption can't actually be known (the same
+// physical wheel notch reports wildly different raw deltaY across
+// OS/compositor/mouse-scroll-speed combinations), and guessing it wrong
+// reintroduces the exact bug it was meant to fix, just uniformly instead of
+// only on compact shelves (confirmed live: a wrong guess made every shelf,
+// not just narrow ones, overshoot by the same wrong multiple). Scaling
+// relative to the page's own largest shelf instead needs no such guess: it
+// leaves the largest shelf's behavior exactly as raw deltaY already produced
+// (verified correct before any of this scaling existed) and only shrinks the
+// delta for shelves with smaller cards, proportionally to how much smaller.
+function _maxCardStep() {
+    let max = 0;
+    document.querySelectorAll('.shelf-grid').forEach(g => {
+        const step = _cardStep(g);
+        if (step && step > max) max = step;
+    });
+    return max || null;
+}
+
 function _nearestCardBoundary(grid, pos) {
     const step = _cardStep(grid);
     if (!step) return pos;
@@ -998,11 +1019,11 @@ window.addEventListener('load', () => {
 // e.deltaY is a fixed pixel amount per notch, independent of how wide this
 // particular shelf's cards are -- a compact shelf like Shuffle can have
 // cards under half the width of a normal one. Scaling it by this shelf's
-// own card step (relative to an assumed "typical" one-notch distance)
-// means one notch reliably moves about one card everywhere, instead of
-// moving one card on a wide-card shelf but two or more on a narrow one --
-// reported live on the Shuffle shelf specifically.
-const WHEEL_NOTCH_PX = 100; // assumed raw deltaY for one "typical" wheel notch
+// own card step relative to the page's largest shelf (_maxCardStep, see its
+// own comment for why that's the reference instead of an assumed absolute
+// "typical" pixel amount) means one notch reliably moves about one card
+// everywhere, instead of moving one card on a wide-card shelf but two or
+// more on a narrow one -- reported live on the Shuffle shelf specifically.
 //
 // Eased by hand via rAF rather than a plain scrollLeft assignment (which is
 // an instant jump, not a scroll) or native scrollBy({behavior:'smooth'}) --
@@ -1039,7 +1060,8 @@ document.addEventListener('wheel', e => {
     e.preventDefault();
     const maxScroll = grid.scrollWidth - grid.clientWidth;
     const cardStep = _cardStep(grid);
-    const scaledDelta = cardStep ? e.deltaY * (cardStep / WHEEL_NOTCH_PX) : e.deltaY;
+    const refStep = _maxCardStep();
+    const scaledDelta = (cardStep && refStep) ? e.deltaY * (cardStep / refStep) : e.deltaY;
     const current = _wheelTargets.has(grid) ? _wheelTargets.get(grid) : grid.scrollLeft;
     const target = Math.max(0, Math.min(maxScroll, current + scaledDelta));
     const alreadyAnimating = _wheelTargets.has(grid);
