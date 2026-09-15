@@ -1,12 +1,11 @@
 # Release Notes
 
-## v1.10.6 - 2026-09-13
+## v1.10.7
 ### Improvements
 
-- The PAGYWOSG tooltip and quals panel now flag a game whose SteamGifts win came only from winning its DLC, as a reminder to mention that when submitting the game.
-- Renamed the browser companion script from "PlayDate Date Importer" to "PlayDate Companion," since it now also handles SteamGifts wins sync.
+- Playtime and last-played times are now updated before the home page loads.
 
 ### Fixes
 
-- Fixed SteamGifts DLC win adoptions being silently reverted by a Full Refresh.
-- Fixed the SteamGifts sync progress bar jumping straight from about halfway to done.
+- Fixed several menu screens (Appearance, Community, Data, System, Gamepad Controls, Monthly in a Month) cutting off content instead of scrolling on smaller screens like Steam Deck.
+- Fixed several checkboxes and toggles, including the BLAEO sync review list, not being selectable with a gamepad.
