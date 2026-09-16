@@ -1,4 +1,5 @@
 import logging
+import math
 import re
 import sqlite3
 from datetime import datetime, timezone
@@ -456,17 +457,40 @@ def recalculate_tag_similarity():
     Cheap enough (~130ms even at 30,000 games, measured) to just run inline
     on every call -- no daemon-thread/cancellation machinery needed the way
     bulk_rescrape_games() needs it. Returns the number of games scored.
+
+    The liked pool is playtime-weighted (added v1.10.8, same formula
+    duplicated in pick.py's tag_similarity() closure): a game barely
+    touched before being marked Beaten/Completed shouldn't define "what
+    tags this person likes" as strongly as one that was actually played for
+    a long time. `_playtime_weight()` is a log curve that saturates at
+    `_PLAYTIME_WEIGHT_CAP_HOURS` -- heavily-diminishing returns rather than
+    a hard cutoff, so a 100hr and a 1000hr game land close together near the
+    cap (both near-fully weighted) while a 1hr game counts for much less and
+    a 5-minute one barely registers at all. The library-wide baseline pool
+    stays uniformly weighted -- it represents genre *presence* in the
+    library, not how much any of it was played.
     """
     conn = get_db()
     try:
-        def _tag_pool_rate(rows):
-            n = len(rows)
+        _PLAYTIME_WEIGHT_CAP_HOURS = 60  # hours at/above which weight saturates to 1.0
+
+        def _playtime_weight(playtime_minutes):
+            hours = (playtime_minutes or 0) / 60.0
+            if hours <= 0:
+                return 0.0
+            return min(1.0, math.log1p(hours) / math.log1p(_PLAYTIME_WEIGHT_CAP_HOURS))
+
+        def _tag_pool_rate(rows, weights=None):
+            n = len(rows) if weights is None else sum(weights)
             if not n:
                 return {}
-            counts: dict[str, int] = {}
-            for row in rows:
+            counts: dict[str, float] = {}
+            for i, row in enumerate(rows):
+                w = 1.0 if weights is None else weights[i]
+                if w <= 0:
+                    continue
                 for tag in [t.strip() for t in (row['tags'] or '').split(',') if t.strip()]:
-                    counts[tag] = counts.get(tag, 0) + 1
+                    counts[tag] = counts.get(tag, 0) + w
             return {t: c / n for t, c in counts.items()}
 
         # Steam only -- other platforms' plugins don't all populate `tags` with
@@ -476,13 +500,13 @@ def recalculate_tag_similarity():
         # this same column, which isn't genre/style data at all and would
         # otherwise poison both pools with noise unrelated to actual taste.
         liked_rows = conn.execute(
-            "SELECT tags FROM games "
+            "SELECT tags, playtime_forever FROM games "
             "WHERE completion_status IN ('Beaten', 'Completed') "
             "AND platform = 'steam' AND tags IS NOT NULL AND tags != ''"
         ).fetchall()
         if not liked_rows:
             liked_rows = conn.execute(
-                "SELECT tags FROM games "
+                "SELECT tags, playtime_forever FROM games "
                 "WHERE platform = 'steam' AND tags IS NOT NULL AND tags != '' "
                 "ORDER BY playtime_forever DESC LIMIT 50"
             ).fetchall()
@@ -490,7 +514,13 @@ def recalculate_tag_similarity():
             "SELECT tags FROM games WHERE platform = 'steam' AND tags IS NOT NULL AND tags != ''"
         ).fetchall()
 
-        liked_rate = _tag_pool_rate(liked_rows)
+        liked_weights = [_playtime_weight(r['playtime_forever']) for r in liked_rows]
+        if not any(w > 0 for w in liked_weights):
+            # No playtime data on any liked game at all (e.g. an imported
+            # library with untracked playtime) -- fall back to a flat count
+            # rather than losing the whole signal to an all-zero weighting.
+            liked_weights = None
+        liked_rate = _tag_pool_rate(liked_rows, liked_weights)
         library_rate = _tag_pool_rate(library_rows)
         # A tag in only a handful of library games can swing wildly on one or
         # two data points -- not enough sample to trust either direction, so

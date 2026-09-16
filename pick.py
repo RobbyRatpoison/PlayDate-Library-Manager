@@ -3,6 +3,7 @@ Pick 6 Scoring section for the six signals (tag similarity, review score,
 staleness, completion bias, playtime, release recency) and the fallback to
 top-50-most-played when there are no beaten games."""
 import logging
+import math
 import random
 
 from flask import Blueprint, jsonify, render_template, request
@@ -140,7 +141,7 @@ def pick_game():
         # all and would otherwise poison both pools with noise unrelated to
         # actual taste.
         liked_rows = db.execute(
-            "SELECT tags FROM games "
+            "SELECT tags, playtime_forever FROM games "
             "WHERE completion_status IN ('Beaten', 'Completed') "
             "AND platform = 'steam' AND tags IS NOT NULL AND tags != ''"
         ).fetchall()
@@ -149,7 +150,7 @@ def pick_game():
         if not liked_rows:
             using_fallback = True
             liked_rows = db.execute(
-                "SELECT tags FROM games "
+                "SELECT tags, playtime_forever FROM games "
                 "WHERE platform = 'steam' AND tags IS NOT NULL AND tags != '' "
                 "ORDER BY playtime_forever DESC LIMIT 50"
             ).fetchall()
@@ -173,24 +174,47 @@ def pick_game():
 
         db.close()
 
-        def _tag_pool_rate(rows):
+        _PLAYTIME_WEIGHT_CAP_HOURS = 60  # hours at/above which weight saturates to 1.0
+
+        def _playtime_weight(playtime_minutes):
+            """Diminishing-returns weight for how much a liked game's
+            playtime counts toward the tag profile -- a log curve that
+            saturates at _PLAYTIME_WEIGHT_CAP_HOURS, so a 100hr and a 1000hr
+            game land close together near the cap while a 1hr game (and
+            especially a 5-minute one) barely registers. Same formula
+            duplicated in database.recalculate_tag_similarity()."""
+            hours = (playtime_minutes or 0) / 60.0
+            if hours <= 0:
+                return 0.0
+            return min(1.0, math.log1p(hours) / math.log1p(_PLAYTIME_WEIGHT_CAP_HOURS))
+
+        def _tag_pool_rate(rows, weights=None):
             """{tag: fraction of these rows carrying it}. A tag common to both
             the liked and library-wide pools cancels toward neutral on its
             own -- no separate IDF/rarity correction needed, unlike the
             playtime-weighted-sum approach this replaced, where ubiquitous
             tags like 'Action' or 'Singleplayer' dominated every score
             regardless of whether they said anything distinctive about
-            taste."""
-            n = len(rows)
+            taste. `weights` (liked pool only) lets playtime scale each
+            row's contribution instead of counting every row equally."""
+            n = len(rows) if weights is None else sum(weights)
             if not n:
                 return {}
-            counts: dict[str, int] = {}
-            for row in rows:
+            counts: dict[str, float] = {}
+            for i, row in enumerate(rows):
+                w = 1.0 if weights is None else weights[i]
+                if w <= 0:
+                    continue
                 for tag in [t.strip() for t in (row['tags'] or '').split(',') if t.strip()]:
-                    counts[tag] = counts.get(tag, 0) + 1
+                    counts[tag] = counts.get(tag, 0) + w
             return {t: c / n for t, c in counts.items()}
 
-        liked_rate = _tag_pool_rate(liked_rows)
+        liked_weights = [_playtime_weight(r['playtime_forever']) for r in liked_rows]
+        if not any(w > 0 for w in liked_weights):
+            # No playtime data on any liked game at all -- fall back to a
+            # flat count rather than losing the whole signal.
+            liked_weights = None
+        liked_rate = _tag_pool_rate(liked_rows, liked_weights)
         library_rate = _tag_pool_rate(library_rows)
         # A tag in only a handful of library games can swing wildly on one or
         # two data points -- not enough sample to trust either direction, so
