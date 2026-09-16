@@ -10,7 +10,6 @@
 ### Improvements
 
 - Reorganized the menu: frequently used tools moved up, account/appearance/library/gamepad settings consolidated into a new Settings menu, and HowLongToBeat given its own menu entry.
-- Every settings sub-screen now shows a link back to where it was opened from.
 - Tag similarity now weighs how long you played a game, not just whether you finished it.
 
 ### Fixes
