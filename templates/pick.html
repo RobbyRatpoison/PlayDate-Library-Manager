@@ -746,7 +746,7 @@ function resetAdvTuneSettings() {
         'adv-hltb-long-floor': 10, 'adv-hltb-long-cap': 110, 'adv-hltb-short-cap': 10,
     };
     for (const [id, val] of Object.entries(defaults)) document.getElementById(id).value = val;
-    _onAdvTuneSlider('adv-smart-tag-weight', 'adv-v-smart-tag-weight', v => v + '% tags / ' + (100 - v) + '% review');
+    _onAdvTuneSlider('adv-smart-tag-weight', 'adv-v-smart-tag-weight', v => v + '/' + (100 - v));
     _onAdvTuneSlider('adv-staleness-cap',    'adv-v-staleness-cap',    v => v + ' days');
     _onAdvTuneSlider('adv-recency-cap',      'adv-v-recency-cap',      v => v + ' yr');
     _onAdvTuneSlider('adv-hltb-long-floor',  'adv-v-hltb-long-floor',  v => v + ' hr');
