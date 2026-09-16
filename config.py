@@ -29,7 +29,7 @@ def api_error(message, status=500, *, exc=None, log_label=None):
         log.error("%s: %s", log_label or message, exc, exc_info=True)
     return jsonify({"status": "error", "message": message}), status
 
-__version__ = "1.10.8"
+__version__ = "1.11.0"
 # Full tag this build came from (e.g. "1.6.5-beta.2"), overwritten by CI —
 # __version__ above is always the bare X.Y.Z (stripped of any -beta/-rc
 # suffix, since Inno Setup/display code assume that), so it alone can't tell
@@ -456,6 +456,18 @@ DEFAULT_STATE = {
     "auto_downgrade_completed": True,
     "startup_page": "home",
     "renderer": "gtk",
+    "tag_similarity_min_library_rate": 2.0,
+    "tag_similarity_smoothing_k": 4,
+    "tag_similarity_playtime_cap_hours": 60,
+    "pick6_staleness_cap_days": 730,
+    "pick6_recency_cap_years": 10,
+    "pick6_hltb_long_floor_hours": 10,
+    "pick6_hltb_long_cap_hours": 110,
+    "pick6_hltb_short_cap_hours": 10,
+    "pick6_smart_tag_weight": 65,
+    "gamepad_deadzone": 35,
+    "gamepad_repeat_initial_ms": 400,
+    "gamepad_repeat_rate_ms": 150,
 }
 
 def _current_renderer_display(state):
@@ -584,6 +596,18 @@ def inject_config_status():
         auto_complete_on_100pct=state.get('auto_complete_on_100pct', True),
         auto_downgrade_completed=state.get('auto_downgrade_completed', True),
         startup_page=state.get('startup_page', 'home'),
+        tag_similarity_min_library_rate=state.get('tag_similarity_min_library_rate', 2.0),
+        tag_similarity_smoothing_k=state.get('tag_similarity_smoothing_k', 4),
+        tag_similarity_playtime_cap_hours=state.get('tag_similarity_playtime_cap_hours', 60),
+        pick6_staleness_cap_days=state.get('pick6_staleness_cap_days', 730),
+        pick6_recency_cap_years=state.get('pick6_recency_cap_years', 10),
+        pick6_hltb_long_floor_hours=state.get('pick6_hltb_long_floor_hours', 10),
+        pick6_hltb_long_cap_hours=state.get('pick6_hltb_long_cap_hours', 110),
+        pick6_hltb_short_cap_hours=state.get('pick6_hltb_short_cap_hours', 10),
+        pick6_smart_tag_weight=state.get('pick6_smart_tag_weight', 65),
+        gamepad_deadzone=state.get('gamepad_deadzone', 35),
+        gamepad_repeat_initial_ms=state.get('gamepad_repeat_initial_ms', 400),
+        gamepad_repeat_rate_ms=state.get('gamepad_repeat_rate_ms', 150),
         platform_priority=_active_platform_priority(state),
         app_version=__build__,
         tutorial_seen=config.get('tutorial_seen', False),
@@ -1161,6 +1185,30 @@ def save_state(updates):
                 state["startup_page"] = updates["startup_page"]
         if "hide_duplicates" in updates:
             state["hide_duplicates"] = bool(updates["hide_duplicates"])
+        if "tag_similarity_min_library_rate" in updates:
+            state["tag_similarity_min_library_rate"] = max(0.0, min(20.0, float(updates["tag_similarity_min_library_rate"])))
+        if "tag_similarity_smoothing_k" in updates:
+            state["tag_similarity_smoothing_k"] = max(0, min(20, int(updates["tag_similarity_smoothing_k"])))
+        if "tag_similarity_playtime_cap_hours" in updates:
+            state["tag_similarity_playtime_cap_hours"] = max(1, min(500, int(updates["tag_similarity_playtime_cap_hours"])))
+        if "pick6_staleness_cap_days" in updates:
+            state["pick6_staleness_cap_days"] = max(1, min(3650, int(updates["pick6_staleness_cap_days"])))
+        if "pick6_recency_cap_years" in updates:
+            state["pick6_recency_cap_years"] = max(1, min(100, int(updates["pick6_recency_cap_years"])))
+        if "pick6_hltb_long_floor_hours" in updates:
+            state["pick6_hltb_long_floor_hours"] = max(0, min(500, int(updates["pick6_hltb_long_floor_hours"])))
+        if "pick6_hltb_long_cap_hours" in updates:
+            state["pick6_hltb_long_cap_hours"] = max(1, min(1000, int(updates["pick6_hltb_long_cap_hours"])))
+        if "pick6_hltb_short_cap_hours" in updates:
+            state["pick6_hltb_short_cap_hours"] = max(1, min(500, int(updates["pick6_hltb_short_cap_hours"])))
+        if "pick6_smart_tag_weight" in updates:
+            state["pick6_smart_tag_weight"] = max(0, min(100, int(updates["pick6_smart_tag_weight"])))
+        if "gamepad_deadzone" in updates:
+            state["gamepad_deadzone"] = max(0, min(90, int(updates["gamepad_deadzone"])))
+        if "gamepad_repeat_initial_ms" in updates:
+            state["gamepad_repeat_initial_ms"] = max(50, min(2000, int(updates["gamepad_repeat_initial_ms"])))
+        if "gamepad_repeat_rate_ms" in updates:
+            state["gamepad_repeat_rate_ms"] = max(20, min(1000, int(updates["gamepad_repeat_rate_ms"])))
         if "last_backup_at" in updates:
             state["last_backup_at"] = float(updates["last_backup_at"])
         if "platform_priority" in updates:

@@ -470,9 +470,13 @@ def recalculate_tag_similarity():
     stays uniformly weighted -- it represents genre *presence* in the
     library, not how much any of it was played.
     """
+    from config import load_state
+    _tuning = load_state()
     conn = get_db()
     try:
-        _PLAYTIME_WEIGHT_CAP_HOURS = 60  # hours at/above which weight saturates to 1.0
+        # Tunable via Settings -> Library -> Tag Similarity; see config.DEFAULT_STATE
+        # for the shipped defaults these fall back to.
+        _PLAYTIME_WEIGHT_CAP_HOURS = _tuning.get('tag_similarity_playtime_cap_hours', 60)
 
         def _playtime_weight(playtime_minutes):
             hours = (playtime_minutes or 0) / 60.0
@@ -526,7 +530,7 @@ def recalculate_tag_similarity():
         # two data points -- not enough sample to trust either direction, so
         # it's excluded rather than treated as a real signal (falls back to
         # 0.0/neutral wherever it's looked up, same as an unknown tag).
-        MIN_LIBRARY_RATE = 0.02
+        MIN_LIBRARY_RATE = _tuning.get('tag_similarity_min_library_rate', 2.0) / 100.0
         library_rate = {t: r for t, r in library_rate.items() if r >= MIN_LIBRARY_RATE}
         # Iterate library_rate's (already-filtered) keys only, not the union
         # with liked_rate -- a tag the floor above excluded must default to a
@@ -538,7 +542,7 @@ def recalculate_tag_similarity():
         # tag and nothing else beats one with several matching tags, purely
         # for having nothing to dilute its lone lucky tag. Empirically tuned
         # against a real library, not a principled constant.
-        SMOOTHING_K = 4
+        SMOOTHING_K = _tuning.get('tag_similarity_smoothing_k', 4)
 
         rows = conn.execute("SELECT appid, tags FROM games").fetchall()
         updates = []

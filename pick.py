@@ -174,7 +174,9 @@ def pick_game():
 
         db.close()
 
-        _PLAYTIME_WEIGHT_CAP_HOURS = 60  # hours at/above which weight saturates to 1.0
+        # Tunable via Settings -> Library -> Tag Similarity; see
+        # config.DEFAULT_STATE for the shipped defaults these fall back to.
+        _PLAYTIME_WEIGHT_CAP_HOURS = state.get('tag_similarity_playtime_cap_hours', 60)
 
         def _playtime_weight(playtime_minutes):
             """Diminishing-returns weight for how much a liked game's
@@ -220,7 +222,7 @@ def pick_game():
         # two data points -- not enough sample to trust either direction, so
         # it's excluded rather than treated as a real signal (falls back to
         # 0.0/neutral wherever it's looked up, same as an unknown tag).
-        MIN_LIBRARY_RATE = 0.02
+        MIN_LIBRARY_RATE = state.get('tag_similarity_min_library_rate', 2.0) / 100.0
         library_rate = {t: r for t, r in library_rate.items() if r >= MIN_LIBRARY_RATE}
         # Iterate library_rate's (already-filtered) keys only, not the union
         # with liked_rate -- a tag the floor above excluded must default to a
@@ -232,7 +234,7 @@ def pick_game():
         # tag and nothing else beats one with several matching tags, purely
         # for having nothing to dilute its lone lucky tag. Empirically tuned
         # against a real library, not a principled constant.
-        _TAG_SMOOTHING_K = 4
+        _TAG_SMOOTHING_K = state.get('tag_similarity_smoothing_k', 4)
 
         def _raw_tag_score(g):
             candidate_tags = [t.strip() for t in (g.get('tags') or '').split(',') if t.strip()]
@@ -270,16 +272,25 @@ def pick_game():
             if rp is not None and rp != '': return float(rp) / 100.0
             return None
 
+        _staleness_cap_days = state.get('pick6_staleness_cap_days', 730)
+
         def staleness_score(g):
             from datetime import datetime, timezone
             now = datetime.now(timezone.utc).timestamp()
             lp = g.get('last_played')
             if lp:
                 try:
-                    return min((now - float(lp)) / 86400, 730) / 730.0
+                    return min((now - float(lp)) / 86400, _staleness_cap_days) / _staleness_cap_days
                 except Exception:
                     return 0.5
             return 1.0
+
+        # Tunable via the Pick 6 page's Advanced panel; see config.DEFAULT_STATE
+        # for the shipped defaults these fall back to.
+        _hltb_long_floor_min = state.get('pick6_hltb_long_floor_hours', 10) * 60
+        _hltb_long_span_min = max(1, state.get('pick6_hltb_long_cap_hours', 110)
+                                   - state.get('pick6_hltb_long_floor_hours', 10)) * 60
+        _hltb_short_cap_min = state.get('pick6_hltb_short_cap_hours', 10) * 60
 
         def hltb_length_score(g):
             # Returns [0,1] where 1 = longest, or None if no data.
@@ -290,16 +301,16 @@ def pick_game():
             if not times:
                 return None  # handled as low (not neutral) by sig() via unknown_val
             if w_hltb >= 0:
-                # Prefer long: max time, floor at 10hrs, scale over 100hrs above floor.
-                # 10hr → 0, 35hr → 0.5, 110hr+ → 1.0
+                # Prefer long: max time, floor at the configured hours, scale
+                # over the configured span above that floor.
                 val = max(times)
-                return math.sqrt(max(0.0, min(float(val) - 600.0, 6000.0) / 6000.0)
-)
+                return math.sqrt(max(0.0, min(float(val) - _hltb_long_floor_min, _hltb_long_span_min) / _hltb_long_span_min))
             else:
-                # Prefer short: min time, cap at 10hrs.
-                # 0hr → 0, 2.5hr → 0.5, 10hr+ → 1.0
+                # Prefer short: min time, cap at the configured hours.
                 val = min(times)
-                return math.sqrt(min(float(val), 600.0) / 600.0)
+                return math.sqrt(min(float(val), _hltb_short_cap_min) / _hltb_short_cap_min)
+
+        _recency_cap_years = state.get('pick6_recency_cap_years', 10)
 
         def recency_score(g):
             rd = g.get('release_date')
@@ -309,7 +320,7 @@ def pick_game():
                 from datetime import datetime, timezone
                 year = datetime.fromtimestamp(float(rd), tz=timezone.utc).year
                 age_years = max(datetime.now().year - year, 0)
-                return 1.0 - min(age_years, 10) / 10.0
+                return 1.0 - min(age_years, _recency_cap_years) / _recency_cap_years
             except Exception:
                 return 0.5
 
@@ -383,7 +394,8 @@ def pick_game():
                 final = (sig(w_tags, sim) + sig(w_review, rev, unknown_val=0.1) + sig(w_staleness, stal)
                          + sig(w_recency, rec, unknown_val=0.1) + sig(w_hltb, hltb, unknown_val=0.1))
             else:
-                final = 0.65 * sim + 0.35 * (rev if rev is not None else 0.1)
+                tag_w = state.get('pick6_smart_tag_weight', 65) / 100.0
+                final = tag_w * sim + (1.0 - tag_w) * (rev if rev is not None else 0.1)
 
             return final, sim, matched
 

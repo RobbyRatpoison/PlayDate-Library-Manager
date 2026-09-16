@@ -204,6 +204,9 @@
             }
         },
         setCapturing(val) { _capturing = val; },
+        // Applied live so the Gamepad settings modal doesn't need a restart.
+        setDeadzone(pct) { STICK_DEAD = pct / 100; },
+        setRepeatTiming(initialMs, rateMs) { REPEAT_INITIAL = initialMs; REPEAT_RATE = rateMs; },
         // Dynamically register a lazily-created modal (e.g. plugin manage modals)
         registerModal(id) {
             if (_MODAL_IDS.includes(id)) return;
@@ -333,9 +336,13 @@
         hatRepeat:   0,
     };
 
-    const REPEAT_INITIAL  = 400;
-    const REPEAT_RATE     = 150;
-    const STICK_DEAD      = 0.35;
+    // Tunable via Settings -> Gamepad; window._GAMEPAD_* are injected in
+    // base.html from state.json (config.DEFAULT_STATE has the shipped
+    // defaults). `let` rather than `const` so setDeadzone()/setRepeatTiming()
+    // below can apply a change live without a page reload.
+    let REPEAT_INITIAL  = window._GAMEPAD_REPEAT_INITIAL_MS ?? 400;
+    let REPEAT_RATE     = window._GAMEPAD_REPEAT_RATE_MS ?? 150;
+    let STICK_DEAD       = (window._GAMEPAD_DEADZONE ?? 35) / 100;
     // Gamepad Diagnostics exists to show raw button/axis state, so normal
     // app-level dispatch (A clicking the focused element, B closing modals)
     // is suppressed entirely while it's open — otherwise neither button

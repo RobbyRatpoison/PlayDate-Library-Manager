@@ -5550,6 +5550,57 @@ async function recalculateTagSimilarity() {
         status.textContent = '✘ Error: ' + e.message;
     }
 }
+
+function _onTagSimSlider(el, valId, suffix) {
+    document.getElementById(valId).textContent = el.value + suffix;
+    const pct = (el.value - el.min) / (el.max - el.min) * 100;
+    el.style.setProperty('--slider-pct', pct + '%');
+}
+
+(function _initTagSimSliders() {
+    for (const id of ['tagsim-min-rate-slider', 'tagsim-smoothing-slider', 'tagsim-playtime-cap-slider']) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const pct = (el.value - el.min) / (el.max - el.min) * 100;
+        el.style.setProperty('--slider-pct', pct + '%');
+    }
+})();
+
+async function _saveTagSimAndRecalc(minRate, smoothingK, playtimeCap) {
+    const status = document.getElementById('tagsim-settings-status');
+    savePreference({
+        tag_similarity_min_library_rate: minRate,
+        tag_similarity_smoothing_k: smoothingK,
+        tag_similarity_playtime_cap_hours: playtimeCap,
+    });
+    status.textContent = 'Recalculating…';
+    try {
+        const r = await fetch('/api/recalculate-tag-similarity', { method: 'POST' });
+        const d = await r.json();
+        status.textContent = r.ok ? `Saved -- ${d.scored ?? 0} games rescored` : 'Saved, but recalculation failed';
+    } catch (e) {
+        status.textContent = 'Saved, but recalculation errored: ' + e.message;
+    }
+}
+
+function saveTagSimSettings() {
+    const minRate = parseFloat(document.getElementById('tagsim-min-rate-slider').value);
+    const smoothingK = parseInt(document.getElementById('tagsim-smoothing-slider').value, 10);
+    const playtimeCap = parseInt(document.getElementById('tagsim-playtime-cap-slider').value, 10);
+    _saveTagSimAndRecalc(minRate, smoothingK, playtimeCap);
+}
+
+function resetTagSimSettings() {
+    const defaults = { minRate: 2, smoothingK: 4, playtimeCap: 60 };
+    const mr = document.getElementById('tagsim-min-rate-slider');
+    const sk = document.getElementById('tagsim-smoothing-slider');
+    const pc = document.getElementById('tagsim-playtime-cap-slider');
+    mr.value = defaults.minRate; sk.value = defaults.smoothingK; pc.value = defaults.playtimeCap;
+    _onTagSimSlider(mr, 'tagsim-min-rate-val', '%');
+    _onTagSimSlider(sk, 'tagsim-smoothing-val', '');
+    _onTagSimSlider(pc, 'tagsim-playtime-cap-val', 'hr');
+    _saveTagSimAndRecalc(defaults.minRate, defaults.smoothingK, defaults.playtimeCap);
+}
 async function runPopSync(confirmCleanup) {
     const status = document.getElementById('pop-sync-status');
     status.textContent = confirmCleanup === undefined ? 'Syncing…' : 'Updating…';
@@ -5631,6 +5682,67 @@ function openGamepadModal() {
 }
 function closeGamepadModal() {
     document.getElementById('gamepad-modal').style.display = 'none';
+}
+
+function _onGamepadFeelSlider(el, valId) {
+    const suffix = el.id === 'gamepad-deadzone-slider' ? '%' : 'ms';
+    document.getElementById(valId).textContent = el.value + suffix;
+    const pct = (el.value - el.min) / (el.max - el.min) * 100;
+    el.style.setProperty('--slider-pct', pct + '%');
+}
+
+(function _initGamepadFeelSliders() {
+    for (const id of ['gamepad-deadzone-slider', 'gamepad-repeat-initial-slider', 'gamepad-repeat-rate-slider']) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const pct = (el.value - el.min) / (el.max - el.min) * 100;
+        el.style.setProperty('--slider-pct', pct + '%');
+    }
+})();
+
+function _applyGamepadFeel(deadzone, initialMs, rateMs) {
+    window._GAMEPAD_DEADZONE = deadzone;
+    window._GAMEPAD_REPEAT_INITIAL_MS = initialMs;
+    window._GAMEPAD_REPEAT_RATE_MS = rateMs;
+    if (window._inputMgr) {
+        window._inputMgr.setDeadzone(deadzone);
+        window._inputMgr.setRepeatTiming(initialMs, rateMs);
+    }
+}
+
+function saveGamepadFeel() {
+    const deadzone  = parseInt(document.getElementById('gamepad-deadzone-slider').value, 10);
+    const initialMs = parseInt(document.getElementById('gamepad-repeat-initial-slider').value, 10);
+    const rateMs    = parseInt(document.getElementById('gamepad-repeat-rate-slider').value, 10);
+    const status = document.getElementById('gamepad-feel-status');
+    _applyGamepadFeel(deadzone, initialMs, rateMs);
+    savePreference({
+        gamepad_deadzone: deadzone,
+        gamepad_repeat_initial_ms: initialMs,
+        gamepad_repeat_rate_ms: rateMs,
+    });
+    status.textContent = 'Saved.';
+    setTimeout(() => { status.textContent = ''; }, 2000);
+}
+
+function resetGamepadFeel() {
+    const defaults = { deadzone: 35, initialMs: 400, rateMs: 150 };
+    const dz = document.getElementById('gamepad-deadzone-slider');
+    const ri = document.getElementById('gamepad-repeat-initial-slider');
+    const rr = document.getElementById('gamepad-repeat-rate-slider');
+    dz.value = defaults.deadzone; ri.value = defaults.initialMs; rr.value = defaults.rateMs;
+    _onGamepadFeelSlider(dz, 'gamepad-deadzone-val');
+    _onGamepadFeelSlider(ri, 'gamepad-repeat-initial-val');
+    _onGamepadFeelSlider(rr, 'gamepad-repeat-rate-val');
+    _applyGamepadFeel(defaults.deadzone, defaults.initialMs, defaults.rateMs);
+    savePreference({
+        gamepad_deadzone: defaults.deadzone,
+        gamepad_repeat_initial_ms: defaults.initialMs,
+        gamepad_repeat_rate_ms: defaults.rateMs,
+    });
+    const status = document.getElementById('gamepad-feel-status');
+    status.textContent = 'Reset to defaults.';
+    setTimeout(() => { status.textContent = ''; }, 2000);
 }
 function openAdvancedModal() {
     document.getElementById('advanced-modal').style.display = 'flex';

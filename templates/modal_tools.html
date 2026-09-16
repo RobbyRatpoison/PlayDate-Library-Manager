@@ -767,6 +767,40 @@
                 <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Scores every game by tag similarity to your Beaten/Completed games (the same taste profile Pick 6 uses), so it can be used as a sort option in Library and Home. Recalculates automatically after a sync, rescrape, or a relevant edit — this forces it right away.</div>
                 <button class="nav-btn" style="font-size:0.8rem;" data-modal-row="27" onclick="recalculateTagSimilarity()">Recalculate Now</button>
                 <div id="tag-similarity-status" style="font-size:0.78rem; color:#8f98a0; margin-top:4px; min-height:1em;"></div>
+
+                <div style="margin-top:14px; border-top:1px solid var(--border); padding-top:10px;">
+                    <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Rare-tag floor</label>
+                    <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Tags present in fewer than this % of your Steam library are ignored entirely (too small a sample to trust). Lower to let rarer tags count; raise if the disliked-tags list looks noisy.</div>
+                    <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                        <input type="range" id="tagsim-min-rate-slider" min="0" max="10" step="0.5" value="{{ tag_similarity_min_library_rate }}"
+                            oninput="_onTagSimSlider(this, 'tagsim-min-rate-val', '%')"
+                            class="hltb-slider" data-modal-row="24">
+                        <span id="tagsim-min-rate-val" style="font-size:0.85rem; color:var(--text-primary); min-width:36px; text-align:right; flex-shrink:0;">{{ tag_similarity_min_library_rate }}%</span>
+                    </div>
+                </div>
+                <div style="margin-top:10px;">
+                    <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Smoothing</label>
+                    <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Higher values pull sparsely-tagged games toward neutral so one lucky tag can't outscore a game with several genuinely matching tags.</div>
+                    <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                        <input type="range" id="tagsim-smoothing-slider" min="0" max="20" value="{{ tag_similarity_smoothing_k }}"
+                            oninput="_onTagSimSlider(this, 'tagsim-smoothing-val', '')"
+                            class="hltb-slider" data-modal-row="25">
+                        <span id="tagsim-smoothing-val" style="font-size:0.85rem; color:var(--text-primary); min-width:28px; text-align:right; flex-shrink:0;">{{ tag_similarity_smoothing_k }}</span>
+                    </div>
+                </div>
+                <div style="margin-top:10px;">
+                    <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Playtime saturation</label>
+                    <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Hours a Beaten/Completed game needs before it counts at full weight in your taste profile. Lower if short games should shape your profile just as much as long ones.</div>
+                    <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                        <input type="range" id="tagsim-playtime-cap-slider" min="1" max="200" value="{{ tag_similarity_playtime_cap_hours }}"
+                            oninput="_onTagSimSlider(this, 'tagsim-playtime-cap-val', 'hr')"
+                            class="hltb-slider" data-modal-row="26">
+                        <span id="tagsim-playtime-cap-val" style="font-size:0.85rem; color:var(--text-primary); min-width:36px; text-align:right; flex-shrink:0;">{{ tag_similarity_playtime_cap_hours }}hr</span>
+                    </div>
+                </div>
+                <button class="nav-btn" style="margin-top:10px; font-size:0.8rem;" data-modal-row="28" onclick="saveTagSimSettings()">Save</button>
+                <button class="nav-btn" style="margin-top:10px; margin-left:6px; font-size:0.8rem;" data-modal-row="28" onclick="resetTagSimSettings()">Reset to Defaults</button>
+                <div id="tagsim-settings-status" style="font-size:0.78rem; color:#8f98a0; margin-top:4px; min-height:1em;"></div>
             </div>
         </div>
         </div>
@@ -975,6 +1009,42 @@
             <button id="gamepad-suppress-btn" class="settings-item" data-modal-row="1" onclick="toggleGamepadSuppress()">Pause gamepad on launch: ON</button>
             <button class="settings-item" data-modal-row="2" onclick="openGamepadRemap()">Gamepad Controls</button>
             <button class="settings-item" data-modal-row="3" onclick="openGamepadDiag()">Gamepad Diagnostics</button>
+        </div>
+        <div class="hub-section">
+            <div class="hub-section-label">Stick Feel</div>
+            <div style="padding:8px 10px;">
+                <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Dead zone</label>
+                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">How far a stick must move before it registers. Raise this if a pad drifts or scrolls on its own at rest.</div>
+                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                    <input type="range" id="gamepad-deadzone-slider" min="0" max="90" value="{{ gamepad_deadzone }}"
+                        oninput="_onGamepadFeelSlider(this, 'gamepad-deadzone-val')"
+                        class="hltb-slider" data-modal-row="4">
+                    <span id="gamepad-deadzone-val" style="font-size:0.85rem; color:var(--text-primary); min-width:32px; text-align:right; flex-shrink:0;">{{ gamepad_deadzone }}%</span>
+                </div>
+            </div>
+            <div style="padding:8px 10px;">
+                <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Repeat: initial delay</label>
+                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">How long a button/stick must be held before it starts auto-repeating.</div>
+                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                    <input type="range" id="gamepad-repeat-initial-slider" min="50" max="1000" step="10" value="{{ gamepad_repeat_initial_ms }}"
+                        oninput="_onGamepadFeelSlider(this, 'gamepad-repeat-initial-val')"
+                        class="hltb-slider" data-modal-row="5">
+                    <span id="gamepad-repeat-initial-val" style="font-size:0.85rem; color:var(--text-primary); min-width:40px; text-align:right; flex-shrink:0;">{{ gamepad_repeat_initial_ms }}ms</span>
+                </div>
+            </div>
+            <div style="padding:8px 10px;">
+                <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Repeat: rate</label>
+                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">How fast it repeats once held past the initial delay. Lower is faster.</div>
+                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                    <input type="range" id="gamepad-repeat-rate-slider" min="20" max="500" step="5" value="{{ gamepad_repeat_rate_ms }}"
+                        oninput="_onGamepadFeelSlider(this, 'gamepad-repeat-rate-val')"
+                        class="hltb-slider" data-modal-row="6">
+                    <span id="gamepad-repeat-rate-val" style="font-size:0.85rem; color:var(--text-primary); min-width:40px; text-align:right; flex-shrink:0;">{{ gamepad_repeat_rate_ms }}ms</span>
+                </div>
+                <button class="nav-btn" style="margin-top:8px; font-size:0.8rem;" data-modal-row="7" onclick="saveGamepadFeel()">Save</button>
+                <button class="nav-btn" style="margin-top:8px; margin-left:6px; font-size:0.8rem;" data-modal-row="7" onclick="resetGamepadFeel()">Reset to Defaults</button>
+                <div id="gamepad-feel-status" style="font-size:0.78rem; color:#8f98a0; margin-top:4px; min-height:1em;"></div>
+            </div>
         </div>
         </div>
     </div>
