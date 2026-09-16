@@ -5,7 +5,7 @@
 
 - Added a Settings menu for tuning how tag similarity matching works.
 - Added gamepad dead zone and repeat-speed settings.
-- Added an Advanced Tuning panel on Pick 6 for adjusting how staleness, release date, and length affect picks.
+- Added an Advanced Tuning menu on Pick 6 for adjusting how staleness, release date, and length affect picks.
 
 ### Improvements
 
