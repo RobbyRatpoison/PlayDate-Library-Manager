@@ -345,6 +345,13 @@ div.nav-dropdown .custom-select-btn:hover {
     background: transparent;
     z-index: 1001;
 }
+/* A sub-modal whose own parent is itself a sub-modal (e.g. Settings -> Appearance ->
+   Background Image) needs a third stacking tier -- otherwise it ties with its parent's
+   z-index and DOM order (not open recency) decides which one paints on top. */
+.modal-overlay.sub-sub-modal {
+    background: transparent;
+    z-index: 1002;
+}
 
 .modal-content {
     background: var(--bg-surface);

@@ -772,28 +772,37 @@
         'update-confirm-overlay', // base.html install-update confirmation
         'whats-new-modal',     // base.html post-update changelog popup
         'editModal', 'filterModal', 'viewModal',
-        // Data modal sub-modals
-        'backup-modal', 'bg-modal', 'import-modal',
         // Library bulk modals
         'bulk-edit-modal', 'bulk-rescrape-modal', 'bulk-delete-modal',
         // Tools page expanding modals
-        'pagywosg-modal', 'steam-junk-modal', 'blacklist-modal', 'theme-modal', 'send-log-modal',
+        'blacklist-modal',
         // Sub-modals of hamburger items (before their parents)
-        'dup-entries-modal',   // from library-modal
+        'cardOutlinesModal',   // from appearance-modal
+        'cardBadgesModal',     // from appearance-modal
+        'bg-modal',            // from appearance-modal
+        'theme-modal',         // from appearance-modal
         'theme-picker-modal',  // from appearance-modal
+        'dup-entries-modal',   // from library-modal
+        'pagywosg-modal',      // from community-modal
+        'miam-modal',          // from community-modal
         'santa-modal',         // from community-modal
+        'backup-modal',        // from data-modal
+        'import-modal',        // from data-modal
         'playnite-modal',      // from data-modal
         'filter-io-modal',     // from data-modal
         'gamepad-remap-modal', // from gamepad-modal
         'gamepad-diag-modal',  // from gamepad-modal
-        // Top-level hamburger modals
-        'hltb-modal',
-        'settings-modal',
+        'send-log-modal',      // from advanced-modal
+        'steam-junk-modal',    // from blacklist-modal
+        // Settings hub sub-modals (before settings-modal itself)
         'account-modal',
         'appearance-modal',
         'library-modal',
         'gamepad-modal',
         'advanced-modal',
+        // Top-level hamburger modals
+        'hltb-modal',
+        'settings-modal',
         'emulators-modal',
         'plugins-modal',
         'community-modal',
@@ -2300,28 +2309,32 @@
             ['bulk-rescrape-modal',   'closeBulkRescrapeModal'],
             ['bulk-delete-modal',     'closeBulkDeleteModal'],
             // sub-modals (before their parents)
-            ['dup-entries-modal',     'closeDupEntriesModal'],
+            ['cardOutlinesModal',     'closeCardOutlinesModal'],
+            ['cardBadgesModal',       'closeCardBadgesModal'],
+            ['bg-modal',              'closeBgModal'],
+            ['theme-modal',           'closeThemeModal'],
             ['theme-picker-modal',    'closeThemePickerModal'],
+            ['dup-entries-modal',     'closeDupEntriesModal'],
+            ['pagywosg-modal',        'closePagModal'],
+            ['miam-modal',            'closeMiamModal'],
             ['santa-modal',           'closeSantaModal'],
+            ['backup-modal',          'closeBackupModal'],
+            ['import-modal',          'closeImportModal'],
             ['playnite-modal',        'closePlayniteModal'],
             ['filter-io-modal',       'closeFilterIoModal'],
-            ['backup-modal',          'closeBackupModal'],
-            ['bg-modal',              'closeBgModal'],
-            ['import-modal',          'closeImportModal'],
-            ['pagywosg-modal',        'closePagModal'],
-            ['steam-junk-modal',      'closeSteamJunkModal'],
-            ['theme-modal',           'closeThemeModal'],
-            ['send-log-modal',        'closeSendLogModal'],
             ['gamepad-remap-modal',   'closeGamepadRemap'],
             ['gamepad-diag-modal',    'closeGamepadDiag'],
-            // top-level hamburger modals
-            ['hltb-modal',            'closeHltbModal'],
-            ['settings-modal',        'closeSettingsModal'],
+            ['send-log-modal',        'closeSendLogModal'],
+            ['steam-junk-modal',      'closeSteamJunkModal'],
+            // settings hub sub-modals (before settings-modal itself)
             ['account-modal',         'closeAccountModal'],
             ['appearance-modal',      'closeAppearanceModal'],
             ['library-modal',         'closeLibraryModal'],
             ['gamepad-modal',         'closeGamepadModal'],
             ['advanced-modal',        'closeAdvancedModal'],
+            // top-level hamburger modals
+            ['hltb-modal',            'closeHltbModal'],
+            ['settings-modal',        'closeSettingsModal'],
             ['emulators-modal',       'closeEmulatorsModal'],
             ['plugins-modal',         'closePluginsModal'],
             ['community-modal',       'closeCommunityModal'],
@@ -3166,9 +3179,12 @@
         _watchModal('bg-modal');
         _watchModal('import-modal');
         _watchModal('pagywosg-modal');
+        _watchModal('miam-modal');
         _watchModal('steam-junk-modal');
         _watchModal('theme-modal');
         _watchModal('send-log-modal');
+        _watchModal('cardOutlinesModal');
+        _watchModal('cardBadgesModal');
 
         // Color picker popover — dynamically inserted/removed from document.body
         const _cpPopVisible = () => !!document.getElementById('_color-picker-popover');
