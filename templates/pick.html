@@ -456,6 +456,8 @@
                 </div>
                 <span id="mode-desc" class="mode-desc">Picks any game with equal probability.</span>
                 <span id="smart-bounds-info" class="smart-bounds-info" style="display:none;">Auto-filter: review &ge; 70%</span>
+                <button onclick="openAdvTuneModal()" title="Advanced Tuning" data-tooltip="Advanced Tuning"
+                        style="margin-left:auto; background:none; border:none; color:#8f98a0; font-size:1.1rem; cursor:pointer; padding:2px 6px; line-height:1;">&#9881;</button>
             </div>
 
             <!-- Weighted sliders (shown only in weighted mode) -->
@@ -517,51 +519,6 @@
                             <input type="number" class="bound-input" id="bi-hltb" placeholder="hours" min="0" max="9999" value="3">
                             <span class="bound-unit">hrs</span>
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Advanced curve/blend tuning (affects Smart + Weighted scoring, not Random) -->
-            <div class="weighted-panel open collapsed" id="advtune-panel">
-                <div class="weighted-panel-header" onclick="toggleAdvTunePanel()">
-                    <span class="weighted-panel-title">Advanced Tuning</span>
-                    <span class="weighted-panel-chevron">&#9660;</span>
-                </div>
-                <div class="weighted-panel-body">
-                    <div class="slider-row">
-                        <div class="slider-label">Smart mode blend<small>Tag similarity vs. review score, when not using Weighted</small></div>
-                        <input type="range" id="adv-smart-tag-weight" min="0" max="100" value="{{ pick6_smart_tag_weight }}" oninput="_onAdvTuneSlider('adv-smart-tag-weight', 'adv-v-smart-tag-weight', v => v + '/' + (100-v))">
-                        <span class="slider-val" id="adv-v-smart-tag-weight" style="width:auto; white-space:nowrap;">{{ pick6_smart_tag_weight }}/{{ 100 - pick6_smart_tag_weight }}</span>
-                    </div>
-                    <div class="slider-row">
-                        <div class="slider-label">Staleness cap<small>Days since last played that count as "maximally stale"</small></div>
-                        <input type="range" id="adv-staleness-cap" min="30" max="2000" value="{{ pick6_staleness_cap_days }}" oninput="_onAdvTuneSlider('adv-staleness-cap', 'adv-v-staleness-cap', v => v + ' days')">
-                        <span class="slider-val" id="adv-v-staleness-cap">{{ pick6_staleness_cap_days }} days</span>
-                    </div>
-                    <div class="slider-row">
-                        <div class="slider-label">Recency cap<small>Age in years that counts as "maximally old"</small></div>
-                        <input type="range" id="adv-recency-cap" min="1" max="50" value="{{ pick6_recency_cap_years }}" oninput="_onAdvTuneSlider('adv-recency-cap', 'adv-v-recency-cap', v => v + ' yr')">
-                        <span class="slider-val" id="adv-v-recency-cap">{{ pick6_recency_cap_years }} yr</span>
-                    </div>
-                    <div class="slider-row">
-                        <div class="slider-label">Prefer-long HLTB floor<small>Below this, a long game scores 0 on Length</small></div>
-                        <input type="range" id="adv-hltb-long-floor" min="0" max="100" value="{{ pick6_hltb_long_floor_hours }}" oninput="_onAdvTuneSlider('adv-hltb-long-floor', 'adv-v-hltb-long-floor', v => v + ' hr')">
-                        <span class="slider-val" id="adv-v-hltb-long-floor">{{ pick6_hltb_long_floor_hours }} hr</span>
-                    </div>
-                    <div class="slider-row">
-                        <div class="slider-label">Prefer-long HLTB cap<small>At or above this, a long game scores 1.0 on Length</small></div>
-                        <input type="range" id="adv-hltb-long-cap" min="10" max="300" value="{{ pick6_hltb_long_cap_hours }}" oninput="_onAdvTuneSlider('adv-hltb-long-cap', 'adv-v-hltb-long-cap', v => v + ' hr')">
-                        <span class="slider-val" id="adv-v-hltb-long-cap">{{ pick6_hltb_long_cap_hours }} hr</span>
-                    </div>
-                    <div class="slider-row">
-                        <div class="slider-label">Prefer-short HLTB cap<small>At or above this, a short game scores 0 on Length</small></div>
-                        <input type="range" id="adv-hltb-short-cap" min="1" max="100" value="{{ pick6_hltb_short_cap_hours }}" oninput="_onAdvTuneSlider('adv-hltb-short-cap', 'adv-v-hltb-short-cap', v => v + ' hr')">
-                        <span class="slider-val" id="adv-v-hltb-short-cap">{{ pick6_hltb_short_cap_hours }} hr</span>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
-                        <button class="nav-btn" style="font-size:0.8rem;" onclick="saveAdvTuneSettings()">Save</button>
-                        <button class="nav-btn" style="font-size:0.8rem;" onclick="resetAdvTuneSettings()">Reset to Defaults</button>
-                        <span id="advtune-status" style="font-size:0.78rem; color:#8f98a0;"></span>
                     </div>
                 </div>
             </div>
@@ -709,53 +666,6 @@ function setMode(mode) {
 function toggleWeightsPanel() {
     document.getElementById('weighted-panel').classList.toggle('collapsed');
     requestAnimationFrame(enforceCardRatio);
-}
-
-function toggleAdvTunePanel() {
-    document.getElementById('advtune-panel').classList.toggle('collapsed');
-    requestAnimationFrame(enforceCardRatio);
-}
-
-function _onAdvTuneSlider(sliderId, valId, fmt) {
-    const el = document.getElementById(sliderId);
-    document.getElementById(valId).textContent = fmt(el.value);
-    updateSliderFill(el);
-}
-
-function _advTuneValues() {
-    return {
-        pick6_smart_tag_weight:     parseInt(document.getElementById('adv-smart-tag-weight').value, 10),
-        pick6_staleness_cap_days:   parseInt(document.getElementById('adv-staleness-cap').value, 10),
-        pick6_recency_cap_years:    parseInt(document.getElementById('adv-recency-cap').value, 10),
-        pick6_hltb_long_floor_hours: parseInt(document.getElementById('adv-hltb-long-floor').value, 10),
-        pick6_hltb_long_cap_hours:  parseInt(document.getElementById('adv-hltb-long-cap').value, 10),
-        pick6_hltb_short_cap_hours: parseInt(document.getElementById('adv-hltb-short-cap').value, 10),
-    };
-}
-
-function saveAdvTuneSettings() {
-    const status = document.getElementById('advtune-status');
-    savePreference(_advTuneValues());
-    status.textContent = 'Saved.';
-    setTimeout(() => { status.textContent = ''; }, 2000);
-}
-
-function resetAdvTuneSettings() {
-    const defaults = {
-        'adv-smart-tag-weight': 65, 'adv-staleness-cap': 730, 'adv-recency-cap': 10,
-        'adv-hltb-long-floor': 10, 'adv-hltb-long-cap': 110, 'adv-hltb-short-cap': 10,
-    };
-    for (const [id, val] of Object.entries(defaults)) document.getElementById(id).value = val;
-    _onAdvTuneSlider('adv-smart-tag-weight', 'adv-v-smart-tag-weight', v => v + '/' + (100 - v));
-    _onAdvTuneSlider('adv-staleness-cap',    'adv-v-staleness-cap',    v => v + ' days');
-    _onAdvTuneSlider('adv-recency-cap',      'adv-v-recency-cap',      v => v + ' yr');
-    _onAdvTuneSlider('adv-hltb-long-floor',  'adv-v-hltb-long-floor',  v => v + ' hr');
-    _onAdvTuneSlider('adv-hltb-long-cap',    'adv-v-hltb-long-cap',    v => v + ' hr');
-    _onAdvTuneSlider('adv-hltb-short-cap',   'adv-v-hltb-short-cap',   v => v + ' hr');
-    savePreference(_advTuneValues());
-    const status = document.getElementById('advtune-status');
-    status.textContent = 'Reset to defaults.';
-    setTimeout(() => { status.textContent = ''; }, 2000);
 }
 
 const SNAP_ZONE = 5;

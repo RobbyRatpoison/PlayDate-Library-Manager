@@ -5751,6 +5751,65 @@ function closeAdvancedModal() {
     document.getElementById('advanced-modal').style.display = 'none';
 }
 
+function openAdvTuneModal() {
+    document.getElementById('advtune-modal').style.display = 'flex';
+}
+function closeAdvTuneModal() {
+    document.getElementById('advtune-modal').style.display = 'none';
+}
+
+function _onAdvTuneSlider(el, valId, fmt) {
+    document.getElementById(valId).textContent = fmt(el.value);
+    const pct = (el.value - el.min) / (el.max - el.min) * 100;
+    el.style.setProperty('--slider-pct', pct + '%');
+}
+
+(function _initAdvTuneSliders() {
+    for (const id of ['adv-smart-tag-weight', 'adv-staleness-cap', 'adv-recency-cap',
+                       'adv-hltb-long-floor', 'adv-hltb-long-cap', 'adv-hltb-short-cap']) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const pct = (el.value - el.min) / (el.max - el.min) * 100;
+        el.style.setProperty('--slider-pct', pct + '%');
+    }
+})();
+
+function _advTuneValues() {
+    return {
+        pick6_smart_tag_weight:     parseInt(document.getElementById('adv-smart-tag-weight').value, 10),
+        pick6_staleness_cap_days:   parseInt(document.getElementById('adv-staleness-cap').value, 10),
+        pick6_recency_cap_years:    parseInt(document.getElementById('adv-recency-cap').value, 10),
+        pick6_hltb_long_floor_hours: parseInt(document.getElementById('adv-hltb-long-floor').value, 10),
+        pick6_hltb_long_cap_hours:  parseInt(document.getElementById('adv-hltb-long-cap').value, 10),
+        pick6_hltb_short_cap_hours: parseInt(document.getElementById('adv-hltb-short-cap').value, 10),
+    };
+}
+
+function saveAdvTuneSettings() {
+    const status = document.getElementById('advtune-status');
+    savePreference(_advTuneValues());
+    status.textContent = 'Saved.';
+    setTimeout(() => { status.textContent = ''; }, 2000);
+}
+
+function resetAdvTuneSettings() {
+    const defaults = {
+        'adv-smart-tag-weight': 65, 'adv-staleness-cap': 730, 'adv-recency-cap': 10,
+        'adv-hltb-long-floor': 10, 'adv-hltb-long-cap': 110, 'adv-hltb-short-cap': 10,
+    };
+    for (const [id, val] of Object.entries(defaults)) document.getElementById(id).value = val;
+    _onAdvTuneSlider(document.getElementById('adv-smart-tag-weight'), 'adv-v-smart-tag-weight', v => v + '/' + (100 - v));
+    _onAdvTuneSlider(document.getElementById('adv-staleness-cap'),    'adv-v-staleness-cap',    v => v + ' days');
+    _onAdvTuneSlider(document.getElementById('adv-recency-cap'),      'adv-v-recency-cap',      v => v + ' yr');
+    _onAdvTuneSlider(document.getElementById('adv-hltb-long-floor'),  'adv-v-hltb-long-floor',  v => v + ' hr');
+    _onAdvTuneSlider(document.getElementById('adv-hltb-long-cap'),    'adv-v-hltb-long-cap',    v => v + ' hr');
+    _onAdvTuneSlider(document.getElementById('adv-hltb-short-cap'),   'adv-v-hltb-short-cap',   v => v + ' hr');
+    savePreference(_advTuneValues());
+    const status = document.getElementById('advtune-status');
+    status.textContent = 'Reset to defaults.';
+    setTimeout(() => { status.textContent = ''; }, 2000);
+}
+
 function resizeToSteamDeck() {
     if (window.pywebview && window.pywebview.api && window.pywebview.api.resize_window) {
         window.pywebview.api.resize_window(1280, 800);

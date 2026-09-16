@@ -810,6 +810,7 @@
         // Top-level hamburger modals
         'hltb-modal',
         'settings-modal',
+        'advtune-modal', // opened directly from the Pick 6 page's gear icon
         'emulators-modal',
         'plugins-modal',
         'community-modal',
@@ -2342,6 +2343,7 @@
             // top-level hamburger modals
             ['hltb-modal',            'closeHltbModal'],
             ['settings-modal',        'closeSettingsModal'],
+            ['advtune-modal',         'closeAdvTuneModal'],
             ['emulators-modal',       'closeEmulatorsModal'],
             ['plugins-modal',         'closePluginsModal'],
             ['community-modal',       'closeCommunityModal'],
@@ -3160,6 +3162,7 @@
 
         // Top-level hamburger modals
         _watchModal('settings-modal');
+        _watchModal('advtune-modal');
         _watchModal('account-modal');
         _watchModal('appearance-modal');
         _watchModal('library-modal');
