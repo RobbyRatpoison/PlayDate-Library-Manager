@@ -717,7 +717,9 @@ function toggleAdvTunePanel() {
 }
 
 function _onAdvTuneSlider(sliderId, valId, fmt) {
-    document.getElementById(valId).textContent = fmt(document.getElementById(sliderId).value);
+    const el = document.getElementById(sliderId);
+    document.getElementById(valId).textContent = fmt(el.value);
+    updateSliderFill(el);
 }
 
 function _advTuneValues() {
