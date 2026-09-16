@@ -5620,32 +5620,24 @@ function openBaseDir() {
     fetch('/api/open-base-dir', { method: 'POST' }).catch(() => {});
     setTimeout(() => { _openBaseDirBusy = false; }, 1000);
 }
-function openSystemModal() {
-    document.getElementById('system-modal').style.display = 'flex';
+function openSettingsModal() {
+    document.getElementById('settings-modal').style.display = 'flex';
 }
-function closeSystemModal() {
-    document.getElementById('system-modal').style.display = 'none';
+function closeSettingsModal() {
+    document.getElementById('settings-modal').style.display = 'none';
 }
-function _onHltbSlider(el) {
-    document.getElementById('hltb-threshold-val').textContent = el.value;
-    const pct = (el.value - el.min) / (el.max - el.min) * 100;
-    el.style.setProperty('--slider-pct', pct + '%');
+function openGamepadModal() {
+    document.getElementById('gamepad-modal').style.display = 'flex';
 }
-
-function saveHltbThreshold() {
-    const val = parseInt(document.getElementById('hltb-threshold-slider').value, 10);
-    const status = document.getElementById('hltb-threshold-status');
-    savePreference({ hltb_match_threshold: val });
-    status.textContent = 'Saved.';
-    setTimeout(() => { status.textContent = ''; }, 2000);
+function closeGamepadModal() {
+    document.getElementById('gamepad-modal').style.display = 'none';
 }
-
-(function _initHltbSlider() {
-    const el = document.getElementById('hltb-threshold-slider');
-    if (!el) return;
-    const pct = (el.value - el.min) / (el.max - el.min) * 100;
-    el.style.setProperty('--slider-pct', pct + '%');
-})();
+function openAdvancedModal() {
+    document.getElementById('advanced-modal').style.display = 'flex';
+}
+function closeAdvancedModal() {
+    document.getElementById('advanced-modal').style.display = 'none';
+}
 
 function resizeToSteamDeck() {
     if (window.pywebview && window.pywebview.api && window.pywebview.api.resize_window) {

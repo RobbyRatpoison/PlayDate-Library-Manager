@@ -779,23 +779,25 @@
         // Tools page expanding modals
         'pagywosg-modal', 'steam-junk-modal', 'blacklist-modal', 'theme-modal', 'send-log-modal',
         // Sub-modals of hamburger items (before their parents)
-        'hltb-modal',          // from library-modal
         'dup-entries-modal',   // from library-modal
         'theme-picker-modal',  // from appearance-modal
         'santa-modal',         // from community-modal
         'playnite-modal',      // from data-modal
         'filter-io-modal',     // from data-modal
-        'gamepad-remap-modal', // from system-modal
-        'gamepad-diag-modal',  // from system-modal
+        'gamepad-remap-modal', // from gamepad-modal
+        'gamepad-diag-modal',  // from gamepad-modal
         // Top-level hamburger modals
+        'hltb-modal',
+        'settings-modal',
         'account-modal',
         'appearance-modal',
         'library-modal',
+        'gamepad-modal',
+        'advanced-modal',
         'emulators-modal',
         'plugins-modal',
         'community-modal',
         'data-modal',
-        'system-modal',
         'store-names-modal',
         'tutorial-modal',
         // Home page edit mode panels (use style.display)
@@ -2298,7 +2300,6 @@
             ['bulk-rescrape-modal',   'closeBulkRescrapeModal'],
             ['bulk-delete-modal',     'closeBulkDeleteModal'],
             // sub-modals (before their parents)
-            ['hltb-modal',            'closeHltbModal'],
             ['dup-entries-modal',     'closeDupEntriesModal'],
             ['theme-picker-modal',    'closeThemePickerModal'],
             ['santa-modal',           'closeSantaModal'],
@@ -2314,14 +2315,17 @@
             ['gamepad-remap-modal',   'closeGamepadRemap'],
             ['gamepad-diag-modal',    'closeGamepadDiag'],
             // top-level hamburger modals
+            ['hltb-modal',            'closeHltbModal'],
+            ['settings-modal',        'closeSettingsModal'],
             ['account-modal',         'closeAccountModal'],
             ['appearance-modal',      'closeAppearanceModal'],
             ['library-modal',         'closeLibraryModal'],
+            ['gamepad-modal',         'closeGamepadModal'],
+            ['advanced-modal',        'closeAdvancedModal'],
             ['emulators-modal',       'closeEmulatorsModal'],
             ['plugins-modal',         'closePluginsModal'],
             ['community-modal',       'closeCommunityModal'],
             ['data-modal',            'closeDataModal'],
-            ['system-modal',          'closeSystemModal'],
             ['blacklist-modal',       'closeBlacklistModal'],
             ['store-names-modal',     'closeStoreNamesModal'],
             ['tutorial-modal',        'closeTutorialModal'],
@@ -3135,15 +3139,17 @@
         _watchModal('bulk-delete-modal');
 
         // Top-level hamburger modals
+        _watchModal('settings-modal');
         _watchModal('account-modal');
         _watchModal('appearance-modal');
         _watchModal('library-modal');
         _watchModal('dup-entries-modal');
+        _watchModal('gamepad-modal');
+        _watchModal('advanced-modal');
         _watchModal('emulators-modal');
         _watchModal('plugins-modal');
         _watchModal('community-modal');
         _watchModal('data-modal');
-        _watchModal('system-modal');
         _watchModal('blacklist-modal');
         _watchModal('store-names-modal');
         _watchModal('tutorial-modal');

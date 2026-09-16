@@ -593,6 +593,9 @@
         <!-- Scrollable body -->
         <div style="overflow-y:auto; flex:1; min-height:0; padding:0 1.875rem 1.875rem;">
         <div class="hub-section">
+            <button class="settings-item" data-modal-row="10" onclick="closeAppearanceModal();window.location.href='/?edit=1'">Edit Home Layout</button>
+        </div>
+        <div class="hub-section">
             <button class="settings-item" data-modal-row="0" onclick="openBgModal()">Background &amp; Opacity</button>
             <button class="settings-item" data-modal-row="1" onclick="openThemePickerModal()">Theme</button>
             <button class="settings-item" data-modal-row="2" onclick="openThemeModal()">Theme Editor</button>
@@ -753,22 +756,6 @@
                 </label>
                 <div style="font-size:0.75rem; color:#8f98a0; margin-top:3px; padding-left:22px;">Catches games where the developer added achievements after you'd already 100%'d it.</div>
             </div>
-        </div>
-        <div class="hub-section">
-            <div class="hub-section-label">HLTB</div>
-            <div style="padding:8px 10px;">
-                <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Auto-confirm threshold</label>
-                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Minimum name similarity (0–100) for auto-confirming a match. Matches below this are flagged as unconfirmed.</div>
-                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                    <input type="range" id="hltb-threshold-slider" min="0" max="100" value="{{ hltb_match_threshold }}"
-                        oninput="_onHltbSlider(this)"
-                        class="hltb-slider" data-modal-row="24">
-                    <span id="hltb-threshold-val" style="font-size:0.85rem; color:var(--text-primary); min-width:28px; text-align:right; flex-shrink:0;">{{ hltb_match_threshold }}</span>
-                </div>
-                <button class="nav-btn" style="margin-top:8px; font-size:0.8rem;" data-modal-row="25" onclick="saveHltbThreshold()">Save</button>
-                <div id="hltb-threshold-status" style="font-size:0.78rem; color:#8f98a0; margin-top:4px; min-height:1em;"></div>
-            </div>
-            <button class="settings-item" data-modal-row="26" onclick="openHltbModal()">HLTB Data</button>
         </div>
         <div class="hub-section">
             <div class="hub-section-label">Tag Similarity</div>
@@ -941,17 +928,60 @@
     </div>
 </div>
 
-<!-- ── SYSTEM MODAL ── -->
-<div id="system-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeSystemModal();">
+<!-- ── SETTINGS MODAL (hub) ── -->
+<div id="settings-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeSettingsModal();">
+    <div class="modal-content" style="width:360px; max-height:90vh; padding:0; display:flex; flex-direction:column; overflow:hidden;">
+        <div style="flex-shrink:0; padding:1.875rem 1.875rem 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 style="margin:0; color:var(--text-primary);">Settings</h2>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:0.78rem; color:var(--text-secondary);">v{{ app_version }}</span>
+                    <button onclick="closeSettingsModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+                </div>
+            </div>
+        </div>
+        <div style="overflow-y:auto; flex:1; min-height:0; padding:0 1.875rem 1.875rem;">
+        <div class="hub-section">
+            <button class="settings-item" data-modal-row="0" onclick="closeSettingsModal();openAccountModal()">Account</button>
+            <button class="settings-item" data-modal-row="1" onclick="closeSettingsModal();openAppearanceModal()">Appearance</button>
+            <button class="settings-item" data-modal-row="2" onclick="closeSettingsModal();openLibraryModal()">Library</button>
+            <button class="settings-item" data-modal-row="3" onclick="closeSettingsModal();openGamepadModal()">Gamepad</button>
+            <button class="settings-item" data-modal-row="4" onclick="closeSettingsModal();openAdvancedModal()">Advanced</button>
+        </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── GAMEPAD MODAL ── -->
+<div id="gamepad-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeGamepadModal();">
     <div class="modal-content" style="width:360px; max-height:90vh; padding:0; display:flex; flex-direction:column; overflow:hidden;">
         <!-- Fixed header -->
         <div style="flex-shrink:0; padding:1.875rem 1.875rem 0;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <h2 style="margin:0; color:var(--text-primary);">System</h2>
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:0.78rem; color:var(--text-secondary);">v{{ app_version }}</span>
-                    <button onclick="closeSystemModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
-                </div>
+                <h2 style="margin:0; color:var(--text-primary);">Gamepad</h2>
+                <button onclick="closeGamepadModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+            </div>
+        </div>
+        <!-- Scrollable body -->
+        <div style="overflow-y:auto; flex:1; min-height:0; padding:0 1.875rem 1.875rem;">
+        <div class="hub-section">
+            <button id="gamepad-enabled-btn" class="settings-item" data-modal-row="0" onclick="toggleGamepadEnabled()">Gamepad input (experimental): OFF</button>
+            <button id="gamepad-suppress-btn" class="settings-item" data-modal-row="1" onclick="toggleGamepadSuppress()">Pause gamepad on launch: ON</button>
+            <button class="settings-item" data-modal-row="2" onclick="openGamepadRemap()">Gamepad Controls</button>
+            <button class="settings-item" data-modal-row="3" onclick="openGamepadDiag()">Gamepad Diagnostics</button>
+        </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── ADVANCED MODAL ── -->
+<div id="advanced-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeAdvancedModal();">
+    <div class="modal-content" style="width:360px; max-height:90vh; padding:0; display:flex; flex-direction:column; overflow:hidden;">
+        <!-- Fixed header -->
+        <div style="flex-shrink:0; padding:1.875rem 1.875rem 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 style="margin:0; color:var(--text-primary);">Advanced</h2>
+                <button onclick="closeAdvancedModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
             </div>
         </div>
         <!-- Scrollable body -->
@@ -968,33 +998,26 @@
                 <input type="checkbox" id="qt-renderer-cb"
                        {% if renderer == 'qt' %}checked{% endif %}
                        onchange="_onQtRendererToggle(this.checked)"
-                       style="width:auto; margin:0;" data-modal-row="8">
+                       style="width:auto; margin:0;" data-modal-row="2">
                 Use Qt/Chromium renderer (experimental)
             </label>
             <div style="font-size:0.75rem; color:#8f98a0; margin-top:3px; padding:0 10px 8px 32px;">Fixes choppy library scrolling on NVIDIA + Wayland. Downloads ~250MB on first enable. Requires restart.</div>
             <div id="qt-renderer-status" style="display:none; margin:0 10px 8px; padding:8px 10px; border-radius:4px; font-size:0.8rem; background:rgba(91,192,222,0.12); border:1px solid rgba(91,192,222,0.35); color:#5bc0de;"></div>
             <div id="qt-renderer-restart-notice" style="display:none; margin:0 10px 8px; padding:8px 10px; background:rgba(255,165,0,0.12); border:1px solid rgba(255,165,0,0.35); border-radius:4px; font-size:0.8rem; color:#ffa500; align-items:center; justify-content:space-between; gap:12px;">
                 <span>Restart PlayDate for this change to take effect.</span>
-                <button class="nav-btn" id="qt-renderer-restart-btn" style="font-size:0.78rem; flex-shrink:0; color:#ffa500; border-color:rgba(255,165,0,0.5);" data-modal-row="9"
+                <button class="nav-btn" id="qt-renderer-restart-btn" style="font-size:0.78rem; flex-shrink:0; color:#ffa500; border-color:rgba(255,165,0,0.5);" data-modal-row="3"
                         onclick="_restartPlayDate(this)">Restart Now</button>
             </div>
         </div>
         {% endif %}
         <div class="hub-section">
-            <div class="hub-section-label">Gamepad</div>
-            <button id="gamepad-enabled-btn" class="settings-item" data-modal-row="2" onclick="toggleGamepadEnabled()">Gamepad input (experimental): OFF</button>
-            <button id="gamepad-suppress-btn" class="settings-item" data-modal-row="3" onclick="toggleGamepadSuppress()">Pause gamepad on launch: ON</button>
-            <button class="settings-item" data-modal-row="4" onclick="openGamepadRemap()">Gamepad Controls</button>
-            <button class="settings-item" data-modal-row="5" onclick="openGamepadDiag()">Gamepad Diagnostics</button>
-        </div>
-        <div class="hub-section">
             <div class="hub-section-label">Support</div>
-            <button class="settings-item" data-modal-row="6" onclick="openSendLogModal()">Send Log to Developer</button>
+            <button class="settings-item" data-modal-row="4" onclick="openSendLogModal()">Send Log to Developer</button>
         </div>
         <div class="hub-section">
             <div class="hub-section-label">Testing</div>
             <div style="padding:8px 10px; display:flex; flex-direction:column; gap:8px;">
-                <button class="nav-btn" data-modal-row="7" onclick="resizeToSteamDeck()" style="font-size:0.8rem;">Resize to Steam Deck (1280x800)</button>
+                <button class="nav-btn" data-modal-row="5" onclick="resizeToSteamDeck()" style="font-size:0.8rem;">Resize to Steam Deck (1280x800)</button>
             </div>
         </div>
         </div>

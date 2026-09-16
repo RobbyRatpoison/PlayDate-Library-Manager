@@ -261,17 +261,15 @@
                     <button id="blaeo-ready-btn" class="hamburger-item" style="display:none;color:var(--accent);" onclick="closeHamburger();openCommunityModal()"><span id="blaeo-ready-label">BLAEO results ready</span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent,#66c0f4);margin-left:8px;flex-shrink:0;pointer-events:none;"></span></button>
                     {% for _t in plugin_fragments('base_nav_items') %}{% include _t %}{% endfor %}
                     <div class="hamburger-sep"></div>
-                    <button class="hamburger-item" onclick="closeHamburger();window.location.href='/?edit=1'">Edit Home Layout</button>
-                    <div class="hamburger-sep"></div>
-                    <button class="hamburger-item" onclick="closeHamburger();openAccountModal()">Steam Account</button>
-                    <button class="hamburger-item" onclick="closeHamburger();openAppearanceModal()">Appearance</button>
-                    <button class="hamburger-item" onclick="closeHamburger();openLibraryModal()">Library</button>
-                    <button class="hamburger-item" onclick="closeHamburger();openEmulatorsModal()">Emulators</button>
-                    <button class="hamburger-item" style="display:flex;align-items:center;" onclick="closeHamburger();openPluginsModal()">Plugins<span id="plugin-update-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#e67e22;visibility:hidden;margin-left:8px;vertical-align:middle;pointer-events:none;"></span></button>
                     <button class="hamburger-item" onclick="closeHamburger();openCommunityModal()">Community Tools</button>
+                    <button class="hamburger-item" style="display:flex;align-items:center;" onclick="closeHamburger();openPluginsModal()">Plugins<span id="plugin-update-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#e67e22;visibility:hidden;margin-left:8px;vertical-align:middle;pointer-events:none;"></span></button>
                     <button class="hamburger-item" onclick="closeHamburger();openDataModal()">Data</button>
-                    <button class="hamburger-item" onclick="closeHamburger();openSystemModal()">System</button>
-                    <button class="hamburger-item" onclick="closeHamburger();openBlacklistModal()">Blacklist</button>
+                    <button class="hamburger-item" onclick="closeHamburger();openEmulatorsModal()">Emulators</button>
+                    <button class="hamburger-item" onclick="closeHamburger();openBlacklistModal()">Blacklist / Junk Finder</button>
+                    <button class="hamburger-item" onclick="closeHamburger();openHltbModal()">HLTB</button>
+                    <div class="hamburger-sep"></div>
+                    <button class="hamburger-item" onclick="closeHamburger();openSettingsModal()">Settings</button>
+                    <div class="hamburger-sep"></div>
                     <button class="hamburger-item" onclick="closeHamburger();openTutorialModal()">Tutorial</button>
                     <div class="hamburger-sep"></div>
                     <button id="update-check-btn" class="hamburger-item" onclick="handleUpdateBtn()"><span id="update-check-label">Check for Updates</span><span id="update-menu-dot"></span></button>
@@ -301,7 +299,7 @@
         <div id="qt-renderer-hint-banner" style="display:none; align-items:flex-start; gap:0.6rem;
              padding:10px 16px; border-radius:6px; margin-bottom:10px; font-size:0.85rem;
              background:rgba(102, 192, 244, 0.12); border:1px solid var(--accent);">
-            <div style="flex:1; line-height:1.5;">Choppy library scrolling? Try the experimental Qt renderer in <a href="#" onclick="openSystemModal();return false;" style="color:inherit;text-decoration:underline;">System settings</a>.</div>
+            <div style="flex:1; line-height:1.5;">Choppy library scrolling? Try the experimental Qt renderer in <a href="#" onclick="openAdvancedModal();return false;" style="color:inherit;text-decoration:underline;">Advanced settings</a>.</div>
             <button id="qt-renderer-hint-close" aria-label="Dismiss"
                     style="background:none; border:none; cursor:pointer; font-size:1rem;
                            line-height:1; color:inherit; opacity:0.75; flex-shrink:0;">✕</button>
