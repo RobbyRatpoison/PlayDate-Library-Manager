@@ -1214,6 +1214,28 @@
         _hideCursor();
         if (window._clearGameCardHover) window._clearGameCardHover();
         if (window._cancelTooltipReshow) window._cancelTooltipReshow();
+        // A text/number field can already have real DOM focus from a mouse
+        // click before the gamepad was ever activated this session (e.g. a
+        // filter-builder value box). Steam Deck's STEAM+X on-screen-keyboard
+        // chord leaks its X press through as a plain button press here, which
+        // would otherwise fall into the modal-zone branch below and steal
+        // focus to the first modal candidate -- silently yanking focus out
+        // from under the field the user just clicked into and breaking
+        // typing. Adopt the already-focused field instead, and remember
+        // which zone we'd have activated into so B/Escape still pops back
+        // to the right place once the field is exited.
+        if (_isTextEntryFocused()) {
+            _state.prevZone         = _anyWatchedOpen() ? 'modal' : (_dropdownIsOpen() ? 'dropdown' : 'content');
+            _state.prevRow          = _state.row;
+            _state.prevCol          = _state.col;
+            _state.prevModalFocused = null;
+            _state.activeInput      = document.activeElement;
+            _state.zone             = (document.activeElement.type === 'number') ? 'number-input' : 'text-input';
+            _state.col              = 0;
+            _state.subItem          = -1;
+            _syncFocus();
+            return;
+        }
         // If a modal is open, enter modal zone at row 0 regardless of previous state
         if (_anyWatchedOpen()) {
             _state.zone         = 'modal';

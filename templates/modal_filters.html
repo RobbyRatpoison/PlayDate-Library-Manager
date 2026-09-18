@@ -900,6 +900,7 @@ function addSimpleRow(data = null) {
     // Column select
     const _colNative = document.createElement('select');
     _colNative.className = 'fm-col-select';
+    _colNative.dataset.modalRow = '6';
     Object.entries(FM_FILTER_CONFIG).forEach(([k, cfg]) => {
         const opt = document.createElement('option');
         opt.value = k; opt.textContent = cfg.label;
@@ -941,6 +942,7 @@ function _compatibleCols(colName) {
 function _buildColSelect(container, compatCols, initValCol) {
     const native = document.createElement('select');
     native.className = 'fm-val-col-select';
+    native.dataset.modalRow = '6';
     compatCols.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c;
@@ -975,6 +977,7 @@ function _buildChipInput(container, cfg, initVal) {
     const box = document.createElement('div');
     box.className = 'pill-input-box';
     box.id = boxId;
+    box.dataset.modalRow = '6';
 
     wrap.appendChild(hidden);
     wrap.appendChild(box);
@@ -1020,10 +1023,12 @@ function _buildLiteralInput(container, cfg, op, initVal) {
             });
         }
         native.className = 'fm-val-input';
+        native.dataset.modalRow = '6';
         el = initCustomSelect(native);
         el.addEventListener('change', updateSqlPreview);
     } else if (cfg.type === 'date_text') {
         el = document.createElement('input');
+        el.dataset.modalRow = '6';
         if (op === 'STRFTIME_MONTH') {
             el.type = 'number'; el.min = 1; el.max = 12; el.placeholder = '1–12';
         } else if (op === 'STRFTIME_DAY') {
@@ -1046,6 +1051,7 @@ function _buildLiteralInput(container, cfg, op, initVal) {
         el.value = initVal || '';
         el.placeholder = 'Enter value…';
         el.className = 'fm-val-input';
+        el.dataset.modalRow = '6';
         el.addEventListener('input', updateSqlPreview);
         el.addEventListener('change', updateSqlPreview);
     }
@@ -1063,6 +1069,7 @@ function populateRowControls(colSel, opContainer, valContainer, data) {
     opContainer.innerHTML = '';
     const _opNative = document.createElement('select');
     _opNative.className = 'fm-op-select';
+    _opNative.dataset.modalRow = '6';
     Object.entries(cfg.comparisons).forEach(([k, label]) => {
         const opt = document.createElement('option');
         opt.value = k; opt.textContent = label;
@@ -1223,6 +1230,7 @@ function addAdvancedRow(groupEl, data = null) {
     const col = (data && data.column) || 'tags';
     const _colNative2 = document.createElement('select');
     _colNative2.className = 'fm-col-select';
+    _colNative2.dataset.modalRow = '6';
     Object.entries(FM_FILTER_CONFIG).forEach(([k, cfg]) => {
         const opt = document.createElement('option');
         opt.value = k; opt.textContent = cfg.label;
@@ -1387,6 +1395,7 @@ function addAdvancedExprRow(groupEl, data = null) {
 
     const ta = document.createElement('textarea');
     ta.className = 'fm-expr-input';
+    ta.dataset.modalRow = '6';
     ta.style.cssText = _EXPR_STYLE;
     ta.placeholder = 'e.g. unlocked_achievements < total_achievements';
     ta.value = (data && data.sql) || '';
