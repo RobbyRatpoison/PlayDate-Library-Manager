@@ -5862,10 +5862,25 @@ function _faceButtonColor(physIdx, gpId) {
     return colors[physIdx] || null;
 }
 
-function _firstConnectedGamepadId() {
+// Same source input.js's own poll loop uses. On a real Steam Deck session
+// (Gaming Mode), WebKit's Gamepad API is deliberately blocked from seeing
+// the built-in controller at all (see gamepad_reader.py) -- so reading
+// navigator.getGamepads() directly, as every function below used to, always
+// returns nothing there regardless of whether the controller is actually
+// working. The Deck's real state arrives via window._pdPad instead (fed by
+// main.py's evdev reader), which is shaped like a standard Gamepad object.
+function _firstGamepad() {
+    if (window._STEAM_DECK_SESSION) {
+        return (window._pdPad && window._pdPad.connected) ? window._pdPad : null;
+    }
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-    for (const g of gamepads) { if (g) return g.id; }
-    return '';
+    for (const g of gamepads) { if (g) return g; }
+    return null;
+}
+
+function _firstConnectedGamepadId() {
+    const gp = _firstGamepad();
+    return gp ? gp.id : '';
 }
 
 let _gpdRafId = null;
@@ -5907,9 +5922,7 @@ function _gpdStartPoll() {
     function poll() {
         _gpdRafId = requestAnimationFrame(poll);
 
-        const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-        let gp = null;
-        for (const g of gamepads) { if (g) { gp = g; break; } }
+        const gp = _firstGamepad();
 
         // Controller
         const ctrlEl = document.getElementById('gpd-controller');
@@ -6078,10 +6091,8 @@ function closeGamepadRemap() {
 function grmStartCapture(action) {
     _captureAction = action;
     _grmPrevBtns = {};
-    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-    for (const g of gamepads) {
-        if (g) { g.buttons.forEach((b, i) => { _grmPrevBtns[i] = b.pressed || b.value > 0.5; }); break; }
-    }
+    const gp = _firstGamepad();
+    if (gp) gp.buttons.forEach((b, i) => { _grmPrevBtns[i] = b.pressed || b.value > 0.5; });
     if (window._inputMgr) window._inputMgr.setCapturing(true);
     _grmRenderRows();
 }
@@ -6108,9 +6119,7 @@ function _grmStartPoll() {
     function poll() {
         _grmRafId = requestAnimationFrame(poll);
 
-        const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-        let gp = null;
-        for (const g of gamepads) { if (g) { gp = g; break; } }
+        const gp = _firstGamepad();
 
         const ctrlEl = document.getElementById('grm-controller');
         if (ctrlEl) {
