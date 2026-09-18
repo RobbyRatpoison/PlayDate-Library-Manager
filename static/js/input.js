@@ -2784,7 +2784,15 @@
                 // here entirely, since it never goes through gamepad state
                 // at all. Blurring on the unfocus transition removes the
                 // target for that synthesized keypress to land on.
-                if (document.activeElement && document.activeElement !== document.body) {
+                // Real text/number entry is exempted: this same unfocus
+                // transition also fires the instant Steam Deck's on-screen
+                // keyboard (STEAM+X) pops open, since that's a separate
+                // surface that steals the compositor's real activation state
+                // from PlayDate's own window -- blurring here happened
+                // before the user ever got to type a character into the
+                // field the OSK was opened for. A stray focused button can't
+                // be typed into, so it's still safe to blur those.
+                if (document.activeElement && document.activeElement !== document.body && !_isTextEntryFocused()) {
                     document.activeElement.blur();
                 }
             }
