@@ -11,6 +11,7 @@
 
 - Reorganized the menu: frequently used tools moved up, account/appearance/library/gamepad settings consolidated into a new Settings menu, and HowLongToBeat given its own menu entry.
 - Tag similarity now weighs how long you played a game, not just whether you finished it.
+- The Qt/Chromium renderer option is now available on any Linux install, not just NVIDIA + Wayland.
 
 ### Fixes
 

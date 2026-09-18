@@ -484,14 +484,29 @@ def _current_renderer_display(state):
 
 def qt_renderer_relevant():
     """True only for the NVIDIA-proprietary-driver + Wayland combination the
-    Qt/QtWebEngine renderer option exists to fix. Gates whether the renderer
-    toggle is shown at all (not whether it can be *used* -- a hand-edited
-    state.json is still honored) -- Steam Deck's AMD APU never satisfies this,
-    which is what keeps the toggle out of Deck users' hands in the normal flow.
+    Qt/QtWebEngine renderer option exists to fix. Gates the "you probably
+    want this" hint (base.html's library-page nudge), not whether the
+    toggle itself is shown at all -- see qt_renderer_available() for that.
     """
     if sys.platform != 'linux':
         return False
     return bool(os.environ.get('WAYLAND_DISPLAY')) and os.path.exists('/proc/driver/nvidia/version')
+
+
+def qt_renderer_available():
+    """True whenever the Advanced modal's renderer toggle should be shown at
+    all: any Linux session except a real Steam Deck one. Deck is excluded
+    for a functional reason, not a cosmetic one -- Qt's event loop starves
+    the GLib.idle_add() call the Deck's evdev gamepad reader depends on, so
+    main.py's _WANT_QT resolution unconditionally forces GTK back on for a
+    real Deck session regardless of this setting. Showing the toggle there
+    would only let someone trigger a pointless ~250MB download for a
+    setting that can never actually take effect, and leave a checkbox stuck
+    showing "on" with nothing to show for it after a restart.
+    """
+    if sys.platform != 'linux':
+        return False
+    return not _is_steam_deck_session()
 
 def validate_steam_creds(api_key, steam_id):
     headers = {
@@ -614,6 +629,7 @@ def inject_config_status():
         steam_deck_session=_is_steam_deck_session(),
         renderer=_current_renderer_display(state),
         qt_renderer_relevant=qt_renderer_relevant(),
+        qt_renderer_available=qt_renderer_available(),
         qt_renderer_hint_seen=config.get('qt_renderer_hint_seen', False),
         in_flatpak=IN_FLATPAK,
     )
