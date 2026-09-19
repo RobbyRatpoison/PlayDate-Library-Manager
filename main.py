@@ -306,6 +306,10 @@ from utils import (get_all_steam_library_paths,
 
 # ── Config ────────────────────────────────────────────────────────────────────
 PORT      = 5000
+# Used when PORT is held by something that isn't PlayDate -- notably macOS's
+# AirPlay Receiver, which listens on 5000 by default. Both are tried by
+# steam_date_import.user.js too, so keep the two lists in sync.
+FALLBACK_PORT = 2468
 HOST      = "127.0.0.1"
 URL       = f"http://{HOST}:{PORT}/"
 ICON_PATH = os.path.join(BASE_DIR, "static", "img", "favicon.png")
@@ -316,28 +320,57 @@ def _run_flask(flask_app):
     log.info(f"Starting waitress on {HOST}:{PORT}")
     serve(flask_app, host=HOST, port=PORT, threads=8, _quiet=True)
 
-def _port_in_use(host, port):
-    """Pre-flight check: is something already bound to our port? Used to
-    detect an already-running PlayDate instance before we start our own
-    server -- without this, a second launch's own waitress bind silently
-    fails while the app carries on regardless, ending up as a second window
-    riding on the *first* instance's server instead of a real second copy.
+def _port_listening(host, port):
+    """Is anything actually accepting connections on host:port?
 
-    SO_REUSEADDR matters here: right after a previous instance exits, the
-    port can sit in TIME_WAIT for a while even though nothing is actually
-    listening on it anymore. Without this flag a plain bind() treats that
-    lingering TIME_WAIT the same as a real live listener and reports a false
-    "already running" on a completely normal restart -- confirmed live,
-    this happened on the very first test of this check."""
+    A connect, not a bind: a bind() check reports a false "in use" for a port
+    lingering in TIME_WAIT right after a previous instance exits (confirmed
+    live on the first test of the old bind-based check), and needs
+    SO_REUSEADDR to avoid that -- which then behaves differently per OS (macOS
+    can let a specific-address bind succeed next to a wildcard listener like
+    AirPlay). A live listener is the only thing that answers a connect."""
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.settimeout(1)
     try:
-        s.bind((host, port))
-        return False
+        return s.connect_ex((host, port)) == 0
     except OSError:
-        return True
+        return False
     finally:
         s.close()
+
+def _is_playdate(host, port):
+    """Does the listener on host:port look like a PlayDate server? Every
+    PlayDate release serves through waitress, so its Server header is the
+    tell -- AirPlay answers 'AirTunes', and any 404 (PlayDate's own
+    /__ready__ returns one) still carries the header, so this needs no new
+    endpoint and also recognises an older PlayDate still running."""
+    import urllib.request
+    import urllib.error
+    try:
+        headers = urllib.request.urlopen(f'http://{host}:{port}/__ready__', timeout=2).headers
+    except urllib.error.HTTPError as e:
+        headers = e.headers
+    except Exception:
+        return False
+    return 'waitress' in (headers.get('Server') or '').lower()
+
+def _choose_port(host):
+    """Pick the port to serve on: PORT, else FALLBACK_PORT if PORT is held by
+    something that isn't PlayDate. Returns the port, 'running' if a PlayDate is
+    already serving on one of them, or None if neither is usable.
+
+    The 'running' answer is what stops a second launch from starting its own
+    server against the same database -- without it, a second launch's own
+    bind fails silently while the app carries on regardless, ending up as a
+    second window riding on the *first* instance's server, with its own
+    independent background threads writing to the same db files."""
+    for port in (PORT, FALLBACK_PORT):
+        if not _port_listening(host, port):
+            return port
+        if _is_playdate(host, port):
+            return 'running'
+        log.warning(f"Port {port} is in use by something other than PlayDate")
+    return None
 
 # ── GTK icon patch (Linux only) ───────────────────────────────────────────────
 def _fix_window_role_and_icon(window):
@@ -1529,23 +1562,35 @@ if __name__ == '__main__':
     #    instance's server while our independent background threads (syncs,
     #    migrations) still write to the same db files it might be mid-backup
     #    on. Checked before anything else touches the DB or starts threads.
-    if _port_in_use(HOST, PORT):
-        log.warning("Another PlayDate instance already has the port — exiting")
+    _chosen_port = _choose_port(HOST)
+    if _chosen_port == 'running' or _chosen_port is None:
+        if _chosen_port == 'running':
+            log.warning("Another PlayDate instance already has the port — exiting")
+            _msg = ("PlayDate is already running.<br><small>Look for an "
+                    "existing window — it may be minimized or behind "
+                    "another one.</small>")
+        else:
+            log.error(f"Ports {PORT} and {FALLBACK_PORT} are both in use by other programs — exiting")
+            _msg = (f"PlayDate couldn't start.<br><small>Ports {PORT} and "
+                    f"{FALLBACK_PORT} are both in use by other programs. "
+                    "Close one of them and try again.</small>")
         try:
             import webview
             webview.create_window(
                 title="PlayDate",
                 html="<body style='font-family:sans-serif;background:#1b2838;"
                      "color:#c7d5e0;text-align:center;padding-top:20%;'>"
-                     "PlayDate is already running.<br><small>Look for an "
-                     "existing window — it may be minimized or behind "
-                     "another one.</small></body>",
+                     + _msg + "</body>",
                 width=420, height=200, resizable=False,
             )
             webview.start()
         except Exception:
             pass
         sys.exit(0)
+    if _chosen_port != PORT:
+        log.info(f"Port {PORT} is taken by another program; serving on {_chosen_port} instead")
+        PORT = _chosen_port
+        URL = f"http://{HOST}:{PORT}/"
 
     # 1. Create Flask app — pass bundle dir so it finds templates/static
     #    when frozen; falls back to normal behaviour when running as script

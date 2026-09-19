@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PlayDate Companion
 // @namespace    playdate
-// @version      3.1
+// @version      3.2
 // @description  Imports Steam activation dates, GOG/EA purchase dates, and SteamGifts wins into PlayDate
 // @icon         https://raw.githubusercontent.com/RobbyRatpoison/PlayDate-Library-Manager/main/static/img/favicon.png
 // @match        https://help.steampowered.com/*
@@ -18,6 +18,28 @@
 
 (function () {
     'use strict';
+
+    // PlayDate serves on 5000, or on 2468 when something else (e.g. macOS's
+    // AirPlay Receiver) already holds 5000. Probe both once and remember which
+    // answers. Keep this list in sync with main.py's PORT / FALLBACK_PORT.
+    const PD_PORTS = [5000, 2468];
+    let PD_BASE = 'http://localhost:' + PD_PORTS[0];
+    const pdReady = (async () => {
+        for (const port of PD_PORTS) {
+            const base = 'http://localhost:' + port;
+            const isPlayDate = await new Promise(resolve => {
+                GM_xmlhttpRequest({
+                    method: 'GET', url: base + '/api/update-status', timeout: 2000,
+                    onload: r => {
+                        try { resolve('current_version' in JSON.parse(r.responseText)); }
+                        catch (e) { resolve(false); }
+                    },
+                    onerror: () => resolve(false), ontimeout: () => resolve(false),
+                });
+            });
+            if (isPlayDate) { PD_BASE = base; return; }
+        }
+    })();
 
     // EA activates by path only — the auth redirect strips ?ref=playdate
     if (window.location.hostname === 'myaccount.ea.com' &&
@@ -45,24 +67,23 @@
         return;
     }
 
-    const PLAYDATE = 'http://localhost:5000';
     const isBulk   = params.get('bulk') === '1';
 
     // GM_xmlhttpRequest bypasses the page's Content Security Policy, which
     // blocks fetch() to localhost.  Use this for all PlayDate API calls.
     // fetch() is still used for same-origin Steam Help page requests.
     function pdFetch(method, path, body) {
-        return new Promise((resolve, reject) => {
+        return pdReady.then(() => new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
                 method,
-                url: PLAYDATE + path,
+                url: PD_BASE + path,
                 headers: { 'Content-Type': 'application/json' },
                 data: body !== undefined ? JSON.stringify(body) : undefined,
                 onload:   resolve,
                 onerror:  reject,
                 ontimeout: reject,
             });
-        });
+        }));
     }
 
     // ── Parse "Oct 1, 2017" or "Mar 25" → "2017-10-01" ──────────────────────
@@ -438,10 +459,11 @@
 
         // ── POST all dates to PlayDate ─────────────────────────────────────────
         try {
+            await pdReady;
             const res  = await new Promise((resolve, reject) => {
                 GM_xmlhttpRequest({
                     method: 'POST',
-                    url: 'http://localhost:5000/api/gog/bulk-date-import',
+                    url: PD_BASE + '/api/gog/bulk-date-import',
                     headers: { 'Content-Type': 'application/json' },
                     data: JSON.stringify({ dates: dateMap }),
                     onload: resolve, onerror: reject, ontimeout: reject,
@@ -568,10 +590,11 @@
             btn.textContent = `Sending ${total} dates…`;
 
             try {
+                await pdReady;
                 const res = await new Promise((resolve, reject) => {
                     GM_xmlhttpRequest({
                         method: 'POST',
-                        url: 'http://localhost:5000/api/ea_app/bulk-date-import',
+                        url: PD_BASE + '/api/ea_app/bulk-date-import',
                         headers: { 'Content-Type': 'application/json' },
                         data: JSON.stringify({ titles }),
                         onload: resolve, onerror: reject, ontimeout: reject,
@@ -597,15 +620,14 @@
     // Cloudflare, in the user's real session) and POSTs them to localhost.
     // =========================================================================
     function runSteamGifts() {
-        const SG      = 'http://localhost:5000';
         const sgParams = new URLSearchParams(window.location.search);
         const auto    = sgParams.get('playdate_sync') === '1';
         const PAGE_DELAY = 1500;
 
         function pd(method, path, body) {
-            return new Promise((resolve, reject) => {
+            return pdReady.then(() => new Promise((resolve, reject) => {
                 GM_xmlhttpRequest({
-                    method, url: SG + path,
+                    method, url: PD_BASE + path,
                     headers: { 'Content-Type': 'application/json' },
                     data: body !== undefined ? JSON.stringify(body) : undefined,
                     onload: r => {
@@ -614,7 +636,7 @@
                     },
                     onerror: reject, ontimeout: reject,
                 });
-            });
+            }));
         }
 
         // Logged-in SteamGifts username from the nav avatar link

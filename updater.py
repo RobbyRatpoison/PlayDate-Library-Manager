@@ -457,7 +457,7 @@ def _relaunch():
     update step -- used by /api/restart to pick up a downloaded plugin update.
 
     Every branch delays the child ~2s so this process fully exits and releases
-    port 5000 first; otherwise the new process's own _port_in_use() check
+    port 5000 first; otherwise the new process's own _choose_port() check
     (main.py) can fire early and land on the 'already running' fallback screen
     (confirmed live via the same pattern in the updater's own relaunch)."""
     if IN_FLATPAK:

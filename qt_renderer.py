@@ -188,10 +188,10 @@ def _do_flatpak_swap():
                            start_new_session=True)
             else:
                 # Same reasoning as the Deck branch above: without a delay,
-                # the new process's own _port_in_use() check (main.py) can
+                # the new process's own _choose_port() check (main.py) can
                 # run before this process has actually torn down and
                 # released port 5000 -- not a false-positive TIME_WAIT read
-                # (that's already handled via SO_REUSEADDR), a genuinely
+                # (a connect check never sees one), a genuinely
                 # real listener that just hasn't exited yet. Confirmed live:
                 # the relaunched Qt window opened straight to the "PlayDate
                 # is already running" fallback screen.
