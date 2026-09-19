@@ -102,11 +102,17 @@ def install(qt_module):
                 logger.exception('qt_webview_patch: setBackgroundColor failed')
             # QtWebEngine ships with JavascriptCanAccessClipboard off, so every
             # navigator.clipboard.writeText() Copy button silently did nothing
-            # under this renderer (confirmed live on the system-update command).
+            # under this renderer (confirmed live via an on/off A/B test of the
+            # right-click Copy). JavascriptCanPaste is a separate switch that
+            # gates document.execCommand('paste'), which the right-click Paste
+            # falls back to -- its Python read_clipboard() is GTK-only.
             try:
                 from qtpy.QtWebEngineWidgets import QWebEngineSettings
-                self.webview.settings().setAttribute(
+                _settings = self.webview.settings()
+                _settings.setAttribute(
                     QWebEngineSettings.WebAttribute.JavascriptCanAccessClipboard, True)
+                _settings.setAttribute(
+                    QWebEngineSettings.WebAttribute.JavascriptCanPaste, True)
             except Exception:
                 logger.exception('qt_webview_patch: enabling clipboard access failed')
 
