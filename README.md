@@ -122,7 +122,7 @@ There is no packaged Mac release yet, so PlayDate runs from source. You need:
 - **Python 3.10 or newer, with tkinter.** The installer from [python.org](https://www.python.org/downloads/macos/) includes it. With Homebrew, run `brew install python@3.12 python-tk@3.12`. Apple's built-in Python is too old, and you don't need Xcode or the Command Line Tools.
 - **Steam**, installed in its default location.
 
-On first run, `launch.sh` looks for a suitable Python (and tells you what to install if it can't find one), sets up the virtual environment, and creates a `PlayDate.app` bundle in `~/Applications`. Re-running it after moving the folder keeps the bundle up to date.
+On first run, `launch.sh` looks for a suitable Python (and, if it can't find one, tells you what to install and waits for you to press Enter), sets up the virtual environment, and creates a `PlayDate.app` bundle in `~/Applications`. Re-running it after moving the folder keeps the bundle up to date.
 
 Non-Steam library plugins that rely on Wine/Proton are Linux-only.
 

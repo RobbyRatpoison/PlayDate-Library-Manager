@@ -109,13 +109,25 @@ mac_python_missing() {
             printf "Install it now with Homebrew (python@3.12 + python-tk@3.12)? [y/N] "
             read -r reply
             if [ "$reply" = "y" ] || [ "$reply" = "Y" ]; then
-                brew install python@3.12 python-tk@3.12 || return 1
-                return 0   # caller re-runs the search
+                if brew install python@3.12 python-tk@3.12; then
+                    return 0   # caller re-runs the search
+                fi
+                echo "The Homebrew install failed."
             fi
         fi
-        echo "Otherwise download the macOS installer from https://www.python.org/downloads/macos/"
-        echo "(it includes tkinter), then run launch.sh again."
+        echo "Download the macOS installer from https://www.python.org/downloads/macos/"
+        echo "(it includes tkinter) and install it."
         command -v open >/dev/null 2>&1 && open "https://www.python.org/downloads/macos/"
+        # Wait here so the user doesn't have to relaunch after installing.
+        while true; do
+            printf "Press Enter once it's installed to continue, or type q to quit: "
+            read -r reply || return 1
+            [ "$reply" = "q" ] || [ "$reply" = "Q" ] && return 1
+            if [ -n "$(find_mac_python)" ]; then
+                return 0   # caller re-runs the search
+            fi
+            echo "Still no suitable Python found (3.$PLAYDATE_MIN_PY_MINOR+ with tkinter)."
+        done
     else
         # Launched from PlayDate.app / Finder: there is no terminal to print to.
         command -v osascript >/dev/null 2>&1 && osascript -e \

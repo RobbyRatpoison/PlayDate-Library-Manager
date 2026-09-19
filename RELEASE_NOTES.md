@@ -4,7 +4,7 @@
 ### Improvements
 
 - Added a `PlayDate.command` file for launching PlayDate on macOS with a double-click.
-- The macOS launcher now finds a compatible Python, or tells you what to install.
+- The macOS launcher now finds a compatible Python, or tells you what to install and continues once you have.
 
 ### Fixes
 
