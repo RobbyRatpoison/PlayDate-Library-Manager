@@ -105,6 +105,10 @@ This installs the required system packages and runs the setup. If PlayDate stops
 
 ### macOS
 
+Double-click **PlayDate.command** in Finder. (Right-click > Open the first time if macOS warns about it. If it won't run at all, run `chmod +x PlayDate.command launch.sh` once in Terminal first, which is needed after a zip download.)
+
+Or from Terminal:
+
 ```bash
 chmod +x launch.sh && ./launch.sh
 ```
