@@ -167,8 +167,8 @@ modules:
       - install -Dm755 playdate-wrapper.sh /app/bin/playdate
       - install -Dm644 io.github.robbyratpoison.PlayDate.desktop /app/share/applications/io.github.robbyratpoison.PlayDate.desktop
       - install -Dm644 io.github.robbyratpoison.PlayDate.metainfo.xml /app/share/metainfo/io.github.robbyratpoison.PlayDate.metainfo.xml
-      # Generated at multiple exact hicolor sizes (source favicon.png is only
-      # 250x250) — store frontends like Shelly/GNOME Software build their own
+      # Generated at multiple exact hicolor sizes (source favicon.png is
+      # 512x512) — store frontends like Shelly/GNOME Software build their own
       # icon cache from the repo's appstream metadata and can silently drop
       # an icon that doesn't match its declared size folder, showing a
       # placeholder instead even though the running app's own window icon
