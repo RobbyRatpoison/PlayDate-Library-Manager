@@ -36,6 +36,9 @@ finish-args:
   # Identical to the GTK manifest's own reasoning -- see that file for the
   # long-form comments on each of these.
   - --filesystem=home
+  - --filesystem=/mnt
+  - --filesystem=/media
+  - --filesystem=/run/media
   - --share=network
   - --share=ipc
   - --socket=wayland

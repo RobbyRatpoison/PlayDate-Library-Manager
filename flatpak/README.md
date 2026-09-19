@@ -77,7 +77,8 @@ Two independent update paths ship together:
 
 ## Permissions
 
-Requests broad host access (`--filesystem=home`, `--talk-name=org.freedesktop.Flatpak`
+Requests broad host access (`--filesystem=home`, plus `/mnt`, `/media` and
+`/run/media` so libraries on a second drive are reachable, `--talk-name=org.freedesktop.Flatpak`
 for `flatpak-spawn --host`) rather than narrow portal-based access — the app's
 whole job is bridging into Steam/GOG/Epic libraries and Wine prefixes that can
 live anywhere under `$HOME`, the same tradeoff Lutris/Heroic/Bottles make.

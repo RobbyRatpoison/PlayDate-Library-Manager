@@ -17,6 +17,13 @@ finish-args:
   # there's no review pressure to narrow this down; it's a known tradeoff and
   # can be tightened later (see flatpak/README.md).
   - --filesystem=home
+  # Game libraries are commonly on a second drive, which lives outside $HOME:
+  # a fixed mount under /mnt, or an automounted removable/secondary disk under
+  # /run/media (udisks, KDE/GNOME) or /media (Debian/Ubuntu). Without these
+  # the folder picker can't reach them and plugins can't read/write there.
+  - --filesystem=/mnt
+  - --filesystem=/media
+  - --filesystem=/run/media
   - --share=network
   - --share=ipc
   - --socket=wayland
