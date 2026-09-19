@@ -38,7 +38,7 @@ Download **PlayDate-\<version\>-Linux.flatpak** from the [latest release](https:
 flatpak install --user PlayDate-<version>-Linux.flatpak
 ```
 
-Use `--user` so PlayDate can update itself. A system-wide install needs administrator approval for every update, which PlayDate can't ask for, so update those with `flatpak update` in a terminal instead.
+Use `--user` so PlayDate can update itself. A system-wide install needs administrator approval for every update, which PlayDate can't ask for, so PlayDate will show you a command to run in a terminal instead.
 
 If your system doesn't already have Flathub configured as a remote, the bundle fetches the missing GNOME runtime from Flathub automatically. The Flatpak stays up to date on its own — updates ship via an in-app "Perform Update" button, and it's also compatible with `flatpak update` or GNOME Software once installed.
 

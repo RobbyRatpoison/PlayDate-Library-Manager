@@ -315,24 +315,27 @@ def perform_update():
                     ['flatpak', 'install', scope, '-y', '--reinstall', bundle_path],
                     capture_output=True, text=True
                 )
+                if result.returncode != 0:
+                    log.error(f"perform-update: flatpak install failed: {result.stderr.strip()}")
+                    if scope == '--system':
+                        # Polkit refuses a system install with no terminal to prompt on.
+                        # Keep the already-downloaded bundle and hand the user the
+                        # command that installs it with admin rights. (`flatpak update`
+                        # isn't offered: it only sees releases published to the ostree
+                        # remote, and betas never are -- it reported "Nothing to update".)
+                        _update_dl_state.update({
+                            'status': 'error',
+                            'error': 'System-wide installs need administrator approval, so PlayDate can\'t update itself. Run this in a terminal, then reopen PlayDate:',
+                            'fix_command': f'sudo flatpak install --system -y --reinstall "{bundle_path}"',
+                            'manual_url': None,
+                        })
+                        return
+                    _update_dl_state.update({'status': 'error', 'error': f'flatpak install failed: {result.stderr.strip()}'})
                 try:
                     os.remove(bundle_path)
                 except OSError:
                     pass
                 if result.returncode != 0:
-                    log.error(f"perform-update: flatpak install failed: {result.stderr.strip()}")
-                    if scope == '--system':
-                        # Polkit refuses a system install with no terminal to prompt on.
-                        # A manual bundle download is no help here, so point at the
-                        # terminal command instead.
-                        _update_dl_state.update({
-                            'status': 'error',
-                            'error': 'System-wide installs need administrator approval, so PlayDate can\'t update itself. Run this in a terminal instead:',
-                            'fix_command': f'flatpak update {app_id}',
-                            'manual_url': None,
-                        })
-                    else:
-                        _update_dl_state.update({'status': 'error', 'error': f'flatpak install failed: {result.stderr.strip()}'})
                     return
 
                 # In Steam Deck Game Mode a bare `flatpak run` gets no window
