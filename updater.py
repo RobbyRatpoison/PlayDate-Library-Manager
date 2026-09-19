@@ -201,7 +201,23 @@ def update_status():
     })
 
 def _flatpak_install_scope(app_id):
-    """'--user' if this Flatpak lives in the user installation, else '--system'."""
+    """'--user' or '--system' for the installation of the *running* copy.
+
+    The same app-id can be installed in both scopes at once, so "does a
+    --user copy exist" (the fallback below) says nothing about which one is
+    running. /.flatpak-info's [Instance] app-path names the running copy's
+    installation, so read that first."""
+    import configparser
+    cp = configparser.ConfigParser()
+    try:
+        cp.read('/.flatpak-info')
+        app_path = cp.get('Instance', 'app-path', fallback='')
+    except Exception:
+        app_path = ''
+    if '/var/lib/flatpak/' in app_path:
+        return '--system'
+    if '/.local/share/flatpak/' in app_path or app_path.startswith(os.path.expanduser('~') + os.sep):
+        return '--user'
     user_check = host_run(['flatpak', 'info', '--user', app_id], capture_output=True, text=True)
     return '--user' if user_check.returncode == 0 else '--system'
 
