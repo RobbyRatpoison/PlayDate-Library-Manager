@@ -1,6 +1,6 @@
 # Release Notes
 
-## v1.11.0
+## v1.11.0 - 2026-09-19
 ### New
 
 - Added a Tuning menu in Settings for adjusting tag similarity matching, review score weighting, and how Pick 6 scores staleness, release date, and length, including the shape of each scoring curve. Each section can be expanded, and graphs show how a change will reshape the result before you save it.
