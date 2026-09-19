@@ -30,9 +30,23 @@ Prefer portable? Download **PlayDate-Windows-Portable.zip**, extract anywhere, a
 
 **Requirements:** Windows 10 or 11 (64-bit). Microsoft Edge WebView2 Runtime is required — it ships pre-installed on Windows 10/11.
 
-### Linux
+### Linux (Flatpak, recommended)
 
-Install the WebKit/GTK system dependencies for your distro first:
+Download **PlayDate-\<version\>-Linux.flatpak** from the [latest release](https://github.com/RobbyRatpoison/PlayDate-Library-Manager/releases/latest), then install it from a terminal:
+
+```bash
+flatpak install --user PlayDate-<version>-Linux.flatpak
+```
+
+Use `--user` so PlayDate can update itself. A system-wide install needs administrator approval for every update, which PlayDate can't ask for, so update those with `flatpak update` in a terminal instead.
+
+If your system doesn't already have Flathub configured as a remote, the bundle fetches the missing GNOME runtime from Flathub automatically. The Flatpak stays up to date on its own — updates ship via an in-app "Perform Update" button, and it's also compatible with `flatpak update` or GNOME Software once installed.
+
+Windows games and launchers from non-Steam plugins need the same runtime as the source install below — Wine, or GE-Proton + [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher), plus `winetricks` and `p7zip`/`7zip` — but installed on the **host** system, not as Flatpaks, since PlayDate runs them via `flatpak-spawn --host`. Native Linux games need none of it.
+
+### Linux (from source)
+
+Prefer not to use Flatpak, or want to run the code directly? Install the WebKit/GTK system dependencies for your distro first:
 
 ```bash
 # Debian, Ubuntu, Mint, Pop!_OS, etc.
@@ -73,21 +87,9 @@ sudo pacman -S wine winetricks p7zip umu-launcher
 
 Install **GE-Proton** with [ProtonUp-Qt](https://davidotek.github.io/protonup-qt/), or use Steam's built-in Proton.
 
-### Linux (Flatpak)
-
-Download **PlayDate-\<version\>-Linux.flatpak** from the [latest release](https://github.com/RobbyRatpoison/PlayDate-Library-Manager/releases/latest), then either double-click it in your file manager or install it from a terminal:
-
-```bash
-flatpak install PlayDate-<version>-Linux.flatpak
-```
-
-If your system doesn't already have Flathub configured as a remote, the bundle fetches the missing GNOME runtime from Flathub automatically. The Flatpak stays up to date on its own — updates ship via an in-app "Perform Update" button, and it's also compatible with `flatpak update` or GNOME Software once installed.
-
-Windows games and launchers from non-Steam plugins need the same runtime as the source install above — Wine, or GE-Proton + [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher), plus `winetricks` and `p7zip`/`7zip` — but installed on the **host** system, not as Flatpaks, since PlayDate runs them via `flatpak-spawn --host`. Native Linux games need none of it.
-
 ### Steam Deck
 
-The Flatpak build above is the recommended way to install PlayDate on Steam Deck. In Desktop Mode, download the `.flatpak` file and double-click it to install via Discover, or use the terminal command above — no sudo password or system package setup required. It runs entirely sandboxed and updates like any other Flatpak app.
+The Flatpak build above is the recommended way to install PlayDate on Steam Deck. In Desktop Mode, download the `.flatpak` file and install it with the terminal command above (including `--user`) — no sudo password or system package setup required. It runs entirely sandboxed and updates like any other Flatpak app.
 
 If you'd rather run from source instead, set a sudo password first if you haven't already:
 
