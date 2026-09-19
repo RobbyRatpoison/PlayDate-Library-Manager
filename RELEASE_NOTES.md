@@ -9,4 +9,4 @@
 ### Fixes
 
 - Fixed system-wide Flatpak installs failing to update with no explanation. PlayDate now warns you first and says how to update.
-- Fixed updates going to the wrong Flatpak copy when PlayDate is installed both system-wide and for your user.
+- Fixed updates on Linux going to the wrong Flatpak copy when PlayDate is installed both system-wide and for your user.
