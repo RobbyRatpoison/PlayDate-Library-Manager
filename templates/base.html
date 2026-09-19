@@ -318,6 +318,7 @@
             <div id="update-confirm-title" style="color:#c7d5e0;font-size:1rem;font-weight:bold;margin:0 0 10px;"></div>
             <div id="update-confirm-backup-hint" style="color:#8f98a0;font-size:0.85rem;line-height:1.6;margin:0 0 22px;">If you haven't backed up recently, it's a good idea to do so before updating - just in case.</div>
             <div id="update-confirm-plugins-hint" style="display:none;color:#8f98a0;font-size:0.8rem;line-height:1.5;margin:-10px 0 16px;"></div>
+            <div id="update-confirm-system-hint" style="display:none;color:#e0a458;font-size:0.8rem;line-height:1.5;margin:-10px 0 16px;"></div>
             <div id="update-confirm-deck-hint" style="display:none;color:#8f98a0;font-size:0.8rem;line-height:1.5;margin:-10px 0 16px;">PlayDate will close to install the update, then reopen through Steam.</div>
             <div style="display:flex;gap:0.625rem;justify-content:center;flex-wrap:wrap;">
                 <button id="update-confirm-backup-btn" data-modal-row="0" onclick="_closeUpdateConfirm();openBackupModal()" style="padding:0.5rem 1.2rem;border-radius:0.375rem;font-size:0.85rem;font-weight:bold;cursor:pointer;letter-spacing:0.04em;background:transparent;color:#c7d5e0;border:1px solid #2a475e;">Back Up First</button>
@@ -1079,6 +1080,20 @@
 
                 document.getElementById('update-confirm-deck-hint').style.display =
                     window._STEAM_DECK_SESSION ? '' : 'none';
+
+                // System-wide Flatpak installs need administrator approval to update,
+                // which PlayDate can't prompt for, so warn before trying.
+                const sysHint = document.getElementById('update-confirm-system-hint');
+                sysHint.style.display = 'none';
+                if (window._IN_FLATPAK) {
+                    try {
+                        const sd = await (await fetch('/api/flatpak-scope')).json();
+                        if (sd.system) {
+                            sysHint.textContent = 'This is a system-wide Flatpak install, so updating from here may fail. If it does, run "flatpak update ' + sd.app_id + '" in a terminal.';
+                            sysHint.style.display = '';
+                        }
+                    } catch (e) {}
+                }
 
                 document.getElementById('update-confirm-overlay').style.display = 'flex';
             } else {

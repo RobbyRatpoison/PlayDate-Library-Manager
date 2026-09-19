@@ -200,6 +200,19 @@ def update_status():
         'is_portable': IS_PORTABLE,
     })
 
+def _flatpak_install_scope(app_id):
+    """'--user' if this Flatpak lives in the user installation, else '--system'."""
+    user_check = host_run(['flatpak', 'info', '--user', app_id], capture_output=True, text=True)
+    return '--user' if user_check.returncode == 0 else '--system'
+
+@updater_bp.route('/api/flatpak-scope')
+def flatpak_scope():
+    """Lets the update confirmation warn about system-wide installs, which need admin approval to update."""
+    if not IN_FLATPAK:
+        return jsonify({'system': False})
+    app_id = _running_flatpak_app_id()
+    return jsonify({'system': _flatpak_install_scope(app_id) == '--system', 'app_id': app_id})
+
 @updater_bp.route('/api/check-update', methods=['POST'])
 def check_update():
     from config import __version__, IS_PORTABLE
@@ -278,8 +291,7 @@ def perform_update():
                 # instead of updating the copy actually running — since
                 # we're IN_FLATPAK right now, the app is guaranteed to be
                 # installed in at least one of the two scopes already.
-                user_check = host_run(['flatpak', 'info', '--user', app_id], capture_output=True, text=True)
-                scope = '--user' if user_check.returncode == 0 else '--system'
+                scope = _flatpak_install_scope(app_id)
 
                 log.info(f"Installing flatpak bundle ({scope}): {bundle_path}")
                 result = host_run(
@@ -292,7 +304,10 @@ def perform_update():
                     pass
                 if result.returncode != 0:
                     log.error(f"perform-update: flatpak install failed: {result.stderr.strip()}")
-                    _update_dl_state.update({'status': 'error', 'error': f'flatpak install failed: {result.stderr.strip()}'})
+                    _err = f'flatpak install failed: {result.stderr.strip()}'
+                    if scope == '--system':
+                        _err += f' | This is a system-wide install, which needs administrator approval to update. Run "flatpak update {app_id}" in a terminal instead.'
+                    _update_dl_state.update({'status': 'error', 'error': _err})
                     return
 
                 # In Steam Deck Game Mode a bare `flatpak run` gets no window
