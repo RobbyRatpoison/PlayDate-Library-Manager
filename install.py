@@ -626,8 +626,10 @@ class InstallerApp(tk.Tk):
     <key>LSUIElement</key>         <false/>
 </dict></plist>""")
 
-        if os.path.exists(ICON_PATH):
-            shutil.copy(ICON_PATH, os.path.join(app_res, "favicon.png"))
+        # macOS wants an .icns for a bundle's icon (Info.plist's CFBundleIconFile).
+        mac_icon = os.path.join(INSTALL_DIR, "static", "img", "favicon.icns")
+        if os.path.exists(mac_icon):
+            shutil.copy(mac_icon, os.path.join(app_res, "favicon.icns"))
 
         subprocess.run(["mdimport", app_bundle], capture_output=True)
         self._log_line("✔  PlayDate.app created in ~/Applications", "ok")

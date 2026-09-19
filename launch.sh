@@ -52,8 +52,8 @@ EOF
 </dict></plist>
 PLISTEOF
     fi
-    [ -f "$DIR/static/img/favicon.png" ] && \
-        cp "$DIR/static/img/favicon.png" "$APP/Contents/Resources/favicon.png" 2>/dev/null || true
+    [ -f "$DIR/static/img/favicon.icns" ] && \
+        cp "$DIR/static/img/favicon.icns" "$APP/Contents/Resources/favicon.icns" 2>/dev/null || true
     mdimport "$APP" 2>/dev/null || true
 fi
 
