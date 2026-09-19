@@ -1210,7 +1210,7 @@ def save_state(updates):
         if "tag_similarity_playtime_cap_hours" in updates:
             state["tag_similarity_playtime_cap_hours"] = max(1, min(500, int(updates["tag_similarity_playtime_cap_hours"])))
         if "review_half_trust_count" in updates:
-            state["review_half_trust_count"] = max(2, min(2000, int(updates["review_half_trust_count"])))
+            state["review_half_trust_count"] = max(2, min(1000, int(updates["review_half_trust_count"])))
         if "pick6_staleness_cap_days" in updates:
             state["pick6_staleness_cap_days"] = max(1, min(3650, int(updates["pick6_staleness_cap_days"])))
         if "pick6_recency_cap_years" in updates:

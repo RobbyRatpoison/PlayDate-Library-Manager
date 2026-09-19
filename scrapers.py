@@ -64,10 +64,23 @@ BACKOFF_DELAYS = [15, 60, 300, 3615]
 def _weighted_score(percent, count):
     """Confidence-interval weighted review score: pulls low-count scores toward 50.
     The curve is tunable (Settings -> Tuning -> Review Scores)."""
-    from config import load_state
     from utils import weighted_review_score
-    half_trust = load_state().get('review_half_trust_count', 10)
-    return weighted_review_score(percent, count, half_trust)
+    return weighted_review_score(percent, count, _review_half_trust())
+
+
+_half_trust_cache = (0.0, 10)
+
+
+def _review_half_trust():
+    """The saved half-trust setting, re-read from state.json at most every few
+    seconds: fetch_review_data calls this once per game from many worker threads,
+    and load_state() takes a process-wide lock and parses the file each time."""
+    global _half_trust_cache
+    now = time.monotonic()
+    if now - _half_trust_cache[0] > 5:
+        from config import load_state
+        _half_trust_cache = (now, load_state().get('review_half_trust_count', 10))
+    return _half_trust_cache[1]
 
 
 def _hours_to_minutes(val):

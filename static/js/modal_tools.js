@@ -5870,7 +5870,7 @@ function _tuneOnSlider(el, key) {
     const raw = parseFloat(el.value);
     document.getElementById('tune-val-' + key).textContent = st.fmt(st.fromSlider ? st.fromSlider(raw) : raw);
     el.style.setProperty('--slider-pct', ((raw - el.min) / (el.max - el.min) * 100) + '%');
-    _tuneRedrawCharts();
+    _tuneRedrawCharts(TUNE_SECTIONS.find(s => s.settings.includes(st)).id);
 }
 
 function _tuneBuild() {
