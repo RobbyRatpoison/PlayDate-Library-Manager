@@ -5539,68 +5539,6 @@ async function detectDuplicates() {
     }
 }
 
-async function recalculateTagSimilarity() {
-    const status = document.getElementById('tag-similarity-status');
-    status.textContent = 'Recalculating…';
-    try {
-        const r = await fetch('/api/recalculate-tag-similarity', { method: 'POST' });
-        const d = await r.json();
-        status.textContent = r.ok ? `${d.scored ?? 0} games scored` : '✘ Recalculation failed';
-    } catch (e) {
-        status.textContent = '✘ Error: ' + e.message;
-    }
-}
-
-function _onTagSimSlider(el, valId, suffix) {
-    document.getElementById(valId).textContent = el.value + suffix;
-    const pct = (el.value - el.min) / (el.max - el.min) * 100;
-    el.style.setProperty('--slider-pct', pct + '%');
-}
-
-(function _initTagSimSliders() {
-    for (const id of ['tagsim-min-rate-slider', 'tagsim-smoothing-slider', 'tagsim-playtime-cap-slider']) {
-        const el = document.getElementById(id);
-        if (!el) continue;
-        const pct = (el.value - el.min) / (el.max - el.min) * 100;
-        el.style.setProperty('--slider-pct', pct + '%');
-    }
-})();
-
-async function _saveTagSimAndRecalc(minRate, smoothingK, playtimeCap) {
-    const status = document.getElementById('tagsim-settings-status');
-    savePreference({
-        tag_similarity_min_library_rate: minRate,
-        tag_similarity_smoothing_k: smoothingK,
-        tag_similarity_playtime_cap_hours: playtimeCap,
-    });
-    status.textContent = 'Recalculating…';
-    try {
-        const r = await fetch('/api/recalculate-tag-similarity', { method: 'POST' });
-        const d = await r.json();
-        status.textContent = r.ok ? `Saved -- ${d.scored ?? 0} games rescored` : 'Saved, but recalculation failed';
-    } catch (e) {
-        status.textContent = 'Saved, but recalculation errored: ' + e.message;
-    }
-}
-
-function saveTagSimSettings() {
-    const minRate = parseFloat(document.getElementById('tagsim-min-rate-slider').value);
-    const smoothingK = parseInt(document.getElementById('tagsim-smoothing-slider').value, 10);
-    const playtimeCap = parseInt(document.getElementById('tagsim-playtime-cap-slider').value, 10);
-    _saveTagSimAndRecalc(minRate, smoothingK, playtimeCap);
-}
-
-function resetTagSimSettings() {
-    const defaults = { minRate: 2, smoothingK: 4, playtimeCap: 60 };
-    const mr = document.getElementById('tagsim-min-rate-slider');
-    const sk = document.getElementById('tagsim-smoothing-slider');
-    const pc = document.getElementById('tagsim-playtime-cap-slider');
-    mr.value = defaults.minRate; sk.value = defaults.smoothingK; pc.value = defaults.playtimeCap;
-    _onTagSimSlider(mr, 'tagsim-min-rate-val', '%');
-    _onTagSimSlider(sk, 'tagsim-smoothing-val', '');
-    _onTagSimSlider(pc, 'tagsim-playtime-cap-val', 'hr');
-    _saveTagSimAndRecalc(defaults.minRate, defaults.smoothingK, defaults.playtimeCap);
-}
 async function runPopSync(confirmCleanup) {
     const status = document.getElementById('pop-sync-status');
     status.textContent = confirmCleanup === undefined ? 'Syncing…' : 'Updating…';
@@ -5751,63 +5689,285 @@ function closeAdvancedModal() {
     document.getElementById('advanced-modal').style.display = 'none';
 }
 
-function openAdvTuneModal() {
-    document.getElementById('advtune-modal').style.display = 'flex';
-}
-function closeAdvTuneModal() {
-    document.getElementById('advtune-modal').style.display = 'none';
+// ── Tuning ─────────────────────────────────────────────────────────────────
+//
+// One collapsible section per formula family. A setting's `key` is its
+// state.json key; `toSlider`/`fromSlider` let a slider work in a different
+// scale than the stored value (review half-trust is stored as a count but
+// slid on a log scale). `chart` names an entry in TUNE_CHARTS, drawn under that
+// slider and redrawn as it moves. `recalc` is the POST run after saving so
+// cached derived columns match the new values (same pattern as the tag
+// similarity recalculation that used to live under Library).
+
+const TUNE_SECTIONS = [
+    {
+        id: 'tagsim', title: 'Tag Similarity',
+        desc: 'Scores every game by tag similarity to your Beaten/Completed games (the taste profile Pick 6 uses too), so it works as a sort in Library and Home. Saving rescores the whole library.',
+        recalc: { url: '/api/recalculate-tag-similarity', label: 'games rescored' },
+        settings: [
+            { key: 'tag_similarity_min_library_rate', label: 'Rare-tag floor', min: 0, max: 10, step: 0.5, def: 2, fmt: v => v + '%',
+              hint: 'Tags in fewer than this % of your Steam library are ignored (too small a sample to trust). Lower to let rarer tags count; raise if the disliked-tags list looks noisy.' },
+            { key: 'tag_similarity_smoothing_k', label: 'Smoothing', min: 0, max: 20, step: 1, def: 4, fmt: v => v,
+              hint: 'Higher values pull sparsely-tagged games toward neutral so one lucky tag cannot outscore a game with several genuinely matching tags.',
+              chart: 'smoothing' },
+            { key: 'tag_similarity_playtime_cap_hours', label: 'Playtime saturation', min: 1, max: 200, step: 1, def: 60, fmt: v => v + ' hr',
+              hint: 'Hours a Beaten/Completed game needs before it counts at full weight in your taste profile. Lower if short games should shape your profile as much as long ones.',
+              chart: 'playtime' },
+        ],
+    },
+    {
+        id: 'reviews', title: 'Review Scores',
+        desc: 'The weighted review score pulls scores with few reviews toward neutral (50%). Saving recomputes it for every game from the review counts already stored, with no re-scraping.',
+        recalc: { url: '/api/recalculate-weighted-scores', label: 'games rescored' },
+        settings: [
+            { key: 'review_half_trust_count', label: 'Reviews needed to trust a score', min: 30, max: 300, step: 5, def: 10,
+              toSlider: n => Math.round(Math.log10(n) * 100), fromSlider: s => Math.round(Math.pow(10, s / 100)),
+              fmt: n => n + ' reviews',
+              hint: 'How many reviews before a score counts halfway between neutral and its raw value. Higher makes small samples count for less, for longer.',
+              chart: 'review' },
+        ],
+    },
+    {
+        id: 'pick6', title: 'Pick 6 Scoring',
+        desc: 'How Pick 6 turns a game\'s data into scores. The signal weights themselves stay on the Pick 6 page (Weighted mode).',
+        settings: [
+            { key: 'pick6_smart_tag_weight', label: 'Smart mode blend', min: 0, max: 100, step: 1, def: 65, fmt: v => v + '/' + (100 - v),
+              hint: 'Tag similarity vs. review score, when not using Weighted.' },
+            { key: 'pick6_staleness_cap_days', label: 'Staleness cap', min: 30, max: 2000, step: 10, def: 730, fmt: v => v + ' days',
+              hint: 'Days since last played that count as "maximally stale."', chart: 'staleness' },
+            { key: 'pick6_recency_cap_years', label: 'Recency cap', min: 1, max: 50, step: 1, def: 10, fmt: v => v + ' yr',
+              hint: 'Age in years that counts as "maximally old."', chart: 'recency' },
+            { key: 'pick6_hltb_long_floor_hours', label: 'Prefer-long floor', min: 0, max: 100, step: 1, def: 10, fmt: v => v + ' hr',
+              hint: 'Below this, a long game scores 0 on Length.' },
+            { key: 'pick6_hltb_long_cap_hours', label: 'Prefer-long cap', min: 10, max: 300, step: 1, def: 110, fmt: v => v + ' hr',
+              hint: 'At or above this, a long game scores 1.0 on Length.', chart: 'hltbLong' },
+            { key: 'pick6_hltb_short_cap_hours', label: 'Prefer-short cap', min: 1, max: 100, step: 1, def: 10, fmt: v => v + ' hr',
+              hint: 'At or above this, a short game scores 0 on Length.', chart: 'hltbShort' },
+        ],
+    },
+];
+
+// Each chart gives y (0..1 unless noted) for x, given a values object `v`
+// keyed by state key. Mirrors the real formulas in database.py / pick.py /
+// utils.py; keep in sync if those change.
+const TUNE_CHARTS = {
+    smoothing: {
+        xMax: 30, xLabel: 'tags on a game', yLabel: 'share of tag score kept',
+        series: [{ fn: (x, v) => x / (x + v.tag_similarity_smoothing_k) }],
+    },
+    playtime: {
+        xMax: 200, xLabel: 'hours played', yLabel: 'weight in profile',
+        series: [{ fn: (x, v) => x <= 0 ? 0 : Math.min(1, Math.log1p(x) / Math.log1p(v.tag_similarity_playtime_cap_hours)) }],
+    },
+    review: {
+        xMax: 100000, xLog: true, xMin: 1, xLabel: 'review count', yLabel: 'weighted score',
+        series: [95, 75, 30].map(pct => ({
+            label: pct + '% positive',
+            fn: (x, v) => {
+                const p = pct / 100, half = Math.max(2, v.review_half_trust_count);
+                return p - (p - 0.5) * Math.pow(2, -Math.log(x + 1) / Math.log(half));
+            },
+        })),
+    },
+    staleness: {
+        xMax: 2000, xLabel: 'days since last played', yLabel: 'staleness score',
+        series: [{ fn: (x, v) => Math.min(x, v.pick6_staleness_cap_days) / v.pick6_staleness_cap_days }],
+    },
+    recency: {
+        xMax: 50, xLabel: 'game age (years)', yLabel: 'recency score',
+        series: [{ fn: (x, v) => 1 - Math.min(x, v.pick6_recency_cap_years) / v.pick6_recency_cap_years }],
+    },
+    hltbLong: {
+        xMax: 300, xLabel: 'hours to beat', yLabel: 'Length score (prefer long)',
+        series: [{ fn: (x, v) => {
+            const floor = v.pick6_hltb_long_floor_hours, span = Math.max(1, v.pick6_hltb_long_cap_hours - floor);
+            return Math.sqrt(Math.max(0, Math.min(x - floor, span)) / span);
+        } }],
+    },
+    hltbShort: {
+        xMax: 100, xLabel: 'hours to beat', yLabel: 'Length score (prefer short)',
+        series: [{ fn: (x, v) => Math.sqrt(Math.min(x, v.pick6_hltb_short_cap_hours) / v.pick6_hltb_short_cap_hours) }],
+    },
+};
+
+let _tuneSaved = null;   // values as last saved (dashed lines)
+let _tuneBuilt = false;
+
+function _tuneSettingById(key) {
+    for (const s of TUNE_SECTIONS) for (const st of s.settings) if (st.key === key) return st;
+    return null;
 }
 
-function _onAdvTuneSlider(el, valId, fmt) {
-    document.getElementById(valId).textContent = fmt(el.value);
-    const pct = (el.value - el.min) / (el.max - el.min) * 100;
-    el.style.setProperty('--slider-pct', pct + '%');
-}
-
-(function _initAdvTuneSliders() {
-    for (const id of ['adv-smart-tag-weight', 'adv-staleness-cap', 'adv-recency-cap',
-                       'adv-hltb-long-floor', 'adv-hltb-long-cap', 'adv-hltb-short-cap']) {
-        const el = document.getElementById(id);
-        if (!el) continue;
-        const pct = (el.value - el.min) / (el.max - el.min) * 100;
-        el.style.setProperty('--slider-pct', pct + '%');
+function _tuneCurrent() {
+    const v = {};
+    for (const sec of TUNE_SECTIONS) for (const st of sec.settings) {
+        const el = document.getElementById('tune-' + st.key);
+        const raw = el ? parseFloat(el.value) : st.def;
+        v[st.key] = st.fromSlider ? st.fromSlider(raw) : raw;
     }
-})();
-
-function _advTuneValues() {
-    return {
-        pick6_smart_tag_weight:     parseInt(document.getElementById('adv-smart-tag-weight').value, 10),
-        pick6_staleness_cap_days:   parseInt(document.getElementById('adv-staleness-cap').value, 10),
-        pick6_recency_cap_years:    parseInt(document.getElementById('adv-recency-cap').value, 10),
-        pick6_hltb_long_floor_hours: parseInt(document.getElementById('adv-hltb-long-floor').value, 10),
-        pick6_hltb_long_cap_hours:  parseInt(document.getElementById('adv-hltb-long-cap').value, 10),
-        pick6_hltb_short_cap_hours: parseInt(document.getElementById('adv-hltb-short-cap').value, 10),
-    };
+    return v;
 }
 
-function saveAdvTuneSettings() {
-    const status = document.getElementById('advtune-status');
-    savePreference(_advTuneValues());
-    status.textContent = 'Saved.';
-    setTimeout(() => { status.textContent = ''; }, 2000);
+function _tunePath(chart, vals, w, h, pad, s) {
+    const xMin = chart.xMin ?? 0;
+    const xs = [];
+    const N = 80;
+    for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        xs.push(chart.xLog ? xMin * Math.pow(chart.xMax / xMin, t) : xMin + (chart.xMax - xMin) * t);
+    }
+    return xs.map((x, i) => {
+        const t = chart.xLog ? Math.log(x / xMin) / Math.log(chart.xMax / xMin) : (x - xMin) / (chart.xMax - xMin);
+        const y = Math.max(0, Math.min(1, s.fn(x, vals)));
+        return (i ? 'L' : 'M') + (pad.l + t * (w - pad.l - pad.r)).toFixed(1) + ' ' + (pad.t + (1 - y) * (h - pad.t - pad.b)).toFixed(1);
+    }).join(' ');
 }
 
-function resetAdvTuneSettings() {
-    const defaults = {
-        'adv-smart-tag-weight': 65, 'adv-staleness-cap': 730, 'adv-recency-cap': 10,
-        'adv-hltb-long-floor': 10, 'adv-hltb-long-cap': 110, 'adv-hltb-short-cap': 10,
-    };
-    for (const [id, val] of Object.entries(defaults)) document.getElementById(id).value = val;
-    _onAdvTuneSlider(document.getElementById('adv-smart-tag-weight'), 'adv-v-smart-tag-weight', v => v + '/' + (100 - v));
-    _onAdvTuneSlider(document.getElementById('adv-staleness-cap'),    'adv-v-staleness-cap',    v => v + ' days');
-    _onAdvTuneSlider(document.getElementById('adv-recency-cap'),      'adv-v-recency-cap',      v => v + ' yr');
-    _onAdvTuneSlider(document.getElementById('adv-hltb-long-floor'),  'adv-v-hltb-long-floor',  v => v + ' hr');
-    _onAdvTuneSlider(document.getElementById('adv-hltb-long-cap'),    'adv-v-hltb-long-cap',    v => v + ' hr');
-    _onAdvTuneSlider(document.getElementById('adv-hltb-short-cap'),   'adv-v-hltb-short-cap',   v => v + ' hr');
-    savePreference(_advTuneValues());
-    const status = document.getElementById('advtune-status');
-    status.textContent = 'Reset to defaults.';
-    setTimeout(() => { status.textContent = ''; }, 2000);
+function _tuneDrawChart(name) {
+    const chart = TUNE_CHARTS[name], host = document.getElementById('tune-chart-' + name);
+    if (!chart || !host) return;
+    const w = 340, h = 130, pad = { l: 34, r: 8, t: 8, b: 30 };
+    const cur = _tuneCurrent(), saved = _tuneSaved || cur;
+    const colors = ['var(--accent)', '#f1c40f', '#e74c3c'];
+    let svg = `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; display:block;" role="img" aria-label="${chart.yLabel} by ${chart.xLabel}">`;
+    // gridlines + y labels
+    for (const y of [0, 0.5, 1]) {
+        const py = pad.t + (1 - y) * (h - pad.t - pad.b);
+        svg += `<line x1="${pad.l}" x2="${w - pad.r}" y1="${py}" y2="${py}" stroke="var(--border)" stroke-width="1"/>`;
+        svg += `<text x="${pad.l - 4}" y="${py + 3}" text-anchor="end" font-size="9" fill="var(--text-secondary)">${y}</text>`;
+    }
+    // x labels
+    for (const t of [0, 0.5, 1]) {
+        const xMin = chart.xMin ?? 0;
+        const xv = chart.xLog ? xMin * Math.pow(chart.xMax / xMin, t) : xMin + (chart.xMax - xMin) * t;
+        const label = xv >= 1000 ? Math.round(xv / 1000) + 'k' : Math.round(xv);
+        const px = pad.l + t * (w - pad.l - pad.r);
+        svg += `<text x="${px}" y="${h - 16}" text-anchor="${t === 0 ? 'start' : t === 1 ? 'end' : 'middle'}" font-size="9" fill="var(--text-secondary)">${label}</text>`;
+    }
+    svg += `<text x="${(pad.l + w - pad.r) / 2}" y="${h - 3}" text-anchor="middle" font-size="9" fill="var(--text-secondary)">${chart.xLabel}</text>`;
+    chart.series.forEach((s, i) => {
+        const color = colors[i % colors.length];
+        svg += `<path d="${_tunePath(chart, saved, w, h, pad, s)}" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.5"/>`;
+        svg += `<path d="${_tunePath(chart, cur, w, h, pad, s)}" fill="none" stroke="${color}" stroke-width="2"/>`;
+    });
+    svg += '</svg>';
+    let legend = chart.series.some(s => s.label)
+        ? '<div style="display:flex; gap:10px; font-size:0.7rem; color:var(--text-secondary); margin-top:2px;">' +
+          chart.series.map((s, i) => `<span><span style="color:${colors[i % colors.length]}">&#9632;</span> ${s.label}</span>`).join('') + '</div>'
+        : '';
+    host.innerHTML = `<div style="font-size:0.7rem; color:var(--text-secondary); margin-bottom:2px;">${chart.yLabel}</div>` + svg + legend;
+}
+
+function _tuneRedrawCharts(sectionId) {
+    for (const sec of TUNE_SECTIONS) {
+        if (sectionId && sec.id !== sectionId) continue;
+        for (const st of sec.settings) if (st.chart) _tuneDrawChart(st.chart);
+    }
+}
+
+function _tuneOnSlider(el, key) {
+    const st = _tuneSettingById(key);
+    const raw = parseFloat(el.value);
+    document.getElementById('tune-val-' + key).textContent = st.fmt(st.fromSlider ? st.fromSlider(raw) : raw);
+    el.style.setProperty('--slider-pct', ((raw - el.min) / (el.max - el.min) * 100) + '%');
+    _tuneRedrawCharts();
+}
+
+function _tuneBuild() {
+    if (_tuneBuilt) return;
+    const init = window._TUNE_INIT || {};
+    _tuneSaved = {};
+    let row = 0;
+    let html = '';
+    for (const sec of TUNE_SECTIONS) {
+        html += `<div class="hub-section" id="tune-sec-${sec.id}">`;
+        html += `<button class="settings-item" data-modal-row="${row++}" onclick="_tuneToggle('${sec.id}')" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                    <span>${sec.title}</span><span id="tune-chev-${sec.id}" style="font-size:0.8rem; opacity:0.7;">&#9656;</span></button>`;
+        html += `<div id="tune-body-${sec.id}" style="display:none; padding:4px 10px 10px;">`;
+        html += `<div style="font-size:0.75rem; color:#8f98a0; margin-bottom:8px;">${sec.desc}</div>`;
+        for (const st of sec.settings) {
+            const val = init[st.key] ?? st.def;
+            _tuneSaved[st.key] = val;
+            const sv = st.toSlider ? st.toSlider(val) : val;
+            html += `<div style="margin-top:10px;">
+                <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">${st.label}</label>
+                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">${st.hint}</div>
+                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                    <input type="range" id="tune-${st.key}" min="${st.min}" max="${st.max}" step="${st.step}" value="${sv}"
+                        oninput="_tuneOnSlider(this, '${st.key}')" class="hltb-slider" data-modal-row="${row++}">
+                    <span id="tune-val-${st.key}" style="font-size:0.85rem; color:var(--text-primary); min-width:64px; text-align:right; flex-shrink:0;">${st.fmt(val)}</span>
+                </div>
+                ${st.chart ? `<div id="tune-chart-${st.chart}" style="margin-top:6px;"></div>` : ''}
+            </div>`;
+        }
+        html += `<div style="margin-top:12px;">
+                <button class="nav-btn" style="font-size:0.8rem;" data-modal-row="${row}" onclick="_tuneSave('${sec.id}')">Save</button>
+                <button class="nav-btn" style="margin-left:6px; font-size:0.8rem;" data-modal-row="${row}" onclick="_tuneReset('${sec.id}')">Reset to Defaults</button>
+                <div id="tune-status-${sec.id}" style="font-size:0.78rem; color:#8f98a0; margin-top:4px; min-height:1em;"></div>
+            </div>`;
+        row++;
+        html += '</div></div>';
+    }
+    document.getElementById('tuning-sections').innerHTML = html;
+    for (const sec of TUNE_SECTIONS) for (const st of sec.settings) {
+        const el = document.getElementById('tune-' + st.key);
+        el.style.setProperty('--slider-pct', ((el.value - el.min) / (el.max - el.min) * 100) + '%');
+    }
+    _tuneBuilt = true;
+}
+
+function _tuneToggle(id) {
+    const body = document.getElementById('tune-body-' + id);
+    const open = body.style.display === 'none';
+    body.style.display = open ? 'block' : 'none';
+    document.getElementById('tune-chev-' + id).innerHTML = open ? '&#9662;' : '&#9656;';
+    if (open) _tuneRedrawCharts(id);
+}
+
+function openTuningModal() {
+    _tuneBuild();
+    document.getElementById('tuning-modal').style.display = 'flex';
+}
+function closeTuningModal() {
+    document.getElementById('tuning-modal').style.display = 'none';
+}
+
+async function _tuneSave(id) {
+    const sec = TUNE_SECTIONS.find(s => s.id === id);
+    const status = document.getElementById('tune-status-' + id);
+    const cur = _tuneCurrent();
+    const payload = {};
+    for (const st of sec.settings) payload[st.key] = cur[st.key];
+    status.textContent = 'Saving…';
+    try {
+        const r = await fetch('/api/update_state', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        });
+        if (!r.ok) throw new Error('save failed');
+        for (const st of sec.settings) _tuneSaved[st.key] = cur[st.key];
+        _tuneRedrawCharts(id);
+        if (sec.recalc) {
+            status.textContent = 'Saved. Recalculating…';
+            const rr = await fetch(sec.recalc.url, { method: 'POST' });
+            const d = await rr.json();
+            status.textContent = rr.ok ? `Saved. ${d.scored ?? 0} ${sec.recalc.label}.` : 'Saved, but recalculation failed.';
+        } else {
+            status.textContent = 'Saved.';
+        }
+    } catch (e) {
+        status.textContent = '✘ ' + e.message;
+    }
+    setTimeout(() => { status.textContent = ''; }, 4000);
+}
+
+function _tuneReset(id) {
+    const sec = TUNE_SECTIONS.find(s => s.id === id);
+    for (const st of sec.settings) {
+        const el = document.getElementById('tune-' + st.key);
+        el.value = st.toSlider ? st.toSlider(st.def) : st.def;
+        _tuneOnSlider(el, st.key);
+    }
+    _tuneSave(id);
 }
 
 function resizeToSteamDeck() {

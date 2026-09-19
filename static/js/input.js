@@ -806,11 +806,11 @@
         'appearance-modal',
         'library-modal',
         'gamepad-modal',
+        'tuning-modal',
         'advanced-modal',
         // Top-level hamburger modals
         'hltb-modal',
         'settings-modal',
-        'advtune-modal', // opened directly from the Pick 6 page's gear icon
         'emulators-modal',
         'plugins-modal',
         'community-modal',
@@ -2361,11 +2361,11 @@
             ['appearance-modal',      'closeAppearanceModal'],
             ['library-modal',         'closeLibraryModal'],
             ['gamepad-modal',         'closeGamepadModal'],
+            ['tuning-modal',          'closeTuningModal'],
             ['advanced-modal',        'closeAdvancedModal'],
             // top-level hamburger modals
             ['hltb-modal',            'closeHltbModal'],
             ['settings-modal',        'closeSettingsModal'],
-            ['advtune-modal',         'closeAdvTuneModal'],
             ['emulators-modal',       'closeEmulatorsModal'],
             ['plugins-modal',         'closePluginsModal'],
             ['community-modal',       'closeCommunityModal'],
@@ -3192,7 +3192,7 @@
 
         // Top-level hamburger modals
         _watchModal('settings-modal');
-        _watchModal('advtune-modal');
+        _watchModal('tuning-modal');
         _watchModal('account-modal');
         _watchModal('appearance-modal');
         _watchModal('library-modal');

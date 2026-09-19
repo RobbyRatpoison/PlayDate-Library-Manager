@@ -3,9 +3,8 @@
 ## v1.11.0
 ### New
 
-- Added a Settings menu for tuning how tag similarity matching works.
+- Added a Tuning menu in Settings for adjusting tag similarity matching, review score weighting, and how Pick 6 scores staleness, release date, and length. Each section can be expanded, and graphs show how a change will reshape the result before you save it.
 - Added gamepad dead zone and repeat-speed settings.
-- Added an Advanced Tuning menu on Pick 6 for adjusting how staleness, release date, and length affect picks.
 
 ### Improvements
 

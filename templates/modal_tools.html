@@ -757,48 +757,6 @@
                 <div style="font-size:0.75rem; color:#8f98a0; margin-top:3px; padding-left:22px;">Catches games where the developer added achievements after you'd already 100%'d it.</div>
             </div>
         </div>
-        <div class="hub-section">
-            <div class="hub-section-label">Tag Similarity</div>
-            <div style="padding:8px 10px;">
-                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Scores every game by tag similarity to your Beaten/Completed games (the same taste profile Pick 6 uses), so it can be used as a sort option in Library and Home. Recalculates automatically after a sync, rescrape, or a relevant edit — this forces it right away.</div>
-                <button class="nav-btn" style="font-size:0.8rem;" data-modal-row="27" onclick="recalculateTagSimilarity()">Recalculate Now</button>
-                <div id="tag-similarity-status" style="font-size:0.78rem; color:#8f98a0; margin-top:4px; min-height:1em;"></div>
-
-                <div style="margin-top:14px; border-top:1px solid var(--border); padding-top:10px;">
-                    <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Rare-tag floor</label>
-                    <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Tags present in fewer than this % of your Steam library are ignored entirely (too small a sample to trust). Lower to let rarer tags count; raise if the disliked-tags list looks noisy.</div>
-                    <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                        <input type="range" id="tagsim-min-rate-slider" min="0" max="10" step="0.5" value="{{ tag_similarity_min_library_rate }}"
-                            oninput="_onTagSimSlider(this, 'tagsim-min-rate-val', '%')"
-                            class="hltb-slider" data-modal-row="24">
-                        <span id="tagsim-min-rate-val" style="font-size:0.85rem; color:var(--text-primary); min-width:36px; text-align:right; flex-shrink:0;">{{ tag_similarity_min_library_rate }}%</span>
-                    </div>
-                </div>
-                <div style="margin-top:10px;">
-                    <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Smoothing</label>
-                    <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Higher values pull sparsely-tagged games toward neutral so one lucky tag can't outscore a game with several genuinely matching tags.</div>
-                    <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                        <input type="range" id="tagsim-smoothing-slider" min="0" max="20" value="{{ tag_similarity_smoothing_k }}"
-                            oninput="_onTagSimSlider(this, 'tagsim-smoothing-val', '')"
-                            class="hltb-slider" data-modal-row="25">
-                        <span id="tagsim-smoothing-val" style="font-size:0.85rem; color:var(--text-primary); min-width:28px; text-align:right; flex-shrink:0;">{{ tag_similarity_smoothing_k }}</span>
-                    </div>
-                </div>
-                <div style="margin-top:10px;">
-                    <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Playtime saturation</label>
-                    <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Hours a Beaten/Completed game needs before it counts at full weight in your taste profile. Lower if short games should shape your profile just as much as long ones.</div>
-                    <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                        <input type="range" id="tagsim-playtime-cap-slider" min="1" max="200" value="{{ tag_similarity_playtime_cap_hours }}"
-                            oninput="_onTagSimSlider(this, 'tagsim-playtime-cap-val', 'hr')"
-                            class="hltb-slider" data-modal-row="26">
-                        <span id="tagsim-playtime-cap-val" style="font-size:0.85rem; color:var(--text-primary); min-width:36px; text-align:right; flex-shrink:0;">{{ tag_similarity_playtime_cap_hours }}hr</span>
-                    </div>
-                </div>
-                <button class="nav-btn" style="margin-top:10px; font-size:0.8rem;" data-modal-row="28" onclick="saveTagSimSettings()">Save</button>
-                <button class="nav-btn" style="margin-top:10px; margin-left:6px; font-size:0.8rem;" data-modal-row="28" onclick="resetTagSimSettings()">Reset to Defaults</button>
-                <div id="tagsim-settings-status" style="font-size:0.78rem; color:#8f98a0; margin-top:4px; min-height:1em;"></div>
-            </div>
-        </div>
         </div>
     </div>
 </div>
@@ -980,7 +938,8 @@
             <button class="settings-item" data-modal-row="1" onclick="openAppearanceModal()">Appearance</button>
             <button class="settings-item" data-modal-row="2" onclick="openLibraryModal()">Library</button>
             <button class="settings-item" data-modal-row="3" onclick="openGamepadModal()">Gamepad</button>
-            <button class="settings-item" data-modal-row="4" onclick="openAdvancedModal()">Advanced</button>
+            <button class="settings-item" data-modal-row="4" onclick="openTuningModal()">Tuning</button>
+            <button class="settings-item" data-modal-row="5" onclick="openAdvancedModal()">Advanced</button>
         </div>
         </div>
     </div>
@@ -1094,84 +1053,33 @@
     </div>
 </div>
 
-<!-- ── PICK 6 ADVANCED TUNING MODAL ── -->
-<div id="advtune-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeAdvTuneModal();">
-    <div class="modal-content" style="width:400px; max-height:90vh; padding:0; display:flex; flex-direction:column; overflow:hidden;">
-        <!-- Fixed header -->
+<!-- ── TUNING MODAL (sub-modal of Settings) ──
+     Sections are rendered from TUNE_SECTIONS in modal_tools.js; each starts
+     collapsed. Initial values come from the server-rendered state below. -->
+<script>
+window._TUNE_INIT = {{ {
+    'tag_similarity_min_library_rate': tag_similarity_min_library_rate,
+    'tag_similarity_smoothing_k': tag_similarity_smoothing_k,
+    'tag_similarity_playtime_cap_hours': tag_similarity_playtime_cap_hours,
+    'review_half_trust_count': review_half_trust_count,
+    'pick6_smart_tag_weight': pick6_smart_tag_weight,
+    'pick6_staleness_cap_days': pick6_staleness_cap_days,
+    'pick6_recency_cap_years': pick6_recency_cap_years,
+    'pick6_hltb_long_floor_hours': pick6_hltb_long_floor_hours,
+    'pick6_hltb_long_cap_hours': pick6_hltb_long_cap_hours,
+    'pick6_hltb_short_cap_hours': pick6_hltb_short_cap_hours,
+}|tojson }};
+</script>
+<div id="tuning-modal" class="modal-overlay sub-modal" style="display:none;" onclick="if(event.target===this)closeTuningModal();">
+    <div class="modal-content" style="width:440px; max-height:90vh; padding:0; display:flex; flex-direction:column; overflow:hidden;">
         <div style="flex-shrink:0; padding:1.875rem 1.875rem 0;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <h2 style="margin:0; color:var(--text-primary);">Advanced Tuning</h2>
-                <button onclick="closeAdvTuneModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <h2 style="margin:0; color:var(--text-primary);">Tuning</h2>
+                <button onclick="closeTuningModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
             </div>
+            <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:14px;">Adjust the formulas behind tag similarity, review scores and Pick 6. Solid lines show your current slider values; dashed lines show what's saved.</div>
         </div>
-        <!-- Scrollable body -->
-        <div style="overflow-y:auto; flex:1; min-height:0; padding:0 1.875rem 1.875rem;">
-        <div class="hub-section">
-            <div style="padding:8px 10px;">
-                <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Smart mode blend</label>
-                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Tag similarity vs. review score, when not using Weighted.</div>
-                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                    <input type="range" id="adv-smart-tag-weight" min="0" max="100" value="{{ pick6_smart_tag_weight }}"
-                        oninput="_onAdvTuneSlider(this, 'adv-v-smart-tag-weight', v => v + '/' + (100-v))"
-                        class="hltb-slider" data-modal-row="0">
-                    <span id="adv-v-smart-tag-weight" style="font-size:0.85rem; color:var(--text-primary); min-width:44px; text-align:right; flex-shrink:0;">{{ pick6_smart_tag_weight }}/{{ 100 - pick6_smart_tag_weight }}</span>
-                </div>
-            </div>
-            <div style="padding:8px 10px;">
-                <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Staleness cap</label>
-                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Days since last played that count as "maximally stale."</div>
-                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                    <input type="range" id="adv-staleness-cap" min="30" max="2000" value="{{ pick6_staleness_cap_days }}"
-                        oninput="_onAdvTuneSlider(this, 'adv-v-staleness-cap', v => v + ' days')"
-                        class="hltb-slider" data-modal-row="1">
-                    <span id="adv-v-staleness-cap" style="font-size:0.85rem; color:var(--text-primary); min-width:56px; text-align:right; flex-shrink:0;">{{ pick6_staleness_cap_days }} days</span>
-                </div>
-            </div>
-            <div style="padding:8px 10px;">
-                <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Recency cap</label>
-                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Age in years that counts as "maximally old."</div>
-                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                    <input type="range" id="adv-recency-cap" min="1" max="50" value="{{ pick6_recency_cap_years }}"
-                        oninput="_onAdvTuneSlider(this, 'adv-v-recency-cap', v => v + ' yr')"
-                        class="hltb-slider" data-modal-row="2">
-                    <span id="adv-v-recency-cap" style="font-size:0.85rem; color:var(--text-primary); min-width:44px; text-align:right; flex-shrink:0;">{{ pick6_recency_cap_years }} yr</span>
-                </div>
-            </div>
-            <div style="padding:8px 10px;">
-                <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Prefer-long HLTB floor</label>
-                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Below this, a long game scores 0 on Length.</div>
-                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                    <input type="range" id="adv-hltb-long-floor" min="0" max="100" value="{{ pick6_hltb_long_floor_hours }}"
-                        oninput="_onAdvTuneSlider(this, 'adv-v-hltb-long-floor', v => v + ' hr')"
-                        class="hltb-slider" data-modal-row="3">
-                    <span id="adv-v-hltb-long-floor" style="font-size:0.85rem; color:var(--text-primary); min-width:44px; text-align:right; flex-shrink:0;">{{ pick6_hltb_long_floor_hours }} hr</span>
-                </div>
-            </div>
-            <div style="padding:8px 10px;">
-                <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Prefer-long HLTB cap</label>
-                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">At or above this, a long game scores 1.0 on Length.</div>
-                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                    <input type="range" id="adv-hltb-long-cap" min="10" max="300" value="{{ pick6_hltb_long_cap_hours }}"
-                        oninput="_onAdvTuneSlider(this, 'adv-v-hltb-long-cap', v => v + ' hr')"
-                        class="hltb-slider" data-modal-row="4">
-                    <span id="adv-v-hltb-long-cap" style="font-size:0.85rem; color:var(--text-primary); min-width:44px; text-align:right; flex-shrink:0;">{{ pick6_hltb_long_cap_hours }} hr</span>
-                </div>
-            </div>
-            <div style="padding:8px 10px;">
-                <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:2px;">Prefer-short HLTB cap</label>
-                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">At or above this, a short game scores 0 on Length.</div>
-                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                    <input type="range" id="adv-hltb-short-cap" min="1" max="100" value="{{ pick6_hltb_short_cap_hours }}"
-                        oninput="_onAdvTuneSlider(this, 'adv-v-hltb-short-cap', v => v + ' hr')"
-                        class="hltb-slider" data-modal-row="5">
-                    <span id="adv-v-hltb-short-cap" style="font-size:0.85rem; color:var(--text-primary); min-width:44px; text-align:right; flex-shrink:0;">{{ pick6_hltb_short_cap_hours }} hr</span>
-                </div>
-                <button class="nav-btn" style="margin-top:8px; font-size:0.8rem;" data-modal-row="6" onclick="saveAdvTuneSettings()">Save</button>
-                <button class="nav-btn" style="margin-top:8px; margin-left:6px; font-size:0.8rem;" data-modal-row="6" onclick="resetAdvTuneSettings()">Reset to Defaults</button>
-                <div id="advtune-status" style="font-size:0.78rem; color:#8f98a0; margin-top:4px; min-height:1em;"></div>
-            </div>
-        </div>
-        </div>
+        <div id="tuning-sections" style="overflow-y:auto; flex:1; min-height:0; padding:0 1.875rem 1.875rem;"></div>
     </div>
 </div>
 

@@ -174,7 +174,7 @@ def pick_game():
 
         db.close()
 
-        # Tunable via Settings -> Library -> Tag Similarity; see
+        # Tunable via Settings -> Tuning; see
         # config.DEFAULT_STATE for the shipped defaults these fall back to.
         _PLAYTIME_WEIGHT_CAP_HOURS = state.get('tag_similarity_playtime_cap_hours', 60)
 
@@ -285,7 +285,7 @@ def pick_game():
                     return 0.5
             return 1.0
 
-        # Tunable via the Pick 6 page's Advanced panel; see config.DEFAULT_STATE
+        # Tunable via Settings -> Tuning; see config.DEFAULT_STATE
         # for the shipped defaults these fall back to.
         _hltb_long_floor_min = state.get('pick6_hltb_long_floor_hours', 10) * 60
         _hltb_long_span_min = max(1, state.get('pick6_hltb_long_cap_hours', 110)
