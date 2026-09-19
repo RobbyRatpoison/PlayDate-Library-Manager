@@ -20,5 +20,5 @@
 - Fixed filter condition value fields not being reachable with a gamepad.
 - Fixed the on-screen keyboard losing focus while typing in a text field.
 - Fixed Gamepad Diagnostics and Remap Buttons not detecting the controller on Steam Deck.
-- Fixed the X and Y gamepad buttons being swapped on the Steam Deck in Gaming Mode and with the Qt renderer.
+- Fixed the X and Y gamepad buttons being swapped with the Qt renderer and on the Steam Deck in Gaming Mode.
 - Fixed the Remap Buttons screen describing Y as "Filter / Search" instead of "Edit Game".
