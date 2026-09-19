@@ -5989,8 +5989,9 @@ function resizeToSteamDeck() {
 
 // ── Gamepad Diagnostics ────────────────────────────────────────────────────
 
-// Standard Gamepad layout: buttons[2] is X, buttons[3] is Y (see the matching
-// note on BTN_IDX in input.js).
+// Standard Gamepad layout: buttons[2] is X, buttons[3] is Y. _activeBtnLabels()
+// trades 2 and 3 on input paths that report them backwards (WebKitGTK; see
+// pdGamepadXYSwapped() in playdate.js and the note on BTN_IDX in input.js).
 const BTN_LABELS = {
     0:'A', 1:'B', 2:'X', 3:'Y',
     4:'LB', 5:'RB', 6:'LT', 7:'RT',
@@ -6017,8 +6018,18 @@ function _isPlayStationPad(id) {
     return /054c|dualshock|dualsense|playstation/i.test(id || '');
 }
 
+// Raw index -> the standard-layout index whose label/color it should carry. Same
+// as the input on most paths; raw 2/3 trade places where pdGamepadXYSwapped()
+// says this window's input path reports X and Y backwards (see playdate.js).
+function _stdFaceIdx(rawIdx) {
+    if (!pdGamepadXYSwapped()) return rawIdx;
+    return rawIdx === 2 ? 3 : rawIdx === 3 ? 2 : rawIdx;
+}
+
 function _activeBtnLabels(gpId) {
-    return _isPlayStationPad(gpId) ? BTN_LABELS_PS : BTN_LABELS;
+    const std = _isPlayStationPad(gpId) ? BTN_LABELS_PS : BTN_LABELS;
+    if (!pdGamepadXYSwapped()) return std;
+    return { ...std, 2: std[3], 3: std[2] };
 }
 
 // Standard face-button brand colors, keyed by the same raw indices as
@@ -6029,7 +6040,7 @@ const FACE_BTN_COLORS_PS   = { 0:'#3a7bd5', 1:'#e0393e', 2:'#e05fa0', 3:'#3bb143
 
 function _faceButtonColor(physIdx, gpId) {
     const colors = _isPlayStationPad(gpId) ? FACE_BTN_COLORS_PS : FACE_BTN_COLORS_XBOX;
-    return colors[physIdx] || null;
+    return colors[_stdFaceIdx(physIdx)] || null;
 }
 
 // Same source input.js's own poll loop uses. On a real Steam Deck session
@@ -6149,12 +6160,15 @@ function _gpdStartPoll() {
             return;
         }
 
-        // Buttons in natural ascending index order (0-3 = A B X Y), so nothing
-        // raw is hidden. Triggers (6/7) are analogue, so they get their own bars
-        // below instead of an on/off chip here.
+        // Face buttons render in reading order (A B X Y) regardless of which raw
+        // index carries X (2 on most paths, 3 on WebKitGTK -- see _stdFaceIdx);
+        // everything else follows in ascending raw order, so nothing is hidden.
+        // Triggers (6/7) are analogue, so they get their own bars below instead
+        // of an on/off chip here.
         const btnEl = document.getElementById('gpd-buttons');
         const labels = _activeBtnLabels(gp.id);
-        const displayOrder = gp.buttons.map((_, i) => i).filter(i => i !== 6 && i !== 7);
+        const displayOrder = [0, 1, _stdFaceIdx(2), _stdFaceIdx(3),
+            ...gp.buttons.map((_, i) => i).filter(i => i > 3 && i !== 6 && i !== 7)];
         let btnHtml = '';
         displayOrder.forEach(i => {
             const btn = gp.buttons[i];
@@ -6213,8 +6227,10 @@ function _gpdStopPoll() {
 const _REMAP_ACTIONS = [
     { action: 'a',     defaultBtn: 0,  label: 'Confirm / Select' },
     { action: 'b',     defaultBtn: 1,  label: 'Back / Cancel' },
-    { action: 'x',     defaultBtn: 2,  label: 'Context Menu' },
-    { action: 'y',     defaultBtn: 3,  label: 'Edit Game' },
+    // x/y defaults are getters: which raw index is X depends on the input path
+    // (pdGamepadXYSwapped), decided at call time rather than script load.
+    { action: 'x',     get defaultBtn() { return _stdFaceIdx(2); }, label: 'Context Menu' },
+    { action: 'y',     get defaultBtn() { return _stdFaceIdx(3); }, label: 'Edit Game' },
     { action: 'lb',    defaultBtn: 4,  label: 'Previous Page' },
     { action: 'rb',    defaultBtn: 5,  label: 'Next Page' },
     { action: 'back',  defaultBtn: 8,  label: 'Open Menu' },

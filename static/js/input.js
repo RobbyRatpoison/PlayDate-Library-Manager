@@ -372,13 +372,13 @@
     const SCROLL_PREVIEW_MIN = 3;     // only show the position preview once ramped to at least this multiple of base speed
 
     // ── Standard Xbox/standard-mapping button indices ─────────────────────────
-    // Follows the W3C Standard Gamepad spec: buttons[2]=X, buttons[3]=Y. An
-    // earlier version swapped these ("confirmed backwards" on WebKitGTK), but
-    // that no longer holds: X/Y were confirmed reversed (Y opened the context
-    // menu, X the edit modal) on the Steam Deck in Gaming Mode, and on a wired
-    // Xbox Elite 2 under both the GTK and Qt renderers. The Deck's evdev
-    // reader (gamepad_reader.py) emits the same standard indices.
-    const BTN_IDX = { a:0, b:1, x:2, y:3, lb:4, rb:5, back:8, start:9, up:12, down:13, left:14, right:15 };
+    // x/y follow the W3C Standard Gamepad spec (buttons[2]=X, buttons[3]=Y)
+    // except on WebKitGTK/libmanette, which reports them backwards -- see
+    // pdGamepadXYSwapped() in playdate.js for which input paths that covers.
+    // A single global swap was wrong either way: it fixed WebKitGTK but put X/Y
+    // backwards on the Qt renderer and the Deck's Gaming Mode evdev reader.
+    const _XY_SWAPPED = pdGamepadXYSwapped();
+    const BTN_IDX = { a:0, b:1, x:_XY_SWAPPED ? 3 : 2, y:_XY_SWAPPED ? 2 : 3, lb:4, rb:5, back:8, start:9, up:12, down:13, left:14, right:15 };
     const AXIS_IDX = { lx:0, ly:1, rx:2, ry:3 };
 
     // ── Platform-specific button overrides ────────────────────────────────────

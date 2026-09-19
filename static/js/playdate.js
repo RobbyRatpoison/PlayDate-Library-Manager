@@ -401,6 +401,19 @@ function describeCustomExprSql(sql) {
     return null;
 }
 
+// Whether raw gamepad buttons 2 and 3 arrive swapped (physical X on 3, Y on 2)
+// on the input path this window uses. The W3C standard layout is X=2, Y=3, and
+// that is what Chromium (Qt renderer, WebView2) and the Steam Deck Gaming Mode
+// evdev reader (gamepad_reader.py) deliver. WebKitGTK on Linux goes through
+// libmanette instead, which reports them backwards -- confirmed on a wired Xbox
+// Elite 2 and the Deck's built-in pad. Used by input.js (BTN_IDX) and the
+// Gamepad Diagnostics/Remap screens (modal_tools.js) so all three agree.
+function pdGamepadXYSwapped() {
+    if (window._STEAM_DECK_SESSION === true) return false;   // evdev path, standard indices
+    const ua = navigator.userAgent || '';
+    return /Linux|X11/.test(ua) && /AppleWebKit/.test(ua) && !/Chrome|Chromium|QtWebEngine/.test(ua);
+}
+
 // Fire-and-forget preference save — keepalive survives page navigation
 function savePreference(payload) {
     fetch('/api/update_state', {
