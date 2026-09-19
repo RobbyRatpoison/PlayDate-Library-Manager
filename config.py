@@ -465,6 +465,14 @@ DEFAULT_STATE = {
     "pick6_hltb_long_floor_hours": 10,
     "pick6_hltb_long_cap_hours": 110,
     "pick6_hltb_short_cap_hours": 10,
+    # Curve exponents: signal = base ** exponent, where base is the 0-1 ramp the
+    # matching cap/floor settings define. 1.0 is a straight line, below 1 rises
+    # fast then flattens, above 1 stays low then climbs. Length defaults to 0.5
+    # (the original square root).
+    "pick6_staleness_curve": 1.0,
+    "pick6_recency_curve": 1.0,
+    "pick6_hltb_long_curve": 0.5,
+    "pick6_hltb_short_curve": 0.5,
     "pick6_smart_tag_weight": 65,
     "gamepad_deadzone": 35,
     "gamepad_repeat_initial_ms": 400,
@@ -621,6 +629,10 @@ def inject_config_status():
         pick6_hltb_long_floor_hours=state.get('pick6_hltb_long_floor_hours', 10),
         pick6_hltb_long_cap_hours=state.get('pick6_hltb_long_cap_hours', 110),
         pick6_hltb_short_cap_hours=state.get('pick6_hltb_short_cap_hours', 10),
+        pick6_staleness_curve=state.get('pick6_staleness_curve', 1.0),
+        pick6_recency_curve=state.get('pick6_recency_curve', 1.0),
+        pick6_hltb_long_curve=state.get('pick6_hltb_long_curve', 0.5),
+        pick6_hltb_short_curve=state.get('pick6_hltb_short_curve', 0.5),
         pick6_smart_tag_weight=state.get('pick6_smart_tag_weight', 65),
         gamepad_deadzone=state.get('gamepad_deadzone', 35),
         gamepad_repeat_initial_ms=state.get('gamepad_repeat_initial_ms', 400),
@@ -1221,6 +1233,10 @@ def save_state(updates):
             state["pick6_hltb_long_cap_hours"] = max(1, min(1000, int(updates["pick6_hltb_long_cap_hours"])))
         if "pick6_hltb_short_cap_hours" in updates:
             state["pick6_hltb_short_cap_hours"] = max(1, min(500, int(updates["pick6_hltb_short_cap_hours"])))
+        for _curve_key in ("pick6_staleness_curve", "pick6_recency_curve",
+                           "pick6_hltb_long_curve", "pick6_hltb_short_curve"):
+            if _curve_key in updates:
+                state[_curve_key] = round(max(0.2, min(4.0, float(updates[_curve_key]))), 2)
         if "pick6_smart_tag_weight" in updates:
             state["pick6_smart_tag_weight"] = max(0, min(100, int(updates["pick6_smart_tag_weight"])))
         if "gamepad_deadzone" in updates:

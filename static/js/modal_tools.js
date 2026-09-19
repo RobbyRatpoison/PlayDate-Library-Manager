@@ -5699,6 +5699,9 @@ function closeAdvancedModal() {
 // cached derived columns match the new values (same pattern as the tag
 // similarity recalculation that used to live under Library).
 
+const _tuneFmtCurve = v => Number(v).toFixed(2);
+const _TUNE_CURVE_HINT = 'Shape of the ramp. 1.00 is a straight line; lower rises fast then flattens, higher stays low then climbs.';
+
 const TUNE_SECTIONS = [
     {
         id: 'tagsim', title: 'Tag Similarity',
@@ -5734,15 +5737,23 @@ const TUNE_SECTIONS = [
             { key: 'pick6_smart_tag_weight', label: 'Smart mode blend', min: 0, max: 100, step: 1, def: 65, fmt: v => v + '/' + (100 - v),
               hint: 'Tag similarity vs. review score, when not using Weighted.' },
             { key: 'pick6_staleness_cap_days', label: 'Staleness cap', min: 30, max: 2000, step: 10, def: 730, fmt: v => v + ' days',
-              hint: 'Days since last played that count as "maximally stale."', chart: 'staleness' },
+              hint: 'Days since last played that count as "maximally stale."' },
+            { key: 'pick6_staleness_curve', label: 'Staleness curve', min: 0.2, max: 4, step: 0.05, def: 1, fmt: _tuneFmtCurve,
+              hint: _TUNE_CURVE_HINT, chart: 'staleness' },
             { key: 'pick6_recency_cap_years', label: 'Recency cap', min: 1, max: 50, step: 1, def: 10, fmt: v => v + ' yr',
-              hint: 'Age in years that counts as "maximally old."', chart: 'recency' },
+              hint: 'Age in years that counts as "maximally old."' },
+            { key: 'pick6_recency_curve', label: 'Recency curve', min: 0.2, max: 4, step: 0.05, def: 1, fmt: _tuneFmtCurve,
+              hint: _TUNE_CURVE_HINT, chart: 'recency' },
             { key: 'pick6_hltb_long_floor_hours', label: 'Prefer-long floor', min: 0, max: 100, step: 1, def: 10, fmt: v => v + ' hr',
               hint: 'Below this, a long game scores 0 on Length.' },
             { key: 'pick6_hltb_long_cap_hours', label: 'Prefer-long cap', min: 10, max: 300, step: 1, def: 110, fmt: v => v + ' hr',
-              hint: 'At or above this, a long game scores 1.0 on Length.', chart: 'hltbLong' },
+              hint: 'At or above this, a long game scores 1.0 on Length.' },
+            { key: 'pick6_hltb_long_curve', label: 'Prefer-long curve', min: 0.2, max: 4, step: 0.05, def: 0.5, fmt: _tuneFmtCurve,
+              hint: _TUNE_CURVE_HINT, chart: 'hltbLong' },
             { key: 'pick6_hltb_short_cap_hours', label: 'Prefer-short cap', min: 1, max: 100, step: 1, def: 10, fmt: v => v + ' hr',
-              hint: 'At or above this, a short game scores 0 on Length.', chart: 'hltbShort' },
+              hint: 'At or above this, a short game scores 0 on Length.' },
+            { key: 'pick6_hltb_short_curve', label: 'Prefer-short curve', min: 0.2, max: 4, step: 0.05, def: 0.5, fmt: _tuneFmtCurve,
+              hint: _TUNE_CURVE_HINT, chart: 'hltbShort' },
         ],
     },
 ];
@@ -5771,22 +5782,22 @@ const TUNE_CHARTS = {
     },
     staleness: {
         xMax: 2000, xLabel: 'days since last played', yLabel: 'staleness score',
-        series: [{ fn: (x, v) => Math.min(x, v.pick6_staleness_cap_days) / v.pick6_staleness_cap_days }],
+        series: [{ fn: (x, v) => Math.pow(Math.min(x, v.pick6_staleness_cap_days) / v.pick6_staleness_cap_days, v.pick6_staleness_curve) }],
     },
     recency: {
         xMax: 50, xLabel: 'game age (years)', yLabel: 'recency score',
-        series: [{ fn: (x, v) => 1 - Math.min(x, v.pick6_recency_cap_years) / v.pick6_recency_cap_years }],
+        series: [{ fn: (x, v) => Math.pow(1 - Math.min(x, v.pick6_recency_cap_years) / v.pick6_recency_cap_years, v.pick6_recency_curve) }],
     },
     hltbLong: {
         xMax: 300, xLabel: 'hours to beat', yLabel: 'Length score (prefer long)',
         series: [{ fn: (x, v) => {
             const floor = v.pick6_hltb_long_floor_hours, span = Math.max(1, v.pick6_hltb_long_cap_hours - floor);
-            return Math.sqrt(Math.max(0, Math.min(x - floor, span)) / span);
+            return Math.pow(Math.max(0, Math.min(x - floor, span)) / span, v.pick6_hltb_long_curve);
         } }],
     },
     hltbShort: {
         xMax: 100, xLabel: 'hours to beat', yLabel: 'Length score (prefer short)',
-        series: [{ fn: (x, v) => Math.sqrt(Math.min(x, v.pick6_hltb_short_cap_hours) / v.pick6_hltb_short_cap_hours) }],
+        series: [{ fn: (x, v) => Math.pow(Math.min(x, v.pick6_hltb_short_cap_hours) / v.pick6_hltb_short_cap_hours, v.pick6_hltb_short_curve) }],
     },
 };
 

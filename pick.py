@@ -273,6 +273,7 @@ def pick_game():
             return None
 
         _staleness_cap_days = state.get('pick6_staleness_cap_days', 730)
+        _staleness_curve = state.get('pick6_staleness_curve', 1.0)
 
         def staleness_score(g):
             from datetime import datetime, timezone
@@ -280,7 +281,7 @@ def pick_game():
             lp = g.get('last_played')
             if lp:
                 try:
-                    return min((now - float(lp)) / 86400, _staleness_cap_days) / _staleness_cap_days
+                    return (min((now - float(lp)) / 86400, _staleness_cap_days) / _staleness_cap_days) ** _staleness_curve
                 except Exception:
                     return 0.5
             return 1.0
@@ -291,12 +292,14 @@ def pick_game():
         _hltb_long_span_min = max(1, state.get('pick6_hltb_long_cap_hours', 110)
                                    - state.get('pick6_hltb_long_floor_hours', 10)) * 60
         _hltb_short_cap_min = state.get('pick6_hltb_short_cap_hours', 10) * 60
+        _hltb_long_curve = state.get('pick6_hltb_long_curve', 0.5)
+        _hltb_short_curve = state.get('pick6_hltb_short_curve', 0.5)
 
         def hltb_length_score(g):
             # Returns [0,1] where 1 = longest, or None if no data.
-            # sqrt curve concentrates probability at the extremes so moderate
-            # lengths don't crowd out clearly short/long games.
-            import math
+            # The default 0.5 exponent (a sqrt curve) concentrates probability
+            # at the extremes so moderate lengths don't crowd out clearly
+            # short/long games.
             times = [v for v in [g.get('hltb_main'), g.get('hltb_extras'), g.get('hltb_completionist')] if v]
             if not times:
                 return None  # handled as low (not neutral) by sig() via unknown_val
@@ -304,13 +307,14 @@ def pick_game():
                 # Prefer long: max time, floor at the configured hours, scale
                 # over the configured span above that floor.
                 val = max(times)
-                return math.sqrt(max(0.0, min(float(val) - _hltb_long_floor_min, _hltb_long_span_min) / _hltb_long_span_min))
+                return (max(0.0, min(float(val) - _hltb_long_floor_min, _hltb_long_span_min) / _hltb_long_span_min)) ** _hltb_long_curve
             else:
                 # Prefer short: min time, cap at the configured hours.
                 val = min(times)
-                return math.sqrt(min(float(val), _hltb_short_cap_min) / _hltb_short_cap_min)
+                return (min(float(val), _hltb_short_cap_min) / _hltb_short_cap_min) ** _hltb_short_curve
 
         _recency_cap_years = state.get('pick6_recency_cap_years', 10)
+        _recency_curve = state.get('pick6_recency_curve', 1.0)
 
         def recency_score(g):
             rd = g.get('release_date')
@@ -320,7 +324,7 @@ def pick_game():
                 from datetime import datetime, timezone
                 year = datetime.fromtimestamp(float(rd), tz=timezone.utc).year
                 age_years = max(datetime.now().year - year, 0)
-                return 1.0 - min(age_years, _recency_cap_years) / _recency_cap_years
+                return (1.0 - min(age_years, _recency_cap_years) / _recency_cap_years) ** _recency_curve
             except Exception:
                 return 0.5
 
