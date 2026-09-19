@@ -6120,6 +6120,7 @@ function _gpdStartPoll() {
 
         if (!gp) {
             document.getElementById('gpd-buttons').innerHTML = '';
+            document.getElementById('gpd-triggers').innerHTML = '';
             document.getElementById('gpd-lstick').textContent = 'x: --  y: --';
             document.getElementById('gpd-rstick').textContent = 'x: --  y: --';
             document.getElementById('gpd-axes-raw').textContent = '--';
@@ -6131,7 +6132,9 @@ function _gpdStartPoll() {
         // else follows in natural ascending order, so nothing raw is hidden.
         const btnEl = document.getElementById('gpd-buttons');
         const labels = _activeBtnLabels(gp.id);
-        const displayOrder = [0, 1, 3, 2, ...gp.buttons.map((_, i) => i).filter(i => i > 3)];
+        // Triggers (6/7) are analogue, so they get their own bars below instead
+        // of an on/off chip here.
+        const displayOrder = [0, 1, 3, 2, ...gp.buttons.map((_, i) => i).filter(i => i > 3 && i !== 6 && i !== 7)];
         let btnHtml = '';
         displayOrder.forEach(i => {
             const btn = gp.buttons[i];
@@ -6145,6 +6148,25 @@ function _gpdStartPoll() {
             btnHtml += `<span style="box-sizing:border-box;padding:1px 7px;border-radius:4px;font-size:0.78rem;background:${bg};color:${color};border:${border};transition:background 0.08s;">${label}</span>`;
         });
         btnEl.innerHTML = btnHtml;
+
+        // Triggers: analogue 0..1 value as a bar plus a number, since a pad can
+        // report anything in between (and a worn or miscalibrated trigger that
+        // never reaches 1.0 or rests above 0 is exactly what this should show).
+        let trigHtml = '';
+        [6, 7].forEach(i => {
+            const btn = gp.buttons[i];
+            if (!btn) return;
+            const v = Math.max(0, Math.min(1, typeof btn.value === 'number' ? btn.value : (btn.pressed ? 1 : 0)));
+            trigHtml += `<div>
+                <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-secondary); margin-bottom:3px;">
+                    <span>${labels[i] || i}</span><span style="font-family:monospace; color:var(--text-primary);">${v.toFixed(2)}</span>
+                </div>
+                <div style="height:8px; border-radius:4px; background:rgba(255,255,255,0.07); overflow:hidden;">
+                    <div style="height:100%; width:${(v * 100).toFixed(1)}%; background:var(--accent);"></div>
+                </div>
+            </div>`;
+        });
+        document.getElementById('gpd-triggers').innerHTML = trigHtml;
 
         // Sticks
         const fmt = v => (v >= 0 ? ' ' : '') + v.toFixed(2);
