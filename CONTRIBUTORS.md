@@ -151,3 +151,4 @@ People who've helped make PlayDate better - bug reports, feature suggestions, te
 
 **woutercools**
 - SteamGifts Full Refresh not actually clearing out an incorrect win left over from an earlier bad sync (e.g. a mistyped username)
+- Couldn't choose a games folder on another mounted drive (`/mnt`, `/media`, `/run/media`) from the Flatpak build

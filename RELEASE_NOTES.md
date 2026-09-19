@@ -14,7 +14,7 @@
 
 ### Fixes
 
-- Fixed the Flatpak version being unable to see other mounted drives (`/mnt`, `/media`, `/run/media`) when choosing a games folder.
+- Fixed the Flatpak version being unable to see other mounted drives (`/mnt`, `/media`, `/run/media`) when choosing a games folder. Thanks to woutercools for the report.
 - Fixed the Card Outline Rules and Card Badges screens not returning to Appearance when closed.
 - Fixed filter condition value fields not being reachable with a gamepad.
 - Fixed the on-screen keyboard losing focus while typing in a text field.
