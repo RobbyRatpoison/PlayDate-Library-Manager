@@ -31,12 +31,12 @@ _EV_SYN, _EV_KEY, _EV_ABS = 0x00, 0x01, 0x03
 _BTN_SOUTH = 0x130            # 304; presence of this = "it's a gamepad"
 
 # evdev button code -> the button index input.js expects (its BTN_IDX:
-# {a:0, b:1, y:2, x:3, lb:4, rb:5, back:8, start:9, up:12..right:15}).
+# {a:0, b:1, x:2, y:3, lb:4, rb:5, back:8, start:9, up:12..right:15}).
 _BTN_MAP = {
     0x130: 0,   # BTN_SOUTH   A
     0x131: 1,   # BTN_EAST    B
-    0x133: 2,   # BTN_NORTH   Y  (top)
-    0x134: 3,   # BTN_WEST    X  (left)
+    0x133: 2,   # BTN_X (aka BTN_NORTH)   X, standard index 2
+    0x134: 3,   # BTN_Y (aka BTN_WEST)    Y, standard index 3
     0x136: 4,   # BTN_TL      LB
     0x137: 5,   # BTN_TR      RB
     0x13a: 8,   # BTN_SELECT  view/back

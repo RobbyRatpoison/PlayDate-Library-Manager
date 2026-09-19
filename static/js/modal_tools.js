@@ -5989,11 +5989,10 @@ function resizeToSteamDeck() {
 
 // ── Gamepad Diagnostics ────────────────────────────────────────────────────
 
-// Indices 2/3 are swapped relative to the W3C Standard Gamepad spec (buttons[2]
-// should be X, buttons[3] should be Y) to match what's actually reported for
-// the physical X/Y buttons — see the matching note on BTN_IDX in input.js.
+// Standard Gamepad layout: buttons[2] is X, buttons[3] is Y (see the matching
+// note on BTN_IDX in input.js).
 const BTN_LABELS = {
-    0:'A', 1:'B', 2:'Y', 3:'X',
+    0:'A', 1:'B', 2:'X', 3:'Y',
     4:'LB', 5:'RB', 6:'LT', 7:'RT',
     8:'Back', 9:'Start',
     10:'L3', 11:'R3',
@@ -6004,7 +6003,7 @@ const BTN_LABELS = {
 // Same physical button positions, PlayStation naming/glyphs — used instead of
 // BTN_LABELS when a PlayStation-family pad is detected (see _isPlayStationPad).
 const BTN_LABELS_PS = {
-    0:'✕', 1:'○', 2:'△', 3:'□', // Cross, Circle, Triangle, Square
+    0:'✕', 1:'○', 2:'□', 3:'△', // Cross, Circle, Square, Triangle
     4:'L1', 5:'R1', 6:'L2', 7:'R2',
     8:'Share', 9:'Options',
     10:'L3', 11:'R3',
@@ -6022,11 +6021,11 @@ function _activeBtnLabels(gpId) {
     return _isPlayStationPad(gpId) ? BTN_LABELS_PS : BTN_LABELS;
 }
 
-// Standard face-button brand colors, keyed by the same swapped raw indices as
+// Standard face-button brand colors, keyed by the same raw indices as
 // BTN_LABELS/BTN_LABELS_PS. Applied as a border, not a fill, so it doesn't
 // compete with the pressed/unpressed background that's the primary signal.
-const FACE_BTN_COLORS_XBOX = { 0:'#3bb143', 1:'#e0393e', 2:'#f4c20d', 3:'#3a7bd5' }; // A green, B red, Y yellow, X blue
-const FACE_BTN_COLORS_PS   = { 0:'#3a7bd5', 1:'#e0393e', 2:'#3bb143', 3:'#e05fa0' }; // Cross blue, Circle red, Triangle green, Square pink
+const FACE_BTN_COLORS_XBOX = { 0:'#3bb143', 1:'#e0393e', 2:'#3a7bd5', 3:'#f4c20d' }; // A green, B red, X blue, Y yellow
+const FACE_BTN_COLORS_PS   = { 0:'#3a7bd5', 1:'#e0393e', 2:'#e05fa0', 3:'#3bb143' }; // Cross blue, Circle red, Square pink, Triangle green
 
 function _faceButtonColor(physIdx, gpId) {
     const colors = _isPlayStationPad(gpId) ? FACE_BTN_COLORS_PS : FACE_BTN_COLORS_XBOX;
@@ -6055,6 +6054,27 @@ function _firstConnectedGamepadId() {
 }
 
 let _gpdRafId = null;
+
+// Stick position as a dot inside the stick's range, with the configured dead
+// zone drawn as a square: input.js applies it per axis (|x| > dead or |y| > dead
+// counts as a direction), so a circle would misrepresent where it kicks in.
+// The dot lights up once it's outside that square, i.e. when the app would
+// actually register a direction.
+function _gpdStickSvg(x, y) {
+    const R = 44, C = 50;
+    const dz = Math.max(0, Math.min(1, (window._GAMEPAD_DEADZONE ?? 35) / 100));
+    const mag = Math.hypot(x, y);
+    const k = mag > 1 ? 1 / mag : 1;   // some pads report corners past 1.0
+    const px = C + x * k * R, py = C + y * k * R;
+    const active = Math.abs(x) > dz || Math.abs(y) > dz;
+    return `<svg viewBox="0 0 100 100" width="96" height="96" role="img" aria-label="stick position">
+        <circle cx="${C}" cy="${C}" r="${R}" fill="rgba(255,255,255,0.04)" stroke="var(--border)" stroke-width="1.5"/>
+        <line x1="${C - R}" y1="${C}" x2="${C + R}" y2="${C}" stroke="var(--border)" stroke-width="1"/>
+        <line x1="${C}" y1="${C - R}" x2="${C}" y2="${C + R}" stroke="var(--border)" stroke-width="1"/>
+        <rect x="${C - dz * R}" y="${C - dz * R}" width="${dz * R * 2}" height="${dz * R * 2}" fill="none" stroke="var(--text-secondary)" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>
+        <circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="${active ? 'var(--accent)' : 'var(--text-secondary)'}"/>
+    </svg>`;
+}
 
 function openGamepadDiag() {
     document.getElementById('gamepad-diag-modal').style.display = 'flex';
@@ -6121,20 +6141,20 @@ function _gpdStartPoll() {
         if (!gp) {
             document.getElementById('gpd-buttons').innerHTML = '';
             document.getElementById('gpd-triggers').innerHTML = '';
+            document.getElementById('gpd-lstick-viz').innerHTML = '';
+            document.getElementById('gpd-rstick-viz').innerHTML = '';
             document.getElementById('gpd-lstick').textContent = 'x: --  y: --';
             document.getElementById('gpd-rstick').textContent = 'x: --  y: --';
             document.getElementById('gpd-axes-raw').textContent = '--';
             return;
         }
 
-        // Buttons — face buttons render in reading order (A B X Y) rather than
-        // raw index order (0,1,2,3 = A,B,Y,X after the index swap); everything
-        // else follows in natural ascending order, so nothing raw is hidden.
+        // Buttons in natural ascending index order (0-3 = A B X Y), so nothing
+        // raw is hidden. Triggers (6/7) are analogue, so they get their own bars
+        // below instead of an on/off chip here.
         const btnEl = document.getElementById('gpd-buttons');
         const labels = _activeBtnLabels(gp.id);
-        // Triggers (6/7) are analogue, so they get their own bars below instead
-        // of an on/off chip here.
-        const displayOrder = [0, 1, 3, 2, ...gp.buttons.map((_, i) => i).filter(i => i > 3 && i !== 6 && i !== 7)];
+        const displayOrder = gp.buttons.map((_, i) => i).filter(i => i !== 6 && i !== 7);
         let btnHtml = '';
         displayOrder.forEach(i => {
             const btn = gp.buttons[i];
@@ -6169,6 +6189,8 @@ function _gpdStartPoll() {
         document.getElementById('gpd-triggers').innerHTML = trigHtml;
 
         // Sticks
+        document.getElementById('gpd-lstick-viz').innerHTML = _gpdStickSvg(gp.axes[0] || 0, gp.axes[1] || 0);
+        document.getElementById('gpd-rstick-viz').innerHTML = _gpdStickSvg(gp.axes[2] || 0, gp.axes[3] || 0);
         const fmt = v => (v >= 0 ? ' ' : '') + v.toFixed(2);
         document.getElementById('gpd-lstick').textContent =
             `x: ${fmt(gp.axes[0] || 0)}  y: ${fmt(gp.axes[1] || 0)}`;
@@ -6191,8 +6213,8 @@ function _gpdStopPoll() {
 const _REMAP_ACTIONS = [
     { action: 'a',     defaultBtn: 0,  label: 'Confirm / Select' },
     { action: 'b',     defaultBtn: 1,  label: 'Back / Cancel' },
-    { action: 'x',     defaultBtn: 3,  label: 'Context Menu' },
-    { action: 'y',     defaultBtn: 2,  label: 'Filter / Search' },
+    { action: 'x',     defaultBtn: 2,  label: 'Context Menu' },
+    { action: 'y',     defaultBtn: 3,  label: 'Edit Game' },
     { action: 'lb',    defaultBtn: 4,  label: 'Previous Page' },
     { action: 'rb',    defaultBtn: 5,  label: 'Next Page' },
     { action: 'back',  defaultBtn: 8,  label: 'Open Menu' },

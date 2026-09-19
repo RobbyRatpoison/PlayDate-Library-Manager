@@ -205,7 +205,7 @@
         },
         setCapturing(val) { _capturing = val; },
         // Applied live so the Gamepad settings modal doesn't need a restart.
-        setDeadzone(pct) { STICK_DEAD = pct / 100; },
+        setDeadzone(pct) { STICK_DEAD = pct / 100; window._GAMEPAD_DEADZONE = pct; },
         setRepeatTiming(initialMs, rateMs) { REPEAT_INITIAL = initialMs; REPEAT_RATE = rateMs; },
         // Dynamically register a lazily-created modal (e.g. plugin manage modals)
         registerModal(id) {
@@ -372,12 +372,13 @@
     const SCROLL_PREVIEW_MIN = 3;     // only show the position preview once ramped to at least this multiple of base speed
 
     // ── Standard Xbox/standard-mapping button indices ─────────────────────────
-    // x/y are swapped relative to the W3C Standard Gamepad spec (which defines
-    // buttons[2]=X, buttons[3]=Y) — confirmed backwards across two unrelated
-    // controllers (a wired Xbox Elite 2 and the Steam Deck's built-in pad),
-    // both on Linux/WebKitGTK/libmanette. Applied unconditionally (not gated
-    // to Linux) per user decision, without Windows/WebView2 verification.
-    const BTN_IDX = { a:0, b:1, x:3, y:2, lb:4, rb:5, back:8, start:9, up:12, down:13, left:14, right:15 };
+    // Follows the W3C Standard Gamepad spec: buttons[2]=X, buttons[3]=Y. An
+    // earlier version swapped these ("confirmed backwards" on WebKitGTK), but
+    // that no longer holds: X/Y were confirmed reversed (Y opened the context
+    // menu, X the edit modal) on the Steam Deck in Gaming Mode, and on a wired
+    // Xbox Elite 2 under both the GTK and Qt renderers. The Deck's evdev
+    // reader (gamepad_reader.py) emits the same standard indices.
+    const BTN_IDX = { a:0, b:1, x:2, y:3, lb:4, rb:5, back:8, start:9, up:12, down:13, left:14, right:15 };
     const AXIS_IDX = { lx:0, ly:1, rx:2, ry:3 };
 
     // ── Platform-specific button overrides ────────────────────────────────────

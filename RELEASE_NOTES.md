@@ -11,7 +11,7 @@
 - Reorganized the menu: frequently used tools moved up, account/appearance/library/gamepad settings consolidated into a new Settings menu, and HowLongToBeat given its own menu entry.
 - Tag similarity now weighs how long you played a game, not just whether you finished it.
 - The Qt/Chromium renderer option is now available on any Linux install, not just NVIDIA + Wayland.
-- Gamepad Diagnostics now shows the triggers as analogue values (0.00 to 1.00) instead of just pressed or not.
+- Gamepad Diagnostics now shows the triggers as analogue values (0.00 to 1.00) instead of just pressed or not, and the sticks as a position dot with your dead zone marked.
 
 ### Fixes
 
@@ -20,3 +20,4 @@
 - Fixed filter condition value fields not being reachable with a gamepad.
 - Fixed the on-screen keyboard losing focus while typing in a text field.
 - Fixed Gamepad Diagnostics and Remap Buttons not detecting the controller on Steam Deck.
+- Fixed the X and Y gamepad buttons being swapped: X now opens the context menu and Y opens the edit modal, and Gamepad Diagnostics labels them correctly. The Remap Buttons screen now describes Y as "Edit Game" instead of "Filter / Search".
