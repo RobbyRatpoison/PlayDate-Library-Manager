@@ -100,6 +100,15 @@ def install(qt_module):
                     QColor(getattr(window, 'background_color', None) or '#1b2838'))
             except Exception:
                 logger.exception('qt_webview_patch: setBackgroundColor failed')
+            # QtWebEngine ships with JavascriptCanAccessClipboard off, so every
+            # navigator.clipboard.writeText() Copy button silently did nothing
+            # under this renderer (confirmed live on the system-update command).
+            try:
+                from qtpy.QtWebEngineWidgets import QWebEngineSettings
+                self.webview.settings().setAttribute(
+                    QWebEngineSettings.WebAttribute.JavascriptCanAccessClipboard, True)
+            except Exception:
+                logger.exception('qt_webview_patch: enabling clipboard access failed')
 
         BrowserView.__init__ = _patched_bv_init
         logger.info('qt_webview_patch: installed page background-colour fix')

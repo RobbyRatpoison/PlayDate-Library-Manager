@@ -325,7 +325,7 @@ def perform_update():
                         # remote, and betas never are -- it reported "Nothing to update".)
                         _update_dl_state.update({
                             'status': 'error',
-                            'error': 'System-wide installs need administrator approval, so PlayDate can\'t update itself. Run this in a terminal, then reopen PlayDate:',
+                            'error': 'System-wide installs need administrator approval, so PlayDate can\'t update itself. Close PlayDate, run this in a terminal, then reopen it:',
                             'fix_command': f'sudo flatpak install --system -y --reinstall "{bundle_path}"',
                             'manual_url': None,
                         })
