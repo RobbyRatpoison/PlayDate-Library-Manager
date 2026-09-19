@@ -1,24 +1,11 @@
 # Release Notes
 
-## v1.11.0 - 2026-09-19
-### New
-
-- Added a Tuning menu in Settings for adjusting tag similarity matching, review score weighting, and how Pick 6 scores staleness, release date, and length, including the shape of each scoring curve. Each section can be expanded, and graphs show how a change will reshape the result before you save it.
-- Added gamepad dead zone and repeat-speed settings.
-
+## v1.11.1
 ### Improvements
 
-- Reorganized the menu: frequently used tools moved up, account/appearance/library/gamepad settings consolidated into a new Settings menu, and HowLongToBeat given its own menu entry.
-- Tag similarity now weighs how long you played a game, not just whether you finished it.
-- The Qt/Chromium renderer option is now available on any Linux install, not just NVIDIA + Wayland.
-- Gamepad Diagnostics now shows the triggers as analogue values (0.00 to 1.00) instead of just pressed or not, and the sticks as a position dot with your dead zone marked.
+- Added a `PlayDate.command` file for launching PlayDate on macOS with a double-click.
+- The macOS launcher now finds a compatible Python, or tells you what to install.
 
 ### Fixes
 
-- Fixed the Flatpak version being unable to see other mounted drives (`/mnt`, `/media`, `/run/media`) when choosing a games folder. (reported by woutercools)
-- Fixed the Card Outline Rules and Card Badges screens not returning to Appearance when closed.
-- Fixed filter condition value fields not being reachable with a gamepad.
-- Fixed the on-screen keyboard losing focus while typing in a text field.
-- Fixed Gamepad Diagnostics and Remap Buttons not detecting the controller on Steam Deck.
-- Fixed the X and Y gamepad buttons being swapped with the Qt renderer and on the Steam Deck in Gaming Mode.
-- Fixed the Remap Buttons screen describing Y as "Filter / Search" instead of "Edit Game".
+- Fixed system-wide Flatpak installs failing to update with no explanation. PlayDate now warns you first and says how to update.
