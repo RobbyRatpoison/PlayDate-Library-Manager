@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 updater_bp = Blueprint('updater', __name__)
 
 _update_cache = {}  # available, latest_version, installer_url, zipball_url, checked_at, error
-_update_dl_state = {'status': 'idle', 'error': None, 'manual_url': None}  # idle|downloading|error
+_update_dl_state = {'status': 'idle', 'error': None, 'manual_url': None, 'fix_command': None}  # idle|downloading|error
 
 
 def _running_flatpak_app_id():
@@ -274,6 +274,7 @@ def perform_update():
 
         _update_dl_state['status'] = 'downloading'
         _update_dl_state['error'] = None
+        _update_dl_state['fix_command'] = None
         try:
             if IN_FLATPAK:
                 # Flatpak: download the new bundle under $HOME (a
@@ -320,10 +321,18 @@ def perform_update():
                     pass
                 if result.returncode != 0:
                     log.error(f"perform-update: flatpak install failed: {result.stderr.strip()}")
-                    _err = f'flatpak install failed: {result.stderr.strip()}'
                     if scope == '--system':
-                        _err += f' | This is a system-wide install, which needs administrator approval to update. Run "flatpak update {app_id}" in a terminal instead.'
-                    _update_dl_state.update({'status': 'error', 'error': _err})
+                        # Polkit refuses a system install with no terminal to prompt on.
+                        # A manual bundle download is no help here, so point at the
+                        # terminal command instead.
+                        _update_dl_state.update({
+                            'status': 'error',
+                            'error': 'System-wide installs need administrator approval, so PlayDate can\'t update itself. Run this in a terminal instead:',
+                            'fix_command': f'flatpak update {app_id}',
+                            'manual_url': None,
+                        })
+                    else:
+                        _update_dl_state.update({'status': 'error', 'error': f'flatpak install failed: {result.stderr.strip()}'})
                     return
 
                 # In Steam Deck Game Mode a bare `flatpak run` gets no window

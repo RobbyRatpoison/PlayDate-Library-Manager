@@ -976,8 +976,13 @@
                 if (d.status === 'error') {
                     clearInterval(_dlPoll);
                     const manualLink = d.manual_url ? `<br><br><a href="${d.manual_url}" target="_blank" style="color:#4fc3f7;">Download manually</a>` : '';
+                    // A system-wide Flatpak can't update itself; show the terminal
+                    // command as selectable text with a Copy button.
+                    const fixCmd = d.fix_command
+                        ? `<div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-top:12px;"><code id="update-fix-cmd" style="background:#0e1621;border:1px solid #2a475e;border-radius:4px;padding:4px 10px;font-size:0.9rem;-webkit-user-select:all;user-select:all;cursor:text;">${escHtml(d.fix_command)}</code><button onclick="navigator.clipboard.writeText(document.getElementById('update-fix-cmd').textContent).then(() => { this.textContent = 'Copied!'; setTimeout(() => { this.textContent = 'Copy'; }, 1500); })" style="padding:4px 12px;cursor:pointer;">Copy</button></div>`
+                        : '';
                     document.getElementById('update-overlay').innerHTML =
-                        `<span style="color:#e57373;">Update download failed.</span><br><small style="font-size:0.85rem;opacity:0.7;">${d.error || 'Unknown error'}</small>${manualLink}<br><br><button onclick="location.reload()" style="margin-top:1rem;padding:0.4rem 1.2rem;cursor:pointer;">Go Back</button>`;
+                        `<span style="color:#e57373;">Update download failed.</span><br><small style="font-size:0.85rem;opacity:0.7;">${d.error || 'Unknown error'}</small>${fixCmd}${manualLink}<br><br><button onclick="location.reload()" style="margin-top:1rem;padding:0.4rem 1.2rem;cursor:pointer;">Go Back</button>`;
                 }
             }, 1500);
         }
