@@ -57,10 +57,90 @@ PLISTEOF
     mdimport "$APP" 2>/dev/null || true
 fi
 
+# ── macOS: find a Python that PlayDate can actually use ────────────────────────
+# Apple's bundled python3 is too old, and on a fresh Mac just *running* it pops
+# up a multi-GB Xcode Command Line Tools install. So on macOS we look for a
+# suitable Python ourselves and, if there isn't one, explain what to install.
+# (Linux is untouched: it needs the distro's python3 to match python3-gi.)
+
+PLAYDATE_MIN_PY_MINOR=10   # keep in sync with requirements.txt
+
+_py_ok() {  # $1 = python executable; needs >= 3.MIN, tkinter, venv, ensurepip
+    [ -x "$1" ] || return 1
+    "$1" - "$PLAYDATE_MIN_PY_MINOR" >/dev/null 2>&1 <<'PYCHECK'
+import sys
+if sys.version_info < (3, int(sys.argv[1])):
+    sys.exit(1)
+import tkinter, venv, ensurepip
+PYCHECK
+}
+
+find_mac_python() {
+    local v c
+    local -a candidates=()
+    for v in 3.14 3.13 3.12 3.11 3.10; do
+        candidates+=(
+            "/Library/Frameworks/Python.framework/Versions/$v/bin/python3"
+            "/opt/homebrew/bin/python$v"
+            "/usr/local/bin/python$v"
+        )
+        c="$(command -v "python$v" 2>/dev/null)" && candidates+=("$c")
+    done
+    c="$(command -v python3 2>/dev/null)" && candidates+=("$c")
+    for c in "${candidates[@]}"; do
+        # /usr/bin/python3 is Apple's stub: only safe to run once the Command
+        # Line Tools are installed, otherwise it triggers the big download.
+        if [ "$c" = "/usr/bin/python3" ] && ! xcode-select -p >/dev/null 2>&1; then
+            continue
+        fi
+        if _py_ok "$c"; then
+            echo "$c"
+            return 0
+        fi
+    done
+    return 1
+}
+
+mac_python_missing() {
+    local msg="PlayDate needs Python 3.$PLAYDATE_MIN_PY_MINOR or newer, with tkinter included."
+    if [ -t 1 ]; then
+        echo "$msg"
+        if command -v brew >/dev/null 2>&1; then
+            printf "Install it now with Homebrew (python@3.12 + python-tk@3.12)? [y/N] "
+            read -r reply
+            if [ "$reply" = "y" ] || [ "$reply" = "Y" ]; then
+                brew install python@3.12 python-tk@3.12 || return 1
+                return 0   # caller re-runs the search
+            fi
+        fi
+        echo "Otherwise download the macOS installer from https://www.python.org/downloads/macos/"
+        echo "(it includes tkinter), then run launch.sh again."
+        command -v open >/dev/null 2>&1 && open "https://www.python.org/downloads/macos/"
+    else
+        # Launched from PlayDate.app / Finder: there is no terminal to print to.
+        command -v osascript >/dev/null 2>&1 && osascript -e \
+            "display dialog \"$msg Install it from python.org, then open PlayDate again.\" buttons {\"OK\"} with title \"PlayDate\"" \
+            >/dev/null 2>&1
+        command -v open >/dev/null 2>&1 && open "https://www.python.org/downloads/macos/"
+    fi
+    return 1
+}
+
 # ── Run setup if venv is missing ───────────────────────────────────────────────
 
 if [ ! -f "$VENV_PYTHON" ]; then
-    PLAYDATE_LAUNCH_PENDING=1 python3 "$DIR/install.py"
+    SETUP_PYTHON="python3"
+    if [ "$OS" = "Darwin" ]; then
+        SETUP_PYTHON="$(find_mac_python)"
+        if [ -z "$SETUP_PYTHON" ]; then
+            mac_python_missing && SETUP_PYTHON="$(find_mac_python)"
+        fi
+        if [ -z "$SETUP_PYTHON" ]; then
+            echo "Setup cannot continue without a suitable Python. Re-run launch.sh after installing one."
+            exit 1
+        fi
+    fi
+    PLAYDATE_LAUNCH_PENDING=1 "$SETUP_PYTHON" "$DIR/install.py"
     if [ ! -f "$VENV_PYTHON" ]; then
         echo "Setup did not complete. Re-run launch.sh to try again."
         exit 1
