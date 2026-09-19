@@ -459,6 +459,7 @@ DEFAULT_STATE = {
     "tag_similarity_min_library_rate": 2.0,
     "tag_similarity_smoothing_k": 4,
     "tag_similarity_playtime_cap_hours": 60,
+    "review_half_trust_count": 10,
     "pick6_staleness_cap_days": 730,
     "pick6_recency_cap_years": 10,
     "pick6_hltb_long_floor_hours": 10,
@@ -614,6 +615,7 @@ def inject_config_status():
         tag_similarity_min_library_rate=state.get('tag_similarity_min_library_rate', 2.0),
         tag_similarity_smoothing_k=state.get('tag_similarity_smoothing_k', 4),
         tag_similarity_playtime_cap_hours=state.get('tag_similarity_playtime_cap_hours', 60),
+        review_half_trust_count=state.get('review_half_trust_count', 10),
         pick6_staleness_cap_days=state.get('pick6_staleness_cap_days', 730),
         pick6_recency_cap_years=state.get('pick6_recency_cap_years', 10),
         pick6_hltb_long_floor_hours=state.get('pick6_hltb_long_floor_hours', 10),
@@ -1207,6 +1209,8 @@ def save_state(updates):
             state["tag_similarity_smoothing_k"] = max(0, min(20, int(updates["tag_similarity_smoothing_k"])))
         if "tag_similarity_playtime_cap_hours" in updates:
             state["tag_similarity_playtime_cap_hours"] = max(1, min(500, int(updates["tag_similarity_playtime_cap_hours"])))
+        if "review_half_trust_count" in updates:
+            state["review_half_trust_count"] = max(2, min(2000, int(updates["review_half_trust_count"])))
         if "pick6_staleness_cap_days" in updates:
             state["pick6_staleness_cap_days"] = max(1, min(3650, int(updates["pick6_staleness_cap_days"])))
         if "pick6_recency_cap_years" in updates:

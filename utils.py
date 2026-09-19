@@ -1,3 +1,4 @@
+import math
 import os
 import platform
 import re
@@ -755,6 +756,24 @@ def review_score_label(percent, total):
     if total >= 50:
         return 'Very Negative'
     return 'Negative'
+
+
+DEFAULT_REVIEW_HALF_TRUST = 10
+
+
+def weighted_review_score(percent, count, half_trust=DEFAULT_REVIEW_HALF_TRUST):
+    """Confidence-weighted review score (0-100): pulls low-count scores toward 50.
+
+    `half_trust` is the value of (count + 1) at which a score is trusted exactly
+    half-way between neutral and its raw value. The default of 10 reproduces the
+    original fixed `2 ** -log10(count + 1)` curve exactly; a larger value makes
+    the curve distrust small samples for longer."""
+    if count == 0:
+        return 0
+    p = percent / 100.0
+    half_trust = max(2.0, float(half_trust))
+    shrink = 2 ** (-math.log(count + 1) / math.log(half_trust))
+    return round((p - (p - 0.5) * shrink) * 100)
 
 
 def validate_user_path(path: str) -> str | None:

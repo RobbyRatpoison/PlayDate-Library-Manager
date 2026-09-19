@@ -474,7 +474,7 @@ def recalculate_tag_similarity():
     _tuning = load_state()
     conn = get_db()
     try:
-        # Tunable via Settings -> Library -> Tag Similarity; see config.DEFAULT_STATE
+        # Tunable via Settings -> Tuning; see config.DEFAULT_STATE
         # for the shipped defaults these fall back to.
         _PLAYTIME_WEIGHT_CAP_HOURS = _tuning.get('tag_similarity_playtime_cap_hours', 60)
 
@@ -563,6 +563,37 @@ def recalculate_tag_similarity():
             updates.append((sim, row['appid']))
 
         conn.executemany("UPDATE games SET tag_similarity = ? WHERE appid = ?", updates)
+        conn.commit()
+        return len(updates)
+    finally:
+        conn.close()
+
+
+def recalculate_weighted_scores():
+    """Recompute games.weighted_percentage from the stored raw review counts
+    using the current confidence curve (Settings -> Tuning -> Review Scores).
+
+    Same trigger-point pattern as recalculate_tag_similarity(): the weighted
+    score is a cached derived value, so changing the curve has to rewrite it.
+    Uses review_percentage/total_reviews exactly as scrapers.fetch_review_data
+    stored them, so a recompute at unchanged settings is a no-op. Games with no
+    review count are left untouched. Steam only: plugins that report reviews
+    (Epic Games, ...) compute weighted_percentage with their own formula, which
+    this must not overwrite. Returns the number of rows rescored."""
+    from config import load_state
+    from utils import weighted_review_score
+    half_trust = load_state().get('review_half_trust_count', 10)
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT appid, review_percentage, total_reviews FROM games "
+            "WHERE platform = 'steam' "
+            "AND typeof(total_reviews) IN ('integer', 'real') AND total_reviews > 0 "
+            "AND typeof(review_percentage) IN ('integer', 'real')"
+        ).fetchall()
+        updates = [(weighted_review_score(r['review_percentage'], r['total_reviews'], half_trust), r['appid'])
+                   for r in rows]
+        conn.executemany("UPDATE games SET weighted_percentage = ? WHERE appid = ?", updates)
         conn.commit()
         return len(updates)
     finally:

@@ -1,9 +1,8 @@
-"""Review confidence weighting (scrapers._weighted_score) and
+"""Review confidence weighting (utils.weighted_review_score) and
 Steam-style review labels (utils.review_score_label)."""
 import pytest
 
-from scrapers import _weighted_score
-from utils import review_score_label
+from utils import review_score_label, weighted_review_score as _weighted_score
 
 
 def test_zero_reviews_scores_zero():
@@ -34,6 +33,29 @@ def test_pull_weakens_as_count_grows():
     scores = [_weighted_score(100, n) for n in (9, 99, 999, 9999)]
     assert scores == sorted(scores)
     assert scores[0] < scores[-1] <= 100
+
+
+def test_default_half_trust_matches_original_fixed_curve():
+    import math
+    for pct in (0, 30, 75, 100):
+        for n in (1, 9, 50, 500, 12345):
+            legacy = round(((pct / 100) - ((pct / 100) - 0.5) * (2 ** (-math.log10(n + 1)))) * 100)
+            assert _weighted_score(pct, n) == legacy
+
+
+def test_larger_half_trust_distrusts_small_samples_for_longer():
+    assert _weighted_score(100, 99, half_trust=100) < _weighted_score(100, 99)
+    assert _weighted_score(100, 99, half_trust=3) > _weighted_score(100, 99)
+
+
+def test_half_trust_is_the_count_plus_one_that_halves_the_pull():
+    # At count + 1 == half_trust the raw score is trusted exactly halfway.
+    assert _weighted_score(100, 29, half_trust=30) == 75
+    assert _weighted_score(0, 199, half_trust=200) == 25
+
+
+def test_half_trust_is_clamped_to_a_sane_minimum():
+    assert _weighted_score(100, 5, half_trust=0) == _weighted_score(100, 5, half_trust=2)
 
 
 @pytest.mark.parametrize("percent,total,label", [

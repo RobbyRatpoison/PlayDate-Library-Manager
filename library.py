@@ -1794,6 +1794,17 @@ def recalculate_tag_similarity_route():
         return api_error('Something went wrong on the server. Check playdate.log for details.', 500, exc=e)
 
 
+@library_bp.route('/api/recalculate-weighted-scores', methods=['POST'])
+def recalculate_weighted_scores_route():
+    try:
+        from database import recalculate_weighted_scores
+        count = recalculate_weighted_scores()
+        return jsonify({'status': 'ok', 'scored': count})
+    except Exception as e:
+        log.error(f"recalculate-weighted-scores failed: {e}", exc_info=True)
+        return api_error('Something went wrong on the server. Check playdate.log for details.', 500, exc=e)
+
+
 def _dup_entry_key(row):
     """Grouping key for a same-platform duplicate entry: the store-native item
     id, falling back to the store URL slug for plugins that only populate that."""

@@ -1,6 +1,5 @@
 import json
 import logging
-import math
 import os
 import queue
 import re
@@ -63,11 +62,12 @@ BACKOFF_DELAYS = [15, 60, 300, 3615]
 
 
 def _weighted_score(percent, count):
-    """Confidence-interval weighted review score: pulls low-count scores toward 50."""
-    if count == 0:
-        return 0
-    p = percent / 100.0
-    return round((p - (p - 0.5) * (2 ** (-math.log10(count + 1)))) * 100)
+    """Confidence-interval weighted review score: pulls low-count scores toward 50.
+    The curve is tunable (Settings -> Tuning -> Review Scores)."""
+    from config import load_state
+    from utils import weighted_review_score
+    half_trust = load_state().get('review_half_trust_count', 10)
+    return weighted_review_score(percent, count, half_trust)
 
 
 def _hours_to_minutes(val):
