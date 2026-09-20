@@ -797,6 +797,7 @@
         'backup-modal',        // from data-modal
         'import-modal',        // from data-modal
         'playnite-modal',      // from data-modal
+        'art-source-modal',    // from data-modal
         'filter-io-modal',     // from data-modal
         'gamepad-remap-modal', // from gamepad-modal
         'gamepad-diag-modal',  // from gamepad-modal
@@ -2352,6 +2353,7 @@
             ['backup-modal',          'closeBackupModal'],
             ['import-modal',          'closeImportModal'],
             ['playnite-modal',        'closePlayniteModal'],
+            ['art-source-modal',      'closeArtSourceEditor'],
             ['filter-io-modal',       'closeFilterIoModal'],
             ['gamepad-remap-modal',   'closeGamepadRemap'],
             ['gamepad-diag-modal',    'closeGamepadDiag'],
@@ -3215,6 +3217,7 @@
         _watchModal('theme-picker-modal');
         _watchModal('santa-modal');
         _watchModal('playnite-modal');
+        _watchModal('art-source-modal');
         _watchModal('filter-io-modal');
         _watchModal('backup-modal');
         _watchModal('bg-modal');

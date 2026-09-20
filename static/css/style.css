@@ -162,20 +162,38 @@ div.nav-dropdown .custom-select-btn:hover {
     background-color: #444;
 }
 
-/* Settings → Artwork Sources: platform name + three compact dropdowns per row. */
+/* Settings → Artwork Sources: one row per platform (name, Default/Customized, Edit). */
 .art-src-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) repeat(3, 5.2rem);
-    gap: 6px 8px;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 6px 12px;
     align-items: center;
 }
-.art-src-head { font-size: 0.7rem; color: var(--text-secondary); }
 .art-src-name { font-size: 0.82rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.art-src-grid .custom-select-btn {
-    padding: 0.3rem 1.3rem 0.3rem 0.5rem;
-    font-size: 0.75rem;
-    background-position: right 0.4rem center;
+.art-src-state { font-size: 0.72rem; color: var(--text-secondary); }
+.art-src-edit { font-size: 0.72rem; height: auto; padding: 0.25rem 0.7rem; }
+
+/* Per-platform editor: ordered source lists (drag or ▲ ▼). */
+.art-src-kind-label { font-size: 0.75rem; color: var(--text-secondary); margin: 10px 0 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+.art-src-list { list-style: none; padding: 0; margin: 0; }
+.art-src-list li {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 8px; margin-bottom: 4px;
+    background: var(--bg-input); border: 1px solid var(--border); border-radius: 0.25rem;
+    font-size: 0.85rem;
 }
+.art-src-list li.art-src-off { opacity: 0.55; }
+.art-src-grip { width: 1rem; color: var(--text-secondary); cursor: grab; text-align: center; }
+.art-src-toggle { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; }
+.art-src-toggle input { width: auto; margin: 0; }
+.art-src-arrow {
+    background: none; border: 1px solid var(--border); color: var(--text-secondary);
+    border-radius: 0.25rem; font-size: 0.7rem; padding: 2px 7px; cursor: pointer; height: auto;
+}
+.art-src-arrow:hover { border-color: var(--accent); color: var(--text-primary); }
+.art-src-list li.art-src-dragging { opacity: 0.35; }
+.art-src-list li.art-src-over { border-color: var(--accent); background: var(--bg-surface); }
+body.art-src-dragging-body, body.art-src-dragging-body * { cursor: grabbing !important; user-select: none !important; }
 
 .custom-select-panel {
     display: none;

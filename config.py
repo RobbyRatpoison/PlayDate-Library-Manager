@@ -1218,8 +1218,12 @@ def save_state(updates):
             for _plat, _kinds in updates["art_source_prefs"].items():
                 if not (isinstance(_plat, str) and re.match(r'^[a-z][a-z0-9_]*$', _plat) and isinstance(_kinds, dict)):
                     continue
-                _k = {kind: v for kind, v in _kinds.items()
-                      if kind in ('vertical', 'horizontal', 'icon') and v in ('steam', 'sgdb')}
+                # Each value is the ordered list of sources to try ([] = all switched off).
+                _k = {}
+                for kind, order in _kinds.items():
+                    if kind in ('vertical', 'horizontal', 'icon') and isinstance(order, list):
+                        _k[kind] = [s for i, s in enumerate(order)
+                                    if s in ('store', 'steam', 'sgdb') and s not in order[:i]]
                 if _k:
                     _clean[_plat] = _k
             state["art_source_prefs"] = _clean

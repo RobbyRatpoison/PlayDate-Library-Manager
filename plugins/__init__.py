@@ -616,7 +616,10 @@ def plugin_icon_rel(plugin_id: str) -> str | None:
 
 def plugin_js_api() -> dict:
     """Return JS API descriptors for all plugins that provide them."""
-    return {p.platform: p.js_api() for p in _plugins.values() if hasattr(p, 'js_api')}
+    # art_store: the plugin can name its own store artwork (art_urls), which the
+    # Artwork Sources settings offer as a "Store" source for that platform.
+    return {p.platform: {**p.js_api(), 'art_store': hasattr(p, 'art_urls')}
+            for p in _plugins.values() if hasattr(p, 'js_api')}
 
 
 def platform_badge_defaults() -> dict:

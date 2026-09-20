@@ -6462,43 +6462,153 @@ else _renderHoverTipFields();
 
 // ── Per-platform artwork source preferences (Settings modal) ─────────────────
 const _ART_KINDS = [['vertical', 'Vertical'], ['horizontal', 'Horizontal'], ['icon', 'Icon']];
-const _ART_CHOICES = [['', 'Default'], ['steam', 'Steam'], ['sgdb', 'SGDB']];
+const _ART_SRC_LABELS = { store: "Store (the platform's own art)", sgdb: 'SteamGridDB', steam: 'Steam' };
 
+// Steam plus the platforms of installed plugins; _PLAT_LABELS alone also
+// carries every emulator platform, which would bury the list.
+function _artPlatforms() {
+    const labels = window._PLAT_LABELS || {};
+    return ['steam', ...Object.keys(window._PLUGIN_API || {})].filter((p, i, a) => labels[p] && a.indexOf(p) === i);
+}
+const _artHasStore  = plat => !!(window._PLUGIN_API && window._PLUGIN_API[plat] && window._PLUGIN_API[plat].art_store);
+const _artAllSources = plat => _artHasStore(plat) ? ['store', 'sgdb', 'steam'] : ['sgdb', 'steam'];
+
+// Mirrors images.art_source_order()'s defaults for a platform nobody has customised.
+function _artDefaultOrder(plat, kind) {
+    if (plat === 'steam') return kind === 'icon' ? ['sgdb', 'steam'] : ['steam', 'sgdb'];
+    return _artAllSources(plat);
+}
+
+// {enabled: sources in the order they're tried, disabled: the rest}
+function _artCurrent(plat, kind) {
+    const saved = ((window._ART_PREFS || {})[plat] || {})[kind];
+    const all = _artAllSources(plat);
+    const enabled = (saved || _artDefaultOrder(plat, kind)).filter(s => all.includes(s));
+    return { enabled, disabled: all.filter(s => !enabled.includes(s)) };
+}
+
+// Settings list: one row per platform (name, Default/Customized, Edit).
 function _renderArtSourcePrefs() {
     const host = document.getElementById('art-source-prefs');
     if (!host) return;
-    const prefs = window._ART_PREFS || {};
     const labels = window._PLAT_LABELS || {};
-    // Steam plus the platforms of installed plugins; _PLAT_LABELS alone also
-    // carries every emulator platform, which would bury the list.
-    const plats = ['steam', ...Object.keys(window._PLUGIN_API || {})].filter((p, i, a) => labels[p] && a.indexOf(p) === i);
-    // One grid: a header row naming the art types once, then one row per platform.
-    // A row's three dropdowns share a data-modal-row so a gamepad moves across them.
-    let rowNo = 60;
-    const head = `<div></div>` + _ART_KINDS.map(([, kLabel]) => `<div class="art-src-head">${kLabel}</div>`).join('');
-    host.innerHTML = `<div class="art-src-grid">${head}` + plats.map(plat => {
-        const row = rowNo++;
-        const selects = _ART_KINDS.map(([kind, kLabel]) => {
-            const cur = (prefs[plat] || {})[kind] || '';
-            const opts = _ART_CHOICES.map(([v, t]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${t}</option>`).join('');
-            return `<select class="art-src-sel" data-plat="${escHtml(plat)}" data-kind="${kind}" ` +
-                `data-modal-row="${row}" data-picker-title="${escHtml(labels[plat])}: ${kLabel} art">${opts}</select>`;
-        }).join('');
-        return `<div class="art-src-name">${escHtml(labels[plat])}</div>${selects}`;
+    host.innerHTML = `<div class="art-src-grid">` + _artPlatforms().map((plat, i) => {
+        const custom = Object.keys((window._ART_PREFS || {})[plat] || {}).length > 0;
+        return `<div class="art-src-name">${escHtml(labels[plat])}</div>` +
+            `<div class="art-src-state">${custom ? 'Customized' : 'Default'}</div>` +
+            `<button type="button" class="nav-btn art-src-edit" data-modal-row="${60 + i}" ` +
+            `onclick="openArtSourceEditor(${escHtml(JSON.stringify(plat))})">Edit</button>`;
     }).join('') + `</div>`;
-    host.querySelectorAll('select.art-src-sel').forEach(sel => initCustomSelect(sel));
-    // The custom-select wrapper is a div that fires a bubbling 'change' but drops inline handlers.
-    if (!host._artChangeBound) { host.addEventListener('change', saveArtSourcePrefs); host._artChangeBound = true; }
 }
 
-function saveArtSourcePrefs() {
-    const prefs = {};
-    document.querySelectorAll('#art-source-prefs .art-src-sel').forEach(sel => {
-        if (!sel.value) return;
-        (prefs[sel.dataset.plat] = prefs[sel.dataset.plat] || {})[sel.dataset.kind] = sel.value;
+// ── Per-platform editor: three ordered lists (Vertical / Horizontal / Icon) ──
+let _artEditPlat = null;
+
+function openArtSourceEditor(plat) {
+    _artEditPlat = plat;
+    document.getElementById('art-src-title').textContent = `${(window._PLAT_LABELS || {})[plat] || plat} artwork`;
+    _renderArtEditor();
+    document.getElementById('art-source-modal').style.display = 'flex';
+}
+
+function closeArtSourceEditor() {
+    document.getElementById('art-source-modal').style.display = 'none';
+    _artEditPlat = null;
+    _renderArtSourcePrefs();
+}
+
+function _saveArtPrefs() {
+    sendStateUpdate({ art_source_prefs: window._ART_PREFS || {} }, false);
+}
+
+function _artSetOrder(kind, enabled) {
+    const prefs = window._ART_PREFS = window._ART_PREFS || {};
+    (prefs[_artEditPlat] = prefs[_artEditPlat] || {})[kind] = enabled;
+    _saveArtPrefs();
+    _renderArtEditor();
+}
+
+function resetArtSourcePlatform() {
+    if (!_artEditPlat) return;
+    if (window._ART_PREFS) delete window._ART_PREFS[_artEditPlat];
+    _saveArtPrefs();
+    _renderArtEditor();
+}
+
+function artToggleSource(kind, src) {
+    const { enabled } = _artCurrent(_artEditPlat, kind);
+    _artSetOrder(kind, enabled.includes(src) ? enabled.filter(s => s !== src) : [...enabled, src]);
+}
+
+function artMoveSource(kind, src, dir) {
+    const { enabled } = _artCurrent(_artEditPlat, kind);
+    const i = enabled.indexOf(src), j = i + dir;
+    if (i < 0 || j < 0 || j >= enabled.length) return;
+    [enabled[i], enabled[j]] = [enabled[j], enabled[i]];
+    _artSetOrder(kind, enabled);
+}
+
+function _renderArtEditor() {
+    const body = document.getElementById('art-src-body');
+    if (!body || !_artEditPlat) return;
+    const plat = _artEditPlat;
+    let row = 800;
+    body.innerHTML = _ART_KINDS.map(([kind, kLabel]) => {
+        const { enabled, disabled } = _artCurrent(plat, kind);
+        const q = s => escHtml(JSON.stringify(s));
+        const item = (src, on, idx) => {
+            const r = row++;
+            const arrows = on
+                ? `<button type="button" class="art-src-arrow" data-modal-row="${r}" ${idx === 0 ? 'style="opacity:0.3;"' : ''} onclick="artMoveSource(${q(kind)},${q(src)},-1)">▲</button>` +
+                  `<button type="button" class="art-src-arrow" data-modal-row="${r}" ${idx === enabled.length - 1 ? 'style="opacity:0.3;"' : ''} onclick="artMoveSource(${q(kind)},${q(src)},1)">▼</button>`
+                : '';
+            return `<li data-src="${src}" class="${on ? 'art-src-on' : 'art-src-off'}">` +
+                `<span class="art-src-grip">${on ? '⠿' : ''}</span>` +
+                `<div class="art-src-toggle" data-modal-row="${r}" onclick="artToggleSource(${q(kind)},${q(src)})">` +
+                `<input type="checkbox" ${on ? 'checked' : ''} onclick="event.stopPropagation()" onchange="artToggleSource(${q(kind)},${q(src)})">` +
+                `<span>${escHtml(_ART_SRC_LABELS[src])}</span></div>${arrows}</li>`;
+        };
+        const lis = enabled.map((s, i) => item(s, true, i)).join('') + disabled.map(s => item(s, false, -1)).join('');
+        return `<div class="art-src-kind-label">${kLabel}</div><ul class="art-src-list" data-kind="${kind}">${lis}</ul>`;
+    }).join('');
+    body.querySelectorAll('ul.art-src-list').forEach(ul => {
+        ul.querySelectorAll('li.art-src-on .art-src-grip').forEach(grip => {
+            grip.addEventListener('mousedown', e => { e.preventDefault(); _artBeginDrag(grip.closest('li'), ul); });
+        });
     });
-    window._ART_PREFS = prefs;
-    sendStateUpdate({ art_source_prefs: prefs }, false);
+}
+
+// Same mouse-driven drag as the platform priority list (native HTML5 drag is
+// unreliable in pywebview); only enabled sources can be dragged.
+function _artBeginDrag(li, ul) {
+    li.classList.add('art-src-dragging');
+    document.body.classList.add('art-src-dragging-body');
+    let hover = null;
+    const others = () => Array.from(ul.querySelectorAll('li.art-src-on:not(.art-src-dragging)'));
+    function onMove(e) {
+        ul.querySelectorAll('.art-src-over').forEach(el => el.classList.remove('art-src-over'));
+        hover = null;
+        for (const item of others()) {
+            const r = item.getBoundingClientRect();
+            if (e.clientY >= r.top && e.clientY <= r.bottom) { hover = item; break; }
+        }
+        if (hover) hover.classList.add('art-src-over');
+    }
+    function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        li.classList.remove('art-src-dragging');
+        document.body.classList.remove('art-src-dragging-body');
+        ul.querySelectorAll('.art-src-over').forEach(el => el.classList.remove('art-src-over'));
+        if (hover && hover !== li) {
+            const on = Array.from(ul.querySelectorAll('li.art-src-on'));
+            if (on.indexOf(li) < on.indexOf(hover)) ul.insertBefore(li, hover.nextSibling);
+            else ul.insertBefore(li, hover);
+            _artSetOrder(ul.dataset.kind, Array.from(ul.querySelectorAll('li.art-src-on')).map(x => x.dataset.src));
+        }
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
 }
 
 // window._PLAT_LABELS / _PLUGIN_API are defined after this script runs, so wait for load.

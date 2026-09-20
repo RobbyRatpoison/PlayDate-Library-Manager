@@ -5,7 +5,8 @@
 
 - Added an optional, customizable info tooltip when hovering a game cover in the Library. (suggested by Colosso)
 - Added Metacritic scores from Steam, available to sort and filter by. (suggested by Colosso)
-- Added per-library artwork source settings, choosing Steam or SteamGridDB for each art type. (suggested by Colosso)
+- Expanded the tutorial with new sections and updated the plugin info.
+- Added per-library artwork source settings: choose and reorder Steam, SteamGridDB or the store's own art for each art type. (suggested by Colosso)
 - The Playnite import now shows what a backup contains and lets you choose which of date added, last played and time played to import. (suggested by Colosso)
 
 ### Fixes

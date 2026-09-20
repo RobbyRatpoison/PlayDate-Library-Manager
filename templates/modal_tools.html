@@ -742,7 +742,7 @@
         <div class="hub-section">
             <div class="hub-section-label">Artwork Sources</div>
             <div style="padding:8px 10px;">
-                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Choose where each library gets its cover art. "Default" uses the normal order (Steam, then SteamGridDB). A chosen source is tried first, with the default order as a fallback. Applies the next time art is fetched or re-scraped. SGDB is SteamGridDB, which needs an API key.</div>
+                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Choose where each library gets its cover art, and in what order the sources are tried: the store's own art (where the plugin provides it), SteamGridDB (needs an API key), or Steam. Applies the next time art is fetched or re-scraped.</div>
                 <div id="art-source-prefs"></div>
             </div>
         </div>
@@ -1562,6 +1562,24 @@ window._TUNE_INIT = {{ {
             <div style="font-size:0.75rem; color:#8f98a0; margin:3px 0 10px; padding-left:22px;">Off: only fills in blanks (for date added, keeps the earlier of the two dates). On: replaces PlayDate's value with Playnite's.</div>
             <button class="nav-btn" data-modal-row="5" onclick="applyPlayniteImport()">Import Selected</button>
         </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── ARTWORK SOURCES EDITOR ── -->
+<div id="art-source-modal" class="modal-overlay sub-modal" style="display:none;" onclick="if(event.target===this)closeArtSourceEditor();">
+    <div class="modal-content" style="width:min(440px,95vw); max-height:90vh; display:flex; flex-direction:column; overflow:hidden;">
+        <div style="flex-shrink:0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <h2 id="art-src-title" style="margin:0; color:var(--text-primary);">Artwork Sources</h2>
+                <button onclick="closeArtSourceEditor()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+            </div>
+            <p style="color:var(--text-secondary); font-size:0.8rem; margin:0 0 10px;">Sources are tried top to bottom until one has art. Drag to reorder (or use ▲ ▼); untick a source to never use it.</p>
+        </div>
+        <div id="art-src-body" style="overflow-y:auto; flex:1; min-height:0;"></div>
+        <div style="flex-shrink:0; display:flex; gap:8px; margin-top:12px;">
+            <button class="nav-btn" id="art-src-reset" data-modal-row="900" onclick="resetArtSourcePlatform()" style="font-size:0.8rem;">Reset to Default</button>
+            <button class="nav-btn" data-modal-row="900" onclick="closeArtSourceEditor()" style="font-size:0.8rem;">Done</button>
         </div>
     </div>
 </div>

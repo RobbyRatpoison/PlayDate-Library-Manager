@@ -112,19 +112,55 @@ def _get_sgdb_key():
     return config.get('sgdb_key') if config else None
 
 
-def _preferred_art_source(kind, appid, source):
-    """The user's per-platform art source preference (state.json
-    `art_source_prefs`, {platform: {vertical|horizontal|icon: 'steam'|'sgdb'}}),
-    or None. Only applies when the caller asked for 'auto'; an explicit source
-    (the edit modal's own picker) always wins."""
+ART_SOURCES = ('store', 'steam', 'sgdb')
+
+
+def art_source_order(kind, platform, has_store, saved):
+    """Ordered sources to try for one art type on one platform, or None to run
+    the original auto chain untouched.
+
+    `saved` is the user's list from state.json `art_source_prefs[platform][kind]`
+    (None = never customised). A saved list is honoured exactly: a source that
+    was switched off is never used, and unknown names / 'store' on a platform
+    whose plugin has no art_urls are dropped. Untouched, a platform whose plugin
+    provides art_urls defaults to store -> SGDB -> Steam (so a re-scrape stops
+    replacing the store's own art with SGDB's); every other platform is None."""
+    if saved is None:
+        if not has_store:
+            return None
+        return ['store', 'sgdb', 'steam']
+    return [s for s in saved if s in ART_SOURCES and (s != 'store' or has_store)]
+
+
+def _download_from_store(kind, appid, plugin):
+    """The platform's own artwork: the plugin says where it is (art_urls),
+    core downloads and converts it. Returns 'store' or 'missing'."""
+    try:
+        url = (plugin.art_urls(appid) or {}).get(kind)
+    except Exception as e:
+        log.warning(f"_download_from_store: {kind} art_urls failed for {appid}: {e}")
+        return 'missing'
+    if url and download_from_url(appid, url, kind) != 'missing':
+        return 'store'
+    return 'missing'
+
+
+def _download_art(kind, appid, assets, source, sgdb_id, game_name, icon_hash=None):
+    """download_vertical/horizontal/icon: run the user's source order for the
+    game's platform when there is one, else the original auto chain. An
+    explicit `source` (the edit modal's own picker) always bypasses the order."""
+    impl = {'vertical': _download_vertical, 'horizontal': _download_horizontal}.get(kind)
+
+    def run(src):
+        if kind == 'icon':
+            return _download_icon(appid, icon_hash, src, sgdb_id, game_name)
+        return impl(appid, assets, src, sgdb_id, game_name)
+
     if source != 'auto':
-        return None
+        return run(source)
     try:
         from config import load_state
-        prefs = load_state().get('art_source_prefs')
-        if not prefs:
-            return None
-        platform = 'steam'
+        platform, plugin = 'steam', None
         if int(appid) < 0:
             from database import get_db
             db = get_db()
@@ -133,42 +169,33 @@ def _preferred_art_source(kind, appid, source):
             finally:
                 db.close()
             platform = (row['platform'] if row else None) or 'steam'
-        pref = (prefs.get(platform) or {}).get(kind)
-        return pref if pref in ('steam', 'sgdb') else None
+            import plugins as _plugins
+            plugin = _plugins.get_for_platform(platform)
+        has_store = plugin is not None and hasattr(plugin, 'art_urls')
+        saved = ((load_state().get('art_source_prefs') or {}).get(platform) or {}).get(kind)
+        order = art_source_order(kind, platform, has_store, saved)
     except Exception as e:
-        log.warning(f"_preferred_art_source: {e}")
-        return None
+        log.warning(f"_download_art: could not resolve source order for {appid}: {e}")
+        order = None
+    if order is None:
+        return run('auto')
+    for src in order:
+        result = _download_from_store(kind, appid, plugin) if src == 'store' else run(src)
+        if result != 'missing':
+            return result
+    return 'missing'
 
 
 def download_vertical(appid, assets=None, source='auto', sgdb_id=None, game_name=None):
-    """Vertical art, trying the platform's preferred source first (if one is
-    set) and then the normal auto chain, so a preference never leaves a gap."""
-    pref = _preferred_art_source('vertical', appid, source)
-    if pref:
-        r = _download_vertical(appid, assets, pref, sgdb_id, game_name)
-        if r != 'missing':
-            return r
-    return _download_vertical(appid, assets, source, sgdb_id, game_name)
+    return _download_art('vertical', appid, assets, source, sgdb_id, game_name)
 
 
 def download_horizontal(appid, assets=None, source='auto', sgdb_id=None, game_name=None):
-    """Horizontal art; same preferred-source-then-auto behavior as download_vertical."""
-    pref = _preferred_art_source('horizontal', appid, source)
-    if pref:
-        r = _download_horizontal(appid, assets, pref, sgdb_id, game_name)
-        if r != 'missing':
-            return r
-    return _download_horizontal(appid, assets, source, sgdb_id, game_name)
+    return _download_art('horizontal', appid, assets, source, sgdb_id, game_name)
 
 
 def download_icon(appid, icon_hash, source='auto', sgdb_id=None, game_name=None):
-    """Icon; same preferred-source-then-auto behavior as download_vertical."""
-    pref = _preferred_art_source('icon', appid, source)
-    if pref:
-        r = _download_icon(appid, icon_hash, pref, sgdb_id, game_name)
-        if r != 'missing':
-            return r
-    return _download_icon(appid, icon_hash, source, sgdb_id, game_name)
+    return _download_art('icon', appid, None, source, sgdb_id, game_name, icon_hash)
 
 
 def _get_steam_assets(appid):
@@ -314,7 +341,8 @@ def _download_vertical(appid, assets=None, source='auto', sgdb_id=None, game_nam
                     break
 
     # 4. Steam CDN fallback for non-Steam games — find matching Steam appid by name
-    if game_name:
+    # (this is the Steam source for a non-Steam game, so an SGDB-only call skips it)
+    if game_name and source != 'sgdb':
         steam_appid = _steam_search_appid(game_name)
         if steam_appid:
             steam_assets = _get_steam_assets(steam_appid)
@@ -396,7 +424,8 @@ def _download_horizontal(appid, assets=None, source='auto', sgdb_id=None, game_n
                     break
 
     # 4. Steam CDN fallback for non-Steam games — find matching Steam appid by name
-    if game_name:
+    # (this is the Steam source for a non-Steam game, so an SGDB-only call skips it)
+    if game_name and source != 'sgdb':
         steam_appid = _steam_search_appid(game_name)
         if steam_appid:
             steam_assets = _get_steam_assets(steam_appid)
@@ -463,7 +492,8 @@ def _download_icon(appid, icon_hash, source='auto', sgdb_id=None, game_name=None
                 break
 
     # 3. SGDB icon via Steam appid fallback for non-Steam games
-    if game_name and sgdb_key:
+    # (still the SGDB source, so a Steam-only call skips it)
+    if game_name and sgdb_key and source != 'steam':
         steam_appid = _steam_search_appid(game_name)
         if steam_appid:
             data = _sgdb_get(f'icons/steam/{steam_appid}', sgdb_key)
