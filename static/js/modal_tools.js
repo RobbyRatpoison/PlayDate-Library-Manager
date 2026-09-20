@@ -6470,19 +6470,24 @@ function _artPlatforms() {
     const labels = window._PLAT_LABELS || {};
     return ['steam', ...Object.keys(window._PLUGIN_API || {})].filter((p, i, a) => labels[p] && a.indexOf(p) === i);
 }
-const _artHasStore  = plat => !!(window._PLUGIN_API && window._PLUGIN_API[plat] && window._PLUGIN_API[plat].art_store);
-const _artAllSources = plat => _artHasStore(plat) ? ['store', 'sgdb', 'steam'] : ['sgdb', 'steam'];
+// art_store (from the plugin) lists the art types it can supply from its own store.
+const _artHasStore  = (plat, kind) => !!(window._PLUGIN_API && window._PLUGIN_API[plat] &&
+    (window._PLUGIN_API[plat].art_store || []).includes(kind));
+const _artAllSources = (plat, kind) => _artHasStore(plat, kind) ? ['store', 'sgdb', 'steam'] : ['sgdb', 'steam'];
 
 // Mirrors images.art_source_order()'s defaults for a platform nobody has customised.
 function _artDefaultOrder(plat, kind) {
     if (plat === 'steam') return kind === 'icon' ? ['sgdb', 'steam'] : ['steam', 'sgdb'];
-    return _artAllSources(plat);
+    const all = _artAllSources(plat, kind);
+    // A plugin with store art may prefer its own order (art_default); others use the original SGDB, Steam.
+    const pref = (window._PLUGIN_API[plat] && window._PLUGIN_API[plat].art_default) || [];
+    return _artHasStore(plat, kind) && pref.length ? pref.filter(s => all.includes(s)) : all;
 }
 
 // {enabled: sources in the order they're tried, disabled: the rest}
 function _artCurrent(plat, kind) {
     const saved = ((window._ART_PREFS || {})[plat] || {})[kind];
-    const all = _artAllSources(plat);
+    const all = _artAllSources(plat, kind);
     const enabled = (saved || _artDefaultOrder(plat, kind)).filter(s => all.includes(s));
     return { enabled, disabled: all.filter(s => !enabled.includes(s)) };
 }

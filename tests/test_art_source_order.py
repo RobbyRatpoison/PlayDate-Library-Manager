@@ -12,6 +12,14 @@ def test_untouched_platform_with_store_art_defaults_to_store_sgdb_steam():
     assert art_source_order('vertical', 'epic_games', True, None) == ['store', 'sgdb', 'steam']
 
 
+def test_plugin_can_supply_its_own_default_order():
+    assert art_source_order('vertical', 'ea_app', True, None, ('sgdb', 'store', 'steam')) == ['sgdb', 'store', 'steam']
+    # ...but a saved list always wins over the plugin's default
+    assert art_source_order('vertical', 'ea_app', True, ['steam'], ('sgdb', 'store')) == ['steam']
+    # ...and the default only applies where the plugin has store art for this type
+    assert art_source_order('icon', 'ea_app', False, None, ('sgdb', 'store')) is None
+
+
 def test_saved_order_is_honoured_exactly():
     assert art_source_order('vertical', 'epic_games', True, ['sgdb', 'store']) == ['sgdb', 'store']
     assert art_source_order('icon', 'gog', False, ['steam', 'sgdb']) == ['steam', 'sgdb']

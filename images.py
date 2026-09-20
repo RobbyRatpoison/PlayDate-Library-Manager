@@ -115,20 +115,21 @@ def _get_sgdb_key():
 ART_SOURCES = ('store', 'steam', 'sgdb')
 
 
-def art_source_order(kind, platform, has_store, saved):
+def art_source_order(kind, platform, has_store, saved, default=None):
     """Ordered sources to try for one art type on one platform, or None to run
     the original auto chain untouched.
 
     `saved` is the user's list from state.json `art_source_prefs[platform][kind]`
     (None = never customised). A saved list is honoured exactly: a source that
     was switched off is never used, and unknown names / 'store' on a platform
-    whose plugin has no art_urls are dropped. Untouched, a platform whose plugin
-    provides art_urls defaults to store -> SGDB -> Steam (so a re-scrape stops
-    replacing the store's own art with SGDB's); every other platform is None."""
+    whose plugin has no art for this type are dropped. Untouched, a platform whose
+    plugin supplies this art type uses the plugin's preferred order (`default`,
+    normally store -> SGDB -> Steam, so a re-scrape stops replacing the store's
+    own art with SGDB's); every other platform is None."""
     if saved is None:
         if not has_store:
             return None
-        return ['store', 'sgdb', 'steam']
+        saved = default or ('store', 'sgdb', 'steam')
     return [s for s in saved if s in ART_SOURCES and (s != 'store' or has_store)]
 
 
@@ -171,9 +172,12 @@ def _download_art(kind, appid, assets, source, sgdb_id, game_name, icon_hash=Non
             platform = (row['platform'] if row else None) or 'steam'
             import plugins as _plugins
             plugin = _plugins.get_for_platform(platform)
-        has_store = plugin is not None and hasattr(plugin, 'art_urls')
+            has_store = kind in _plugins.plugin_art_kinds(plugin)
+        else:
+            has_store = False
         saved = ((load_state().get('art_source_prefs') or {}).get(platform) or {}).get(kind)
-        order = art_source_order(kind, platform, has_store, saved)
+        default = _plugins.plugin_art_default(plugin) if has_store else None
+        order = art_source_order(kind, platform, has_store, saved, default)
     except Exception as e:
         log.warning(f"_download_art: could not resolve source order for {appid}: {e}")
         order = None

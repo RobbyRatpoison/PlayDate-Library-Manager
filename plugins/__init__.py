@@ -616,10 +616,29 @@ def plugin_icon_rel(plugin_id: str) -> str | None:
 
 def plugin_js_api() -> dict:
     """Return JS API descriptors for all plugins that provide them."""
-    # art_store: the plugin can name its own store artwork (art_urls), which the
-    # Artwork Sources settings offer as a "Store" source for that platform.
-    return {p.platform: {**p.js_api(), 'art_store': hasattr(p, 'art_urls')}
+    # art_store: the art types this plugin can supply from its own store (see
+    # plugin_art_kinds), offered as a "Store" source in Artwork Sources.
+    return {p.platform: {**p.js_api(), 'art_store': list(plugin_art_kinds(p)),
+                         'art_default': list(plugin_art_default(p))}
             for p in _plugins.values() if hasattr(p, 'js_api')}
+
+
+def plugin_art_default(plugin) -> tuple:
+    """Order Artwork Sources tries for a platform nobody has customised, when its
+    plugin supplies store art. A plugin whose own sync prefers something else
+    (EA tries SteamGridDB before its CDN) sets `art_default_order`; the default
+    is store first, then SteamGridDB, then Steam."""
+    return tuple(getattr(plugin, 'art_default_order', ('store', 'sgdb', 'steam')))
+
+
+def plugin_art_kinds(plugin) -> tuple:
+    """Art types ('vertical'/'horizontal'/'icon') a plugin can supply through its
+    optional art_urls(appid). A plugin that implements art_urls lists the ones it
+    actually covers in an `art_kinds` attribute (default: all three); one with no
+    art_urls supplies none. Core only offers/uses the "Store" source for these."""
+    if plugin is None or not hasattr(plugin, 'art_urls'):
+        return ()
+    return tuple(getattr(plugin, 'art_kinds', ('vertical', 'horizontal', 'icon')))
 
 
 def platform_badge_defaults() -> dict:
