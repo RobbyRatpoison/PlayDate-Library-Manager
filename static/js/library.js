@@ -1739,14 +1739,17 @@ async function stopBulkDateImport() {
             else slot.remove();
             reposition();
         };
+        const clip = t => (t && t.length > 280) ? t.slice(0, 277).trimEnd() + '...' : t;
+        // Stored server-side (GAMES.short_description): show it with no request.
+        const stored = _GAME_MAP.get(appid)?.short_description;
+        if (stored) { apply(clip(stored)); return; }
         if (_descCache.has(appid)) { apply(_descCache.get(appid)); return; }
         setTimeout(() => {
             if (!slot.isConnected) return;
+            // Not stored yet: the endpoint fetches it once and saves it for next time.
             fetch(`/api/game-description/${appid}`).then(r => r.json()).then(d => {
-                let t = d.status === 'success' && d.description
-                    ? (new DOMParser().parseFromString(d.description, 'text/html').documentElement.textContent || '').trim()
-                    : null;
-                if (t && t.length > 280) t = t.slice(0, 277).trimEnd() + '...';
+                const t = d.status === 'success' && d.description ? clip(d.description) : null;
+                if (t && _GAME_MAP.get(appid)) _GAME_MAP.get(appid).short_description = d.description;
                 _descCache.set(appid, t || null);
                 apply(t);
             }).catch(() => {});
@@ -2451,8 +2454,12 @@ function pickRandomGame() {
 
     async function _dpLoadDescription(appid) {
         try {
-            const res  = await fetch(`/api/game-description/${appid}`);
-            const data = await res.json();
+            // Stored server-side and already in GAMES: no request needed.
+            const game = _GAME_MAP.get(appid);
+            const data = game?.short_description
+                ? { status: 'success', description: game.short_description }
+                : await (await fetch(`/api/game-description/${appid}`)).json();
+            if (data.status === 'success' && data.description && game) game.short_description = data.description;
             if (_dpCurrentAppid !== appid) return; // user selected different game
             const descText    = document.getElementById('detail-desc-text');
             const descLoading = document.getElementById('detail-desc-loading');

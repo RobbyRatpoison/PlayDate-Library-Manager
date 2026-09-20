@@ -114,6 +114,7 @@ def init_db():
         'review_score': 'TEXT',          # e.g., 'Very Positive'
         'review_percentage': 'INT',      # 0-100 score
         'metacritic_score': 'INT',       # Metacritic score from the Steam store page (NULL = none)
+        'short_description': 'TEXT',     # Plain-text store blurb (Steam or plugin); NULL = not fetched yet
         'vertical_art_source': 'TEXT',   # Source of vertical capsule art
         'horizontal_art_source': 'TEXT', # Source of horizontal header art
         'icon_source': 'TEXT',           # Source of game icon

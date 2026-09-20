@@ -863,6 +863,8 @@ def scrape_single(appid):
     if store_data:
         from database import update_game_data as _ugd
         _ugd(appid, metacritic_score=store_data.get('metacritic_score'))
+        if store_data.get('short_description'):
+            _ugd(appid, short_description=store_data['short_description'])
         data_out.update({
             "developers":   store_data.get('developers', ''),
             "publishers":   store_data.get('publishers', ''),
@@ -998,29 +1000,35 @@ def get_game(appid):
 def game_description(appid):
     import plugins as _plugins
     import requests as _r
+    from scrapers import clean_description
+    from database import update_game_data as _ugd
     db = get_db()
-    row = db.execute("SELECT platform, platform_id FROM games WHERE appid = ?", (appid,)).fetchone()
+    row = db.execute("SELECT platform, platform_id, short_description FROM games WHERE appid = ?", (appid,)).fetchone()
     db.close()
     if not row:
         return jsonify({'status': 'error', 'message': 'Game not found'}), 404
+    # Stored by populate/rescrape (Steam) or by an earlier call here (plugins,
+    # and Steam games scraped before the column existed): no request needed.
+    if row['short_description']:
+        return jsonify({'status': 'success', 'description': row['short_description']})
     platform = row['platform'] or 'steam'
+    desc = ''
     try:
         plugin = _plugins.get_for_platform(platform)
         if plugin is not None and hasattr(plugin, 'fetch_description'):
-            desc = plugin.fetch_description(appid, row['platform_id'])
-            if desc:
-                return jsonify({'status': 'success', 'description': desc})
+            desc = clean_description(plugin.fetch_description(appid, row['platform_id']))
         elif platform == 'steam':
             resp = _r.get(
-                f'https://store.steampowered.com/api/appdetails?appids={appid}',
+                f'https://store.steampowered.com/api/appdetails?appids={appid}&l=english',
                 timeout=10
             )
             if resp.ok:
-                d = resp.json()
-                app_data = d.get(str(appid), {})
+                app_data = resp.json().get(str(appid), {})
                 if app_data.get('success'):
-                    desc = app_data.get('data', {}).get('short_description', '')
-                    return jsonify({'status': 'success', 'description': desc})
+                    desc = clean_description(app_data.get('data', {}).get('short_description', ''))
+        if desc:
+            _ugd(appid, short_description=desc)
+            return jsonify({'status': 'success', 'description': desc})
     except Exception as e:
         return api_error('Something went wrong on the server. Check playdate.log for details.', 500, exc=e)
     return jsonify({'status': 'error', 'message': 'No description available'})

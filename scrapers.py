@@ -1123,6 +1123,20 @@ def _scrape_store_page_date(appid, session=None):
         return None
 
 
+def clean_description(text):
+    """Store blurb -> plain text: strips tags, decodes entities, collapses runs of
+    spaces (paragraph breaks are kept, capped at one blank line). Returns '' for
+    anything empty. Shared by the Steam scrape and the on-demand description
+    route so both store the same shape."""
+    if not text:
+        return ''
+    import html as _html
+    text = _html.unescape(re.sub(r'<[^>]+>', ' ', str(text)))
+    text = re.sub(r'[ \t\r\f\v]+', ' ', text)
+    text = re.sub(r' ?\n ?', '\n', text)
+    return re.sub(r'\n{3,}', '\n\n', text).strip()
+
+
 # Scrape Storefront API (Devs, Pubs, Release Date)
 def fetch_store_data(appid, session=None):
     """
@@ -1176,6 +1190,11 @@ def fetch_store_data(appid, session=None):
             'is_free':      1 if data.get('is_free') else 0,
             'metacritic_score': (data.get('metacritic') or {}).get('score'),
         }
+        # Only when present, so a store page with no blurb never blanks one we
+        # already have (update_game_data writes every key it's given).
+        short_desc = clean_description(data.get('short_description'))
+        if short_desc:
+            extracted['short_description'] = short_desc
 
         return extracted
 
