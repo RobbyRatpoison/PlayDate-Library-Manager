@@ -54,9 +54,9 @@ _ABS_RX, _ABS_RY, _ABS_RZ = 0x03, 0x04, 0x05
 _ABS_HAT0X, _ABS_HAT0Y = 0x10, 0x11
 
 _EVIOCGNAME_256 = (2 << 30) | (ord('E') << 8) | 0x06 | (256 << 16)
-_STICK_MAX = 32767.0
-_TRIG_MAX = 255.0
+_ABS_GAS, _ABS_BRAKE = 0x09, 0x0a
 _TRIG_ON = 0.30
+_STEAM_RANGES = {'stick': (-32768, 32767), 'trig': (0, 255)}
 _POLL_HZ = 90
 
 
@@ -68,6 +68,39 @@ def _key_caps(fd):
     except OSError:
         return set()
     return {i for i in range(96 * 8) if buf[i // 8] >> (i % 8) & 1}
+
+
+def _abs_caps(fd):
+    """Set of ABS axis codes the device reports."""
+    import fcntl
+    buf = bytearray(8)
+    try:
+        fcntl.ioctl(fd, (2 << 30) | (ord('E') << 8) | (0x20 + _EV_ABS) | (8 << 16), buf)
+    except OSError:
+        return set()
+    return {i for i in range(64) if buf[i // 8] >> (i % 8) & 1}
+
+
+def _abs_range(fd, code):
+    """(min, max) from EVIOCGABS, or None if the ioctl fails."""
+    import fcntl
+    buf = bytearray(24)     # struct input_absinfo: value,min,max,fuzz,flat,res
+    try:
+        fcntl.ioctl(fd, (2 << 30) | (ord('E') << 8) | (0x40 + code) | (24 << 16), buf)
+    except OSError:
+        return None
+    _v, lo, hi = struct.unpack_from('iii', buf)
+    return (lo, hi) if hi > lo else None
+
+
+def _norm(val, rng, signed):
+    """Scale a raw axis value to [-1, 1] (sticks) or [0, 1] (triggers) using
+    the device's own reported range -- pads differ (Steam's virtual pad is
+    signed 16-bit, a Bluetooth Xbox pad is unsigned 0..65535)."""
+    lo, hi = rng
+    f = (val - lo) / float(hi - lo)
+    f = min(1.0, max(0.0, f))
+    return f * 2.0 - 1.0 if signed else f
 
 
 def find_gamepad():
@@ -105,7 +138,34 @@ class GamepadReader(threading.Thread):
         self._stop = threading.Event()
         self._btn = {}     # standard index -> bool
         self._abs = {}     # evdev abs code -> raw int
-        self._trig = {_ABS_Z: 0, _ABS_RZ: 0}
+        self._trig = {}    # trigger evdev code -> raw int
+        self._rng = {}     # evdev abs code -> (min, max)
+        self._lt = _ABS_Z  # evdev codes this device uses for the triggers
+        self._rt = _ABS_RZ
+        self._rsx = _ABS_RX  # ...and for the right stick
+        self._rsy = _ABS_RY
+
+    def _configure(self, fd):
+        """Work out this device's axis layout. Steam's virtual pad uses
+        ABS_Z/ABS_RZ for triggers (0..255) and ABS_RX/RY for the right stick;
+        a kernel-driven Xbox pad (e.g. Elite 2 over Bluetooth) uses
+        ABS_BRAKE/ABS_GAS for triggers (0..1023) and ABS_Z/ABS_RZ for the
+        right stick, with all sticks unsigned 0..65535."""
+        caps = _abs_caps(fd)
+        if _ABS_GAS in caps and _ABS_BRAKE in caps:
+            self._lt, self._rt = _ABS_BRAKE, _ABS_GAS
+            self._rsx, self._rsy = _ABS_Z, _ABS_RZ
+        else:
+            self._lt, self._rt = _ABS_Z, _ABS_RZ
+            self._rsx, self._rsy = _ABS_RX, _ABS_RY
+        self._rng = {}
+        for c in (_ABS_X, _ABS_Y, self._rsx, self._rsy):
+            self._rng[c] = _abs_range(fd, c) or _STEAM_RANGES['stick']
+        for c in (self._lt, self._rt):
+            self._rng[c] = _abs_range(fd, c) or _STEAM_RANGES['trig']
+        self._trig = {self._lt: self._rng[self._lt][0], self._rt: self._rng[self._rt][0]}
+        self._abs = {}
+        self._btn = {}
 
     def stop(self):
         self._stop.set()
@@ -116,21 +176,19 @@ class GamepadReader(threading.Thread):
         for idx, down in self._btn.items():
             if 0 <= idx < 17:
                 buttons[idx] = {'pressed': bool(down), 'value': 1.0 if down else 0.0}
-        lt = self._trig[_ABS_Z] / _TRIG_MAX
-        rt = self._trig[_ABS_RZ] / _TRIG_MAX
+        lt = _norm(self._trig.get(self._lt, 0), self._rng[self._lt], False)
+        rt = _norm(self._trig.get(self._rt, 0), self._rng[self._rt], False)
         buttons[6] = {'pressed': lt > _TRIG_ON, 'value': round(lt, 3)}
         buttons[7] = {'pressed': rt > _TRIG_ON, 'value': round(rt, 3)}
         hx, hy = ax.get(_ABS_HAT0X, 0), ax.get(_ABS_HAT0Y, 0)
         for i, on in ((12, hy < 0), (13, hy > 0), (14, hx < 0), (15, hx > 0)):
             buttons[i] = {'pressed': bool(on), 'value': 1.0 if on else 0.0}
-        axes = [
-            round(ax.get(_ABS_X, 0) / _STICK_MAX, 3),
-            round(ax.get(_ABS_Y, 0) / _STICK_MAX, 3),
-            round(ax.get(_ABS_RX, 0) / _STICK_MAX, 3),
-            round(ax.get(_ABS_RY, 0) / _STICK_MAX, 3),
-        ]
+        def stick(code):
+            rng = self._rng[code]
+            return round(_norm(ax.get(code, (rng[0] + rng[1]) // 2), rng, True), 3)
+        axes = [stick(_ABS_X), stick(_ABS_Y), stick(self._rsx), stick(self._rsy)]
         self._on_state({
-            'id': 'Steam Deck (evdev event10)',
+            'id': 'Steam Deck (evdev)',
             'mapping': 'standard',
             'connected': True,
             'buttons': buttons,
@@ -146,7 +204,7 @@ class GamepadReader(threading.Thread):
             if not path:
                 if self._btn or self._abs:
                     self._btn.clear(); self._abs.clear()
-                    self._trig = {_ABS_Z: 0, _ABS_RZ: 0}
+                    self._trig = {}
                     try:
                         self._on_state({'connected': False})
                     except Exception:
@@ -159,6 +217,7 @@ class GamepadReader(threading.Thread):
             except OSError:
                 self._stop.wait(2.0)
                 continue
+            self._configure(fd)
             last_emit = 0.0
             dirty = False
             try:
@@ -176,13 +235,13 @@ class GamepadReader(threading.Thread):
                                     self._btn[_BTN_MAP[code]] = val != 0
                                     dirty = True
                                 elif code == _BTN_LT:
-                                    self._trig[_ABS_Z] = 255 if val else 0; dirty = True
+                                    self._trig[self._lt] = self._rng[self._lt][1 if val else 0]; dirty = True
                                 elif code == _BTN_RT:
-                                    self._trig[_ABS_RZ] = 255 if val else 0; dirty = True
+                                    self._trig[self._rt] = self._rng[self._rt][1 if val else 0]; dirty = True
                             elif typ == _EV_ABS:
-                                if code in (_ABS_Z, _ABS_RZ):
+                                if code in (self._lt, self._rt):
                                     self._trig[code] = val; dirty = True
-                                elif code in (_ABS_X, _ABS_Y, _ABS_RX, _ABS_RY,
+                                elif code in (_ABS_X, _ABS_Y, self._rsx, self._rsy,
                                               _ABS_HAT0X, _ABS_HAT0Y):
                                     self._abs[code] = val; dirty = True
                     now = time.time()
