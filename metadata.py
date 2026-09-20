@@ -413,7 +413,7 @@ def backfill_metadata(appid, *, force=False, rerun=False):
     row = db.execute(
         "SELECT name, platform, platform_slug, steam_appid, meta_backfill_fetched, "
         "developers, publishers, genres, categories, tags, release_date, "
-        "review_score, is_free "
+        "review_score, is_free, metacritic_score, short_description "
         "FROM games WHERE appid = ?", (appid,)
     ).fetchone()
     db.close()
@@ -468,6 +468,8 @@ def backfill_metadata(appid, *, force=False, rerun=False):
             out['release_date'] = store['release_date']
         if row['metacritic_score'] is None and store.get('metacritic_score') is not None:
             out['metacritic_score'] = store['metacritic_score']
+        if not row['short_description'] and store.get('short_description'):
+            out['short_description'] = store['short_description']
         if row['is_free'] is None and 'is_free' in store:
             out['is_free'] = store['is_free']
         # Review set is a group, only if the game has no score at all.

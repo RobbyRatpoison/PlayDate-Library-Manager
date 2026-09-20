@@ -242,7 +242,7 @@
                                 <label>Publishers</label>
                                 <input type="text" name="publishers" id="edit-pub" data-modal-row="5">
 
-                                <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 10px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                                     <div>
                                         <label>Release Date</label>
                                         <input type="text" name="release_date" id="edit-rel" placeholder="YYYY-MM-DD" data-modal-row="6">
@@ -259,7 +259,7 @@
                                 <label style="margin-top: 8px;">Review Score</label>
                                 <input type="text" name="review_score" id="edit-review-score" placeholder="e.g. Very Positive" data-modal-row="7">
 
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 5px;">
                                     <div>
                                         <label>Review %</label>
                                         <input type="number" name="review_percentage" id="edit-review-percentage" min="0" max="100" data-modal-row="8">
@@ -267,6 +267,10 @@
                                     <div>
                                         <label data-tooltip="Review score adjusted for confidence. Low review counts are pulled toward 50 (neutral) rather than the raw score. Formula: score - (score - 0.5) × 2^(-log₁₀(reviews+1))">Weighted %</label>
                                         <input type="number" name="weighted_percentage" id="edit-weighted-pct" data-modal-row="8">
+                                    </div>
+                                    <div>
+                                        <label data-tooltip="Metacritic critic score, from the Steam store page">Critic %</label>
+                                        <input type="number" name="metacritic_score" id="edit-metacritic" min="0" max="100" data-modal-row="8">
                                     </div>
                                 </div>
 
@@ -300,6 +304,10 @@
                                 <small class="pill-hint">Type a value and press Enter to add</small>
                             </div>
                         </div>
+
+                        <label style="margin-top: 8px;">Description</label>
+                        <textarea name="short_description" id="edit-short-desc" rows="3" data-modal-row="9"
+                                  style="width:100%; resize:vertical; box-sizing:border-box;"></textarea>
 
                         <div id="hltb-row-i" style="display:none; flex-direction:column; gap:6px; margin-top:10px; padding:10px 14px; background:var(--bg-input); border:1px solid #2a475e; border-radius:5px;">
                             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -810,6 +818,8 @@
         safeSet('edit-total-reviews', game.total_reviews);
         safeSet('edit-positive-reviews', game.positive_reviews);
         safeSet('edit-weighted-pct', game.weighted_percentage);
+        safeSet('edit-metacritic', game.metacritic_score);
+        safeSet('edit-short-desc', game.short_description);
         safeSet('edit-unlocked-ach', game.unlocked_achievements);
         safeSet('edit-total-ach', game.total_achievements);
 
@@ -1276,6 +1286,8 @@ const achLink = document.getElementById('achievements-link');
                 safeSet('edit-total-reviews', game.total_reviews);
                 safeSet('edit-positive-reviews', game.positive_reviews);
                 safeSet('edit-weighted-pct', game.weighted_percentage);
+                safeSet('edit-metacritic', game.metacritic_score);
+                safeSet('edit-short-desc', game.short_description);
                 safeSet('edit-last-played', game.last_played);
                 setPlaytime(game.playtime_forever);
                 safeSet('edit-unlocked-ach', game.unlocked_achievements);
@@ -1343,7 +1355,9 @@ const achLink = document.getElementById('achievements-link');
                 review_score:        () => safeSet('edit-review-score', g.review_score),
                 review_percentage:   () => safeSet('edit-review-percentage', g.review_percentage),
                 weighted_percentage: () => safeSet('edit-weighted-pct', g.weighted_percentage),
-                total_reviews:       () => safeSet('edit-total-reviews', g.total_reviews),
+                metacritic_score:    () => safeSet('edit-metacritic', g.metacritic_score),
+                short_description:   () => safeSet('edit-short-desc', g.short_description),
+                total_reviews:      () => safeSet('edit-total-reviews', g.total_reviews),
                 positive_reviews:    () => safeSet('edit-positive-reviews', g.positive_reviews),
             };
             (data.filled || []).forEach(f => setters[f] && setters[f]());

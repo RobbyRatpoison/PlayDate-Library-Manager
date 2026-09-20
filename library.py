@@ -570,6 +570,9 @@ def update_game():
     for col in ('last_played', 'date_added', 'release_date'):
         if col in data:
             data[col] = date_to_ts(data[col]) if data[col] else None
+    # An emptied number input arrives as '' -- store NULL, not text, in the INT column.
+    if data.get('metacritic_score') == '':
+        data['metacritic_score'] = None
     from utils import get_all_unique_genres, get_all_unique_categories, invalidate_unique_cache
     try:
         old_groups_str = None
@@ -872,7 +875,10 @@ def scrape_single(appid):
             "genres":       store_data.get('genres', ''),
             "categories":   store_data.get('categories', ''),
             "is_free":      store_data.get('is_free', 0),
+            "metacritic_score": store_data.get('metacritic_score'),
         })
+        if store_data.get('short_description'):
+            data_out["short_description"] = store_data['short_description']
     if review_data:
         data_out.update({
             "review_score":        review_data.get('review_score', ''),
