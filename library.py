@@ -441,6 +441,9 @@ def library():
         sort_col = f"CASE WHEN ({_expr}) IS NULL THEN 1 ELSE 0 END, ({_expr})"
     elif sort_col not in SAFE_COLUMNS:
         sort_col = 'name'
+    # SQLite's default BINARY collation puts every capital before every lowercase letter
+    if sort_col == 'name':
+        sort_col = 'name COLLATE NOCASE'
 
     params = []
     where = "1=1"

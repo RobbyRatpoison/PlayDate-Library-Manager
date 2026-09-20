@@ -96,6 +96,9 @@ People who've helped make PlayDate better - bug reports, feature suggestions, te
 - Suggested moving API keys into Settings, editable after initial setup
 - Repeated manual-update hassle prompted the in-app update checker
 
+**Mayanaise**
+- Game lists sorting capitalised names (e.g. "BROK") ahead of all lowercase ones (e.g. "Backpack Hero"), instead of alphabetically
+
 **Meneldur**
 - Startup crash from a missing plugins folder after downgrade/upgrade
 - `ModuleNotFoundError: runners.watcher` crash from missing PyInstaller bundle modules

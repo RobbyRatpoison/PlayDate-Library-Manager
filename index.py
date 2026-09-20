@@ -123,9 +123,9 @@ def _build_shelf_query(shelf, saved_filters, state):
             expr = VIRTUAL_SORT_COLS[sort_col]
             order = f"({expr}) {sort_dir}"
         else:
-            order = f"{sort_col} {sort_dir}"
+            order = f"{sort_col}{' COLLATE NOCASE' if sort_col == 'name' else ''} {sort_dir}"
     else:
-        order = 'name ASC'
+        order = 'name COLLATE NOCASE ASC'
 
     return where, order, params
 
