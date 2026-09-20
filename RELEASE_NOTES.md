@@ -8,7 +8,7 @@
 - Expanded the tutorial with new sections and updated the plugin info.
 - Added per-library artwork source settings: choose and reorder Steam, SteamGridDB or the store's own art for each art type. (suggested by Colosso)
 - The Playnite import now shows what a backup contains and lets you choose which of date added, last played and time played to import. (suggested by Colosso)
-- Added an Add Game button to the Library: add any game by hand from a Steam search, or as a custom entry, even if you don't own or have installed it. (prompted by Mayanaise)
+- Added Add Game (Settings → Library): add any game by hand from a Steam search, or as a custom entry, even if you don't own or have installed it. (prompted by Mayanaise)
 
 ### Fixes
 

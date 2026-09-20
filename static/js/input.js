@@ -781,7 +781,7 @@
         'whats-new-modal',     // base.html post-update changelog popup
         'editModal', 'filterModal', 'viewModal',
         // Library bulk modals
-        'bulk-edit-modal', 'bulk-rescrape-modal', 'bulk-delete-modal', 'add-game-modal',
+        'bulk-edit-modal', 'bulk-rescrape-modal', 'bulk-delete-modal',
         // Tools page expanding modals
         'blacklist-modal',
         // Sub-modals of hamburger items (before their parents)
@@ -791,6 +791,7 @@
         'theme-modal',         // from appearance-modal
         'theme-picker-modal',  // from appearance-modal
         'dup-entries-modal',   // from library-modal
+        'add-game-modal',      // from library-modal
         'pagywosg-modal',      // from community-modal
         'miam-modal',          // from community-modal
         'santa-modal',         // from community-modal
@@ -2340,7 +2341,6 @@
             ['bulk-edit-modal',       'closeBulkEditModal'],
             ['bulk-rescrape-modal',   'closeBulkRescrapeModal'],
             ['bulk-delete-modal',     'closeBulkDeleteModal'],
-            ['add-game-modal',        'closeAddGameModal'],
             // sub-modals (before their parents)
             ['cardOutlinesModal',     'closeCardOutlinesModal'],
             ['cardBadgesModal',       'closeCardBadgesModal'],
@@ -2348,6 +2348,7 @@
             ['theme-modal',           'closeThemeModal'],
             ['theme-picker-modal',    'closeThemePickerModal'],
             ['dup-entries-modal',     'closeDupEntriesModal'],
+            ['add-game-modal',        'closeAddGameModal'],
             ['pagywosg-modal',        'closePagModal'],
             ['miam-modal',            'closeMiamModal'],
             ['santa-modal',           'closeSantaModal'],
@@ -3193,7 +3194,6 @@
         _watchModal('bulk-edit-modal');
         _watchModal('bulk-rescrape-modal');
         _watchModal('bulk-delete-modal');
-        _watchModal('add-game-modal');
 
         // Top-level hamburger modals
         _watchModal('settings-modal');
@@ -3202,6 +3202,7 @@
         _watchModal('appearance-modal');
         _watchModal('library-modal');
         _watchModal('dup-entries-modal');
+        _watchModal('add-game-modal');
         _watchModal('gamepad-modal');
         _watchModal('advanced-modal');
         _watchModal('emulators-modal');
