@@ -6462,7 +6462,7 @@ else _renderHoverTipFields();
 
 // ── Per-platform artwork source preferences (Settings modal) ─────────────────
 const _ART_KINDS = [['vertical', 'Vertical'], ['horizontal', 'Horizontal'], ['icon', 'Icon']];
-const _ART_CHOICES = [['', 'Default'], ['steam', 'Steam'], ['sgdb', 'SteamGridDB']];
+const _ART_CHOICES = [['', 'Default'], ['steam', 'Steam'], ['sgdb', 'SGDB']];
 
 function _renderArtSourcePrefs() {
     const host = document.getElementById('art-source-prefs');
@@ -6472,20 +6472,20 @@ function _renderArtSourcePrefs() {
     // Steam plus the platforms of installed plugins; _PLAT_LABELS alone also
     // carries every emulator platform, which would bury the list.
     const plats = ['steam', ...Object.keys(window._PLUGIN_API || {})].filter((p, i, a) => labels[p] && a.indexOf(p) === i);
+    // One grid: a header row naming the art types once, then one row per platform.
+    // A row's three dropdowns share a data-modal-row so a gamepad moves across them.
     let rowNo = 60;
-    host.innerHTML = plats.map(plat => {
+    const head = `<div></div>` + _ART_KINDS.map(([, kLabel]) => `<div class="art-src-head">${kLabel}</div>`).join('');
+    host.innerHTML = `<div class="art-src-grid">${head}` + plats.map(plat => {
+        const row = rowNo++;
         const selects = _ART_KINDS.map(([kind, kLabel]) => {
             const cur = (prefs[plat] || {})[kind] || '';
             const opts = _ART_CHOICES.map(([v, t]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${t}</option>`).join('');
-            return `<div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0;">` +
-                `<span style="font-size:0.75rem; color:var(--text-secondary); width:4.6rem;">${kLabel}</span>` +
-                `<select class="nav-dropdown art-src-sel" data-plat="${escHtml(plat)}" data-kind="${kind}" ` +
-                `data-modal-row="${rowNo++}" data-picker-title="${escHtml(labels[plat])}: ${kLabel} art" ` +
-                `style="flex:1; min-width:0;">${opts}</select></div>`;
+            return `<select class="art-src-sel" data-plat="${escHtml(plat)}" data-kind="${kind}" ` +
+                `data-modal-row="${row}" data-picker-title="${escHtml(labels[plat])}: ${kLabel} art">${opts}</select>`;
         }).join('');
-        return `<div style="margin-bottom:8px;"><div style="font-size:0.82rem; margin-bottom:3px;">${escHtml(labels[plat])}</div>` +
-            `<div style="display:flex; flex-wrap:wrap; gap:8px;">${selects}</div></div>`;
-    }).join('');
+        return `<div class="art-src-name">${escHtml(labels[plat])}</div>${selects}`;
+    }).join('') + `</div>`;
     host.querySelectorAll('select.art-src-sel').forEach(sel => initCustomSelect(sel));
     // The custom-select wrapper is a div that fires a bubbling 'change' but drops inline handlers.
     if (!host._artChangeBound) { host.addEventListener('change', saveArtSourcePrefs); host._artChangeBound = true; }

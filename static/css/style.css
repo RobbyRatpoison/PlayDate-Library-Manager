@@ -162,6 +162,21 @@ div.nav-dropdown .custom-select-btn:hover {
     background-color: #444;
 }
 
+/* Settings → Artwork Sources: platform name + three compact dropdowns per row. */
+.art-src-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(3, 5.2rem);
+    gap: 6px 8px;
+    align-items: center;
+}
+.art-src-head { font-size: 0.7rem; color: var(--text-secondary); }
+.art-src-name { font-size: 0.82rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.art-src-grid .custom-select-btn {
+    padding: 0.3rem 1.3rem 0.3rem 0.5rem;
+    font-size: 0.75rem;
+    background-position: right 0.4rem center;
+}
+
 .custom-select-panel {
     display: none;
     position: fixed;
