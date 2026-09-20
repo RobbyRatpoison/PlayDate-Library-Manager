@@ -155,3 +155,7 @@ People who've helped make PlayDate better - bug reports, feature suggestions, te
 **woutercools**
 - SteamGifts Full Refresh not actually clearing out an incorrect win left over from an earlier bad sync (e.g. a mistyped username)
 - Couldn't choose a games folder on another mounted drive (`/mnt`, `/media`, `/run/media`) from the Flatpak build
+- Suggested choosing which data to import from a Playnite backup (date added, last played, time played) - led to the Playnite import options screen
+- Suggested choosing the cover art source per library and art type - led to the Artwork Sources settings
+- Suggested a customizable info tooltip when hovering a game cover - led to the Card Tooltip setting
+- Suggested showing the Metacritic score - led to Metacritic scores, fetched from Steam
