@@ -1002,6 +1002,132 @@ def get_game(appid):
     except Exception as e:
         return api_error('Something went wrong on the server. Check playdate.log for details.', 500, exc=e)
 
+# ── Add Game (by hand) ───────────────────────────────────────────────────────
+
+_add_jobs = {}                      # appid -> 'running' | 'done' | 'error'
+_add_jobs_lock = threading.Lock()
+
+
+@library_bp.route('/api/steam-search')
+def steam_search():
+    """Steam store search for the Add Game dialog. in_library flags results that
+    are already in the library so the dialog can say so instead of re-adding."""
+    import requests as _r
+    q = (request.args.get('q') or '').strip()
+    if len(q) < 2:
+        return jsonify([])
+    try:
+        resp = _r.get('https://store.steampowered.com/api/storesearch/',
+                      params={'term': q, 'l': 'english', 'cc': 'us'}, timeout=10)
+        items = resp.json().get('items', []) if resp.ok else []
+        db = get_db()
+        try:
+            existing = {row['appid'] for row in db.execute("SELECT appid FROM games").fetchall()}
+        finally:
+            db.close()
+        return jsonify([{'appid': it['id'], 'name': it['name'], 'in_library': it['id'] in existing}
+                        for it in items if it.get('type') == 'app' and it.get('id')][:12])
+    except Exception as e:
+        return api_error('Could not search Steam. Check your connection and try again.', 502, exc=e)
+
+
+def _enrich_added_game(appid):
+    """Fill in a freshly added game with the same jobs a bulk rescrape/art fetch
+    runs (store data, reviews, tags, art, ProtonDB, HLTB), one game at a time."""
+    from scrapers import (bulk_rescrape_games, bulk_art_scrape_games,
+                          bulk_protondb_scrape_games, bulk_hltb_scrape_games)
+    try:
+        bulk_rescrape_games([appid], None, None)
+        bulk_art_scrape_games([appid], ['vertical', 'horizontal', 'icon'], 'auto', None, None)
+        if appid > 0:
+            bulk_protondb_scrape_games([appid], None, None)
+        bulk_hltb_scrape_games([appid], None, None)
+        status = 'done'
+    except Exception:
+        log.exception(f"add game: enrichment failed for {appid}")
+        status = 'error'
+    with _add_jobs_lock:
+        _add_jobs[appid] = status
+
+
+@library_bp.route('/api/games/add', methods=['POST'])
+def add_game():
+    """Add a game by hand. mode 'steam': a Steam appid (from the search), added as
+    a normal Steam game. mode 'custom': a name only, added under the Custom
+    platform with a negative appid. Either way the details are then fetched in
+    the background (poll /api/games/add-status/<appid>)."""
+    from datetime import datetime, timezone
+    from database import batch_insert_placeholder_games, next_negative_appid
+    data = request.json or {}
+    mode = data.get('mode')
+    name = (data.get('name') or '').strip()[:200]
+    today_ts = int(datetime.now(timezone.utc).timestamp())
+    try:
+        if mode == 'steam':
+            try:
+                appid = int(data.get('appid'))
+            except (TypeError, ValueError):
+                return jsonify({'status': 'error', 'message': 'Choose a game from the search results.'}), 400
+            if appid <= 0:
+                return jsonify({'status': 'error', 'message': 'Invalid Steam AppID.'}), 400
+            db = get_db()
+            try:
+                row = db.execute("SELECT name FROM games WHERE appid = ?", (appid,)).fetchone()
+            finally:
+                db.close()
+            if row:
+                return jsonify({'status': 'exists', 'message': f"{row['name'] or appid} is already in your library."}), 409
+            # Asked for by hand, so an earlier removal shouldn't block it.
+            remove_from_blacklist(appid)
+            from utils import get_locally_installed_appids
+            batch_insert_placeholder_games([{
+                'appid': appid, 'name': name or f'AppID {appid}', 'playtime_forever': 0,
+                'last_played': None, 'completion_status': 'Never Played',
+                'installed': 1 if appid in get_locally_installed_appids() else 0,
+                'icon_hash': '',
+            }], today_ts)
+        elif mode == 'custom':
+            if not name:
+                return jsonify({'status': 'error', 'message': 'Enter a name for the game.'}), 400
+            db = get_db()
+            try:
+                dupe = db.execute(
+                    "SELECT 1 FROM games WHERE platform = 'custom' AND name = ? COLLATE NOCASE", (name,)
+                ).fetchone()
+                if dupe:
+                    return jsonify({'status': 'exists', 'message': f'"{name}" is already in your library as a custom game.'}), 409
+                appid = next_negative_appid(db)
+                db.execute(
+                    """INSERT INTO games
+                       (appid, name, platform, date_added, completion_status, installed,
+                        art_fetched, meta_fetched, cheevos_fetched, protondb_fetched, hltb_fetched)
+                       VALUES (?, ?, 'custom', ?, 'Never Played', 0, '0', '0', '0', '0', '0')""",
+                    (appid, name, today_ts),
+                )
+                db.commit()
+            finally:
+                db.close()
+        else:
+            return jsonify({'status': 'error', 'message': 'Unknown add mode.'}), 400
+    except Exception as e:
+        return api_error('Something went wrong on the server. Check playdate.log for details.', 500, exc=e)
+
+    with _add_jobs_lock:
+        _add_jobs[appid] = 'running'
+    threading.Thread(target=_enrich_added_game, args=(appid,), daemon=True).start()
+    return jsonify({'status': 'success', 'appid': appid})
+
+
+@library_bp.route('/api/games/add-status/<appid>')
+def add_game_status(appid):
+    try:
+        key = int(appid)
+    except ValueError:
+        return jsonify({'status': 'error'}), 400
+    with _add_jobs_lock:
+        return jsonify({'status': _add_jobs.get(key, 'done')})
+
+
 @library_bp.route('/api/game-description/<int:appid>')
 def game_description(appid):
     import plugins as _plugins

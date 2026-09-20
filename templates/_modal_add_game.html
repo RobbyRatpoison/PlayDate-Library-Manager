@@ -1,0 +1,137 @@
+<!-- Add Game (by hand): search Steam, or add a custom entry. Library page only. -->
+<div id="add-game-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeAddGameModal();">
+    <div class="modal-content" style="width:min(520px,95vw); max-height:90vh; display:flex; flex-direction:column; overflow:hidden;">
+        <div style="flex-shrink:0; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h2 style="margin:0; color:var(--text-primary);">Add Game</h2>
+            <button onclick="closeAddGameModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+        </div>
+        <div style="overflow-y:auto; flex:1; min-height:0;">
+            <div class="hub-section-label">Find it on Steam</div>
+            <p style="font-size:0.78rem; color:var(--text-secondary); margin:4px 0 8px;">Adds the game to your library even if you don't own or have installed it. Its details and artwork are fetched from Steam.</p>
+            <input type="text" id="ag-search" data-modal-row="0" placeholder="Search Steam by name..." autocomplete="off"
+                   oninput="agSearchInput(this.value)" style="width:100%; box-sizing:border-box;">
+            <div id="ag-results" style="margin-top:8px;"></div>
+
+            <div class="hub-section-label" style="margin-top:16px;">Not on Steam?</div>
+            <p style="font-size:0.78rem; color:var(--text-secondary); margin:4px 0 8px;">Adds a custom entry. PlayDate looks for artwork and details by name.</p>
+            <div style="display:flex; gap:8px;">
+                <input type="text" id="ag-custom-name" data-modal-row="90" placeholder="Game name" autocomplete="off"
+                       onkeydown="if(event.key==='Enter')agAddCustom()" style="flex:1; min-width:0;">
+                <button class="nav-btn" data-modal-row="90" onclick="agAddCustom()" style="font-size:0.8rem; height:auto;">Add</button>
+            </div>
+            <div id="ag-status" class="tool-status" style="margin-top:12px;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    let searchTimer = null, pollTimer = null, searchSeq = 0, added = false;
+    const $ = id => document.getElementById(id);
+
+    function setStatus(text, cls) {
+        const el = $('ag-status');
+        el.textContent = text || '';
+        el.className = 'tool-status' + (cls ? ' ' + cls : '');
+    }
+
+    window.openAddGameModal = function() {
+        $('add-game-modal').style.display = 'flex';
+        $('ag-search').value = '';
+        $('ag-custom-name').value = '';
+        $('ag-results').innerHTML = '';
+        setStatus('');
+        setTimeout(() => $('ag-search').focus(), 50);
+    };
+
+    window.closeAddGameModal = function() {
+        clearTimeout(searchTimer);
+        clearInterval(pollTimer);
+        $('add-game-modal').style.display = 'none';
+        // Closed mid-fetch: the game is already added, so reload to show it.
+        if (added) window.location.reload();
+    };
+
+    window.agSearchInput = function(value) {
+        clearTimeout(searchTimer);
+        const q = value.trim();
+        if (q.length < 2) { $('ag-results').innerHTML = ''; return; }
+        searchTimer = setTimeout(() => agSearch(q), 350);
+    };
+
+    async function agSearch(q) {
+        const seq = ++searchSeq;
+        $('ag-results').innerHTML = '<div style="font-size:0.8rem; color:var(--text-secondary);">Searching...</div>';
+        try {
+            const res = await fetch('/api/steam-search?q=' + encodeURIComponent(q));
+            const items = await res.json();
+            if (seq !== searchSeq) return;   // a newer search superseded this one
+            if (!res.ok) throw new Error(items.message || 'Search failed.');
+            renderResults(items);
+        } catch (e) {
+            if (seq !== searchSeq) return;
+            $('ag-results').innerHTML = '';
+            setStatus(e.message || 'Search failed.', 'error');
+        }
+    }
+
+    function renderResults(items) {
+        if (!items.length) {
+            $('ag-results').innerHTML = '<div style="font-size:0.8rem; color:var(--text-secondary);">No results.</div>';
+            return;
+        }
+        $('ag-results').innerHTML = items.map((it, i) => {
+            const label = it.in_library ? 'In library' : 'Add';
+            const action = it.in_library ? '' : `onclick="agAddSteam(${escHtml(JSON.stringify(it.appid))}, ${escHtml(JSON.stringify(it.name))})"`;
+            return `<div style="display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--border);">` +
+                `<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.85rem;">${escHtml(it.name)}</span>` +
+                `<span style="font-size:0.7rem; color:var(--text-secondary);">${it.appid}</span>` +
+                `<button class="nav-btn" data-modal-row="${i + 1}" ${action} style="font-size:0.75rem; height:auto; padding:0.25rem 0.7rem;${it.in_library ? ' opacity:0.5;' : ''}">${label}</button></div>`;
+        }).join('');
+    }
+
+    window.agAddSteam = function(appid, name) { submit({ mode: 'steam', appid, name }); };
+
+    window.agAddCustom = function() {
+        const name = $('ag-custom-name').value.trim();
+        if (!name) { setStatus('Enter a name for the game.', 'error'); return; }
+        submit({ mode: 'custom', name });
+    };
+
+    let busy = false;   // a double click / Enter must not add the game twice
+
+    async function submit(body) {
+        if (busy) return;
+        busy = true;
+        setStatus('Adding...', 'info');
+        try {
+            const res = await fetch('/api/games/add', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+            });
+            const d = await res.json();
+            if (d.status !== 'success') { setStatus(d.message || 'Could not add the game.', 'error'); busy = false; return; }
+            added = true;
+            setStatus('Added. Fetching details and artwork...', 'info');
+            waitForDetails(d.appid);   // page reloads when done, so busy stays set
+        } catch (e) {
+            setStatus('Could not add the game: ' + e.message, 'error');
+            busy = false;
+        }
+    }
+
+    // The game exists immediately; its details arrive in the background. Reload once they're in.
+    function waitForDetails(appid) {
+        clearInterval(pollTimer);
+        let tries = 0;
+        pollTimer = setInterval(async () => {
+            tries++;
+            try {
+                const d = await (await fetch('/api/games/add-status/' + appid)).json();
+                if (d.status === 'running' && tries < 90) return;
+            } catch (_) { if (tries < 90) return; }
+            clearInterval(pollTimer);
+            window.location.reload();
+        }, 1000);
+    }
+})();
+</script>

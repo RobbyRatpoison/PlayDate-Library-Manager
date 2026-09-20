@@ -98,6 +98,7 @@ People who've helped make PlayDate better - bug reports, feature suggestions, te
 
 **Mayanaise**
 - Game lists sorting capitalised names (e.g. "BROK") ahead of all lowercase ones (e.g. "Backpack Hero"), instead of alphabetically
+- Installed free-to-play games missing from the library (Steam doesn't list them as owned) - led to the Add Game button
 
 **Meneldur**
 - Startup crash from a missing plugins folder after downgrade/upgrade

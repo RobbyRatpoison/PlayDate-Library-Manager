@@ -781,7 +781,7 @@
         'whats-new-modal',     // base.html post-update changelog popup
         'editModal', 'filterModal', 'viewModal',
         // Library bulk modals
-        'bulk-edit-modal', 'bulk-rescrape-modal', 'bulk-delete-modal',
+        'bulk-edit-modal', 'bulk-rescrape-modal', 'bulk-delete-modal', 'add-game-modal',
         // Tools page expanding modals
         'blacklist-modal',
         // Sub-modals of hamburger items (before their parents)
@@ -2340,6 +2340,7 @@
             ['bulk-edit-modal',       'closeBulkEditModal'],
             ['bulk-rescrape-modal',   'closeBulkRescrapeModal'],
             ['bulk-delete-modal',     'closeBulkDeleteModal'],
+            ['add-game-modal',        'closeAddGameModal'],
             // sub-modals (before their parents)
             ['cardOutlinesModal',     'closeCardOutlinesModal'],
             ['cardBadgesModal',       'closeCardBadgesModal'],
@@ -3192,6 +3193,7 @@
         _watchModal('bulk-edit-modal');
         _watchModal('bulk-rescrape-modal');
         _watchModal('bulk-delete-modal');
+        _watchModal('add-game-modal');
 
         // Top-level hamburger modals
         _watchModal('settings-modal');

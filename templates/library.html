@@ -717,6 +717,7 @@
         {% if _is_filtered %}<button onclick="clearAndReload()" class="clear-btn">✕ CLEAR</button>{% endif %}
         <button onclick="openFilterModal()">FILTERS</button>
         <button onclick="openBulkEditModal()">BULK OPS</button>
+        <button onclick="openAddGameModal()" data-tooltip="Add a game by hand">+ ADD</button>
         <button onclick="pickRandomGame()" data-tooltip="Pick a random game">🎲</button>
         <button id="select-badge" style="display:none;" onclick="_exitSelectMode()" data-tooltip="Cancel selection">
             <span id="select-badge-count">0</span> selected ✕
@@ -991,6 +992,7 @@
         </div>
     </div>
 </div>
+{% include '_modal_add_game.html' %}
 <!-- Bulk Edit Modal (tabbed: Edit / Re-scrape / Date Importer) -->
 <div id="bulk-edit-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeBulkEditModal();">
     <div class="modal-content" style="width:720px;">
