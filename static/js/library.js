@@ -1739,7 +1739,12 @@ async function stopBulkDateImport() {
             else slot.remove();
             reposition();
         };
-        const clip = t => (t && t.length > 280) ? t.slice(0, 277).trimEnd() + '...' : t;
+        // Steam blurbs top out near 300 chars; the cap only trims long plugin descriptions.
+        const clip = t => {
+            if (!t || t.length <= 400) return t;
+            const cut = t.slice(0, 397);
+            return cut.slice(0, cut.lastIndexOf(' ') > 300 ? cut.lastIndexOf(' ') : 397).trimEnd() + '...';
+        };
         // Stored server-side (GAMES.short_description): show it with no request.
         const stored = _GAME_MAP.get(appid)?.short_description;
         if (stored) { apply(clip(stored)); return; }
