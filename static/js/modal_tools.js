@@ -111,6 +111,7 @@ function openPlayniteModal() {
     document.getElementById('playnite-modal').style.display = 'flex';
     document.getElementById('playnite-status').textContent = '';
     document.getElementById('playnite-status').className = 'tool-status';
+    document.getElementById('playnite-options').style.display = 'none';
 }
 function closePlayniteModal() {
     document.getElementById('playnite-modal').style.display = 'none';
@@ -155,15 +156,49 @@ async function runPlayniteImport() {
             if (data.status !== 'running') break;
         }
 
-        if (data.status === 'success') {
-            status.textContent = `Done — updated ${data.updated} game${data.updated !== 1 ? 's' : ''} (${data.found} Steam games found in backup).`;
+        if (data.status === 'ready') {
+            status.textContent = 'Backup scanned.';
             status.className = 'tool-status success';
+            for (const f of ['date_added', 'last_played', 'playtime']) {
+                const n = data.found[f] || 0;
+                document.getElementById(`pn-c-${f}`).textContent = `(${n} game${n !== 1 ? 's' : ''})`;
+                const cb = document.getElementById(`pn-f-${f}`);
+                cb.disabled = n === 0;
+                if (n === 0) cb.checked = false;
+            }
+            document.getElementById('playnite-options').style.display = 'block';
         } else {
             status.textContent = `Error: ${data.error}`;
             status.className = 'tool-status error';
         }
     } catch (e) {
         status.textContent = `Error: ${e.name}: ${e.message}`;
+        status.className = 'tool-status error';
+    }
+}
+
+async function applyPlayniteImport() {
+    const status = document.getElementById('playnite-status');
+    const fields = ['date_added', 'last_played', 'playtime'].filter(f => document.getElementById(`pn-f-${f}`).checked);
+    if (!fields.length) {
+        status.textContent = 'Choose at least one field to import.';
+        status.className = 'tool-status error';
+        return;
+    }
+    const mode = document.getElementById('pn-overwrite').checked ? 'overwrite' : 'fill';
+    try {
+        const res = await fetch('/api/import/playnite-apply', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ fields, mode }),
+        });
+        const d = await res.json();
+        if (d.status !== 'success') throw new Error(d.message || 'Import failed.');
+        const names = { date_added: 'date added', last_played: 'last played', playtime: 'time played' };
+        status.textContent = 'Done — updated ' + fields.map(f => `${d.updated[f]} ${names[f]}`).join(', ') + '.';
+        status.className = 'tool-status success';
+    } catch (e) {
+        status.textContent = `Error: ${e.message}`;
         status.className = 'tool-status error';
     }
 }

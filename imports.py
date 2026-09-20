@@ -21,7 +21,11 @@ TEMP_DB_PATH = os.path.join(BASE_DIR, "temp_import.db")
 
 # ── Playnite date import ──────────────────────────────────────────────────────
 _playnite_import_lock  = threading.Lock()
-_playnite_import_state = {'status': 'idle', 'error': None, 'updated': None, 'found': None}  # idle|running|success|error
+# idle|running|ready|error. 'ready' = backup scanned, `found` holds per-field counts and
+# `_playnite_parsed` the data, waiting for /api/import/playnite-apply to write the
+# fields the user picks (so a multi-GB backup is only parsed once).
+_playnite_import_state = {'status': 'idle', 'error': None, 'found': None}
+_playnite_parsed = {}
 
 # ── Step 1: Upload DB and return its tables + columns ──
 def _inspect_temp_db():
@@ -281,14 +285,11 @@ def execute_import(data):
         return jsonify({"status": "error", "message": "Import failed. Check playdate.log for details."})
 
 
-def parse_playnite_dates(zip_path):
-    """
-    Extracts 'date added' values for Steam games from a Playnite backup ZIP.
-    Playnite stores its library in a LiteDB binary file (library/games.db inside the ZIP).
-    Uses proximity matching between GameId and Added BSON fields (±8KB window) to pair them.
-    Returns {appid_int: 'YYYY-MM-DD'} dict.
-    """
-    # Extract the LiteDB games.db from the ZIP to a temp file
+_PLAYNITE_WINDOW = 8192
+
+
+def _read_playnite_games_db(zip_path):
+    """Bytes of library/games.db (Playnite's LiteDB file) from a backup ZIP, or None."""
     with zipfile.ZipFile(zip_path, 'r') as zf:
         names = zf.namelist()
         games_db_entry = next(
@@ -296,19 +297,21 @@ def parse_playnite_dates(zip_path):
             None
         )
         if not games_db_entry:
-            return {}
+            return None
         with tempfile.NamedTemporaryFile(delete=False, suffix='.litedb') as tmp:
             tmp_path = tmp.name
             tmp.write(zf.read(games_db_entry))
 
     try:
         with open(tmp_path, 'rb') as f:
-            data = f.read()
+            return f.read()
     finally:
         os.unlink(tmp_path)
 
-    # Extract all GameId string field positions and values.
-    # BSON string: type=0x02, key="GameId\x00", then int32 length + bytes + null.
+
+def _playnite_gameids(data):
+    """[(byte_position, steam_appid_int)] for every numeric GameId field.
+    BSON string: type=0x02, key="GameId\\x00", then int32 length + bytes + null."""
     gameids = []
     for m in re.finditer(b'\x02GameId\x00', data):
         pos = m.end()
@@ -320,6 +323,86 @@ def parse_playnite_dates(zip_path):
         val = data[pos + 4:pos + 4 + slen - 1].decode('utf-8', errors='replace')
         if val.isdigit():
             gameids.append((m.start(), int(val)))
+    return gameids
+
+
+def parse_playnite_fields(zip_path):
+    """
+    Extracts Last Played and Time Played (plus Date Added) for Steam games from a
+    Playnite backup ZIP. Returns
+    {appid: {'date_added': 'YYYY-MM-DD', 'last_played': unix_seconds, 'playtime': minutes}}
+    with only the keys a game actually has.
+
+    Unlike Added (present on every game), LastActivity/Playtime can be absent from
+    a document, so pairing each GameId to its nearest field could hand a game its
+    neighbour's value. Fields are therefore paired the other way round: each field
+    occurrence goes to its *nearest GameId* (within the window), and a game keeps
+    the closest occurrence assigned to it -- a game without the field gets nothing.
+
+    NOTE: LastActivity (datetime, 0x09) and Playtime (int64 seconds, 0x12, int32
+    0x10 also accepted) are inferred from Playnite's data model, not yet checked
+    against a real backup (see tests/test_parse_playnite_dates.py).
+    """
+    data = _read_playnite_games_db(zip_path)
+    if not data:
+        return {}
+    gameids = _playnite_gameids(data)
+    if not gameids:
+        return {}
+    gameids.sort()
+    gpositions = [g[0] for g in gameids]
+
+    def _collect(pattern, fmt, size, convert):
+        out = {}   # appid -> (distance, value)
+        for m in re.finditer(pattern, data):
+            pos = m.end()
+            if pos + size > len(data):
+                continue
+            value = convert(struct.unpack_from(fmt, data, pos)[0])
+            if value is None:
+                continue
+            idx = bisect.bisect_left(gpositions, m.start())
+            best = None
+            for i in (idx - 1, idx):
+                if 0 <= i < len(gpositions):
+                    dist = abs(gpositions[i] - m.start())
+                    if dist <= _PLAYNITE_WINDOW and (best is None or dist < best[0]):
+                        best = (dist, gameids[i][1])
+            if best and (best[1] not in out or best[0] < out[best[1]][0]):
+                out[best[1]] = (best[0], value)
+        return {appid: v for appid, (_d, v) in out.items()}
+
+    def _ms_to_seconds(ms):
+        return ms // 1000 if 0 < ms < 4102444800000 else None
+
+    def _seconds_to_minutes(sec):
+        return sec // 60 if sec > 0 else None
+
+    results = {}
+    for field, pattern, fmt, size, convert in (
+        ('date_added',  b'\x09Added\x00',        '<q', 8, _ms_to_seconds),
+        ('last_played', b'\x09LastActivity\x00', '<q', 8, _ms_to_seconds),
+        ('playtime',    b'\x12Playtime\x00',     '<q', 8, _seconds_to_minutes),
+        ('playtime',    b'\x10Playtime\x00',     '<i', 4, _seconds_to_minutes),
+    ):
+        for appid, value in _collect(pattern, fmt, size, convert).items():
+            if field == 'date_added':
+                value = datetime.fromtimestamp(value, tz=timezone.utc).strftime('%Y-%m-%d')
+            results.setdefault(appid, {}).setdefault(field, value)
+    return results
+
+
+def parse_playnite_dates(zip_path):
+    """
+    Extracts 'date added' values for Steam games from a Playnite backup ZIP.
+    Playnite stores its library in a LiteDB binary file (library/games.db inside the ZIP).
+    Uses proximity matching between GameId and Added BSON fields (±8KB window) to pair them.
+    Returns {appid_int: 'YYYY-MM-DD'} dict.
+    """
+    data = _read_playnite_games_db(zip_path)
+    if not data:
+        return {}
+    gameids = _playnite_gameids(data)
 
     # Extract all Added datetime field positions and values.
     # BSON datetime: type=0x09, key="Added\x00", then int64 ms since Unix epoch.
@@ -388,38 +471,82 @@ def import_playnite_dates():
         log.warning(f"Playnite import: file not found at {zip_path!r}")
         return jsonify({"status": "error", "message": "File not found."}), 400
 
-    def _run_playnite_import():
-        from database import date_to_ts
+    def _run_playnite_scan():
         try:
-            date_map = parse_playnite_dates(zip_path)
-            log.info(f"Playnite import: parsed {len(date_map)} appid→date pairs")
+            parsed = parse_playnite_fields(zip_path)
+            log.info(f"Playnite import: parsed {len(parsed)} Steam games")
         except Exception:
             log.exception("Playnite import: parse failed")
             _playnite_import_state.update({'status': 'error', 'error': 'Failed to parse that backup. Check playdate.log for details.'})
             return
-        if not date_map:
-            log.warning("Playnite import: no Steam games with dates found")
-            _playnite_import_state.update({'status': 'error', 'error': 'No Steam games with dates found in the backup.'})
+        if not parsed:
+            log.warning("Playnite import: no Steam games found")
+            _playnite_import_state.update({'status': 'error', 'error': 'No Steam games found in the backup.'})
             return
+        # Only count games already in the library: that's all an import can touch.
         db = get_db()
-        updated = 0
-        for appid, date_str in date_map.items():
-            cursor = db.execute(
-                "UPDATE games SET date_added = ? WHERE appid = ?",
-                (date_to_ts(date_str), appid)
-            )
-            updated += cursor.rowcount
-        db.commit()
-        db.close()
-        log.info(f"Playnite import: updated {updated} games")
-        _playnite_import_state.update({'status': 'success', 'error': None, 'updated': updated, 'found': len(date_map)})
+        try:
+            owned = {r['appid'] for r in db.execute("SELECT appid FROM games").fetchall()}
+        finally:
+            db.close()
+        matched = {a: v for a, v in parsed.items() if a in owned}
+        found = {f: sum(1 for v in matched.values() if f in v) for f in _PLAYNITE_FIELDS}
+        _playnite_parsed.clear()
+        _playnite_parsed.update(matched)
+        _playnite_import_state.update({'status': 'ready', 'error': None, 'found': found})
 
     with _playnite_import_lock:
         if _playnite_import_state['status'] == 'running':
             return jsonify({"status": "error", "message": "An import is already in progress."}), 409
-        _playnite_import_state.update({'status': 'running', 'error': None, 'updated': None, 'found': None})
-        threading.Thread(target=_run_playnite_import, daemon=True).start()
+        _playnite_import_state.update({'status': 'running', 'error': None, 'found': None})
+        threading.Thread(target=_run_playnite_scan, daemon=True).start()
     return jsonify({"status": "started"})
+
+
+_PLAYNITE_FIELDS = ('date_added', 'last_played', 'playtime')
+_PLAYNITE_COLUMNS = {'date_added': 'date_added', 'last_played': 'last_played', 'playtime': 'playtime_forever'}
+
+
+@imports_bp.route('/api/import/playnite-apply', methods=['POST'])
+def playnite_apply():
+    """Writes the chosen fields from the last scanned backup.
+    mode 'fill': only where PlayDate has no value (Date Added: keep the earlier of the two).
+    mode 'overwrite': replace PlayDate's value."""
+    data = request.json or {}
+    fields = [f for f in data.get('fields', []) if f in _PLAYNITE_FIELDS]
+    mode = data.get('mode') if data.get('mode') in ('fill', 'overwrite') else 'fill'
+    if not fields:
+        return jsonify({"status": "error", "message": "Choose at least one field to import."}), 400
+    with _playnite_import_lock:
+        if _playnite_import_state['status'] != 'ready' or not _playnite_parsed:
+            return jsonify({"status": "error", "message": "Scan a Playnite backup first."}), 409
+        parsed = dict(_playnite_parsed)
+
+    db = get_db()
+    updated = {f: 0 for f in fields}
+    try:
+        for appid, vals in parsed.items():
+            for f in fields:
+                if f not in vals:
+                    continue
+                col = _PLAYNITE_COLUMNS[f]
+                new = date_to_ts(vals[f]) if f == 'date_added' else vals[f]
+                if new is None:
+                    continue
+                if mode == 'overwrite':
+                    cond, params = "", ()
+                elif f == 'date_added':
+                    cond, params = " AND (date_added IS NULL OR date_added = 0 OR date_added > ?)", (new,)
+                else:
+                    cond, params = f" AND ({col} IS NULL OR {col} = 0)", ()
+                # col comes from the fixed _PLAYNITE_COLUMNS map, never from the request.
+                cur = db.execute(f"UPDATE games SET {col} = ? WHERE appid = ?{cond}", (new, appid) + params)
+                updated[f] += cur.rowcount
+        db.commit()
+    finally:
+        db.close()
+    log.info(f"Playnite import: applied {fields} (mode={mode}): {updated}")
+    return jsonify({"status": "success", "updated": updated})
 
 @imports_bp.route('/api/import/playnite-dates-status')
 def playnite_import_status():

@@ -890,7 +890,7 @@
             <button class="settings-item" data-modal-row="0" onclick="openFilterIoModal()">Filter Import / Export</button>
             <button class="settings-item" data-modal-row="1" onclick="openBackupModal()">Backup &amp; Restore</button>
             <button class="settings-item" data-modal-row="2" onclick="openImportModal()">Import from Database</button>
-            <button class="settings-item" data-modal-row="3" onclick="openPlayniteModal()">Import Date Added from Playnite</button>
+            <button class="settings-item" data-modal-row="3" onclick="openPlayniteModal()">Import from Playnite</button>
             <button class="settings-item" data-modal-row="4" onclick="runCsvExport()">Export Library to CSV</button>
             <button class="settings-item" data-modal-row="5" onclick="toggleCsvColPicker()" id="csv-col-toggle" style="font-size:0.82em;color:var(--accent);background:none;border:none;padding:2px 0 2px 2px;text-align:left;cursor:pointer;">CSV Columns</button>
             <div id="csv-col-picker" style="display:none;margin:4px 0 4px 2px;font-size:0.82em;color:var(--text-primary);">
@@ -1538,9 +1538,30 @@ window._TUNE_INIT = {{ {
         </div>
         <!-- Scrollable body -->
         <div style="overflow-y:auto; flex:1; min-height:0; padding:8px 1.875rem 1.875rem; margin-top:-8px;">
-        <p style="color:var(--text-secondary); font-size:0.88rem; margin:0 0 16px;">Import <strong>date added</strong> values from a Playnite backup ZIP. Games are matched by Steam AppID — only games already in your PlayDate library will be updated.</p>
+        <p style="color:var(--text-secondary); font-size:0.88rem; margin:0 0 16px;">Import <strong>date added</strong>, <strong>last played</strong> and <strong>time played</strong> from a Playnite backup ZIP. Games are matched by Steam AppID — only games already in your PlayDate library will be updated. Choose a backup to see what it contains.</p>
         <button class="nav-btn" data-modal-row="0" onclick="runPlayniteImport()">Choose Playnite Backup (.zip)</button>
         <div id="playnite-status" class="tool-status" style="margin-top:12px;"></div>
+        <div id="playnite-options" style="display:none; margin-top:14px; border-top:1px solid var(--border); padding-top:12px;">
+            <div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:6px;">Found in this backup (matching games in your library) — choose what to import:</div>
+            <div data-modal-row="1" onclick="var cb=this.querySelector('input');cb.checked=!cb.checked;" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; padding:3px 0;">
+                <input type="checkbox" id="pn-f-date_added" checked onclick="event.stopPropagation()" style="width:auto; margin:0;">
+                <span>Date added <span id="pn-c-date_added" style="color:var(--text-secondary);"></span></span>
+            </div>
+            <div data-modal-row="2" onclick="var cb=this.querySelector('input');cb.checked=!cb.checked;" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; padding:3px 0;">
+                <input type="checkbox" id="pn-f-last_played" onclick="event.stopPropagation()" style="width:auto; margin:0;">
+                <span>Last played <span id="pn-c-last_played" style="color:var(--text-secondary);"></span></span>
+            </div>
+            <div data-modal-row="3" onclick="var cb=this.querySelector('input');cb.checked=!cb.checked;" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; padding:3px 0;">
+                <input type="checkbox" id="pn-f-playtime" onclick="event.stopPropagation()" style="width:auto; margin:0;">
+                <span>Time played <span id="pn-c-playtime" style="color:var(--text-secondary);"></span></span>
+            </div>
+            <div data-modal-row="4" onclick="var cb=this.querySelector('input');cb.checked=!cb.checked;" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; padding:8px 0 0;">
+                <input type="checkbox" id="pn-overwrite" onclick="event.stopPropagation()" style="width:auto; margin:0;">
+                <span>Replace values PlayDate already has</span>
+            </div>
+            <div style="font-size:0.75rem; color:#8f98a0; margin:3px 0 10px; padding-left:22px;">Off: only fills in blanks (for date added, keeps the earlier of the two dates). On: replaces PlayDate's value with Playnite's.</div>
+            <button class="nav-btn" data-modal-row="5" onclick="applyPlayniteImport()">Import Selected</button>
+        </div>
         </div>
     </div>
 </div>
