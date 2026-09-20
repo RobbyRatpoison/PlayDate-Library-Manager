@@ -616,6 +616,7 @@ def inject_config_status():
         hide_duplicates=state.get('hide_duplicates', True),
         require_double_click_launch=state.get('require_double_click_launch', False),
         hover_tooltip=state.get('hover_tooltip', DEFAULT_HOVER_TIP),
+        art_source_prefs=state.get('art_source_prefs', {}),
         ui_scale=state.get('ui_scale', 100),
         auto_promote_unfinished=state.get('auto_promote_unfinished', True),
         auto_complete_on_100pct=state.get('auto_complete_on_100pct', True),
@@ -1212,6 +1213,16 @@ def save_state(updates):
             _want = set(_ht.get("fields") or [])
             state["hover_tooltip"] = {"enabled": bool(_ht.get("enabled")),
                                       "fields": [f for f in HOVER_TIP_FIELDS if f in _want]}
+        if isinstance(updates.get("art_source_prefs"), dict):
+            _clean = {}
+            for _plat, _kinds in updates["art_source_prefs"].items():
+                if not (isinstance(_plat, str) and re.match(r'^[a-z][a-z0-9_]*$', _plat) and isinstance(_kinds, dict)):
+                    continue
+                _k = {kind: v for kind, v in _kinds.items()
+                      if kind in ('vertical', 'horizontal', 'icon') and v in ('steam', 'sgdb')}
+                if _k:
+                    _clean[_plat] = _k
+            state["art_source_prefs"] = _clean
         if "hltb_match_threshold" in updates:
             state["hltb_match_threshold"] = int(updates["hltb_match_threshold"])
         if "ui_scale" in updates:

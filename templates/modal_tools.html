@@ -740,6 +740,13 @@
             </div>
         </div>
         <div class="hub-section">
+            <div class="hub-section-label">Artwork Sources</div>
+            <div style="padding:8px 10px;">
+                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Choose where each library gets its cover art. "Default" uses the normal order (Steam, then SteamGridDB). A chosen source is tried first, with the default order as a fallback. Applies the next time art is fetched or re-scraped; SteamGridDB needs an API key.</div>
+                <div id="art-source-prefs"></div>
+            </div>
+        </div>
+        <div class="hub-section">
             <div class="hub-section-label">Completion Sync</div>
             <div style="padding:8px 10px;">
                 <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:0.85rem; color:var(--text-primary);">
@@ -1071,6 +1078,7 @@
      collapsed. Initial values come from the server-rendered state below. -->
 <script>
 window._HOVER_TIP = {{ hover_tooltip | tojson }};
+window._ART_PREFS = {{ art_source_prefs | tojson }};
 window._TUNE_INIT = {{ {
     'tag_similarity_min_library_rate': tag_similarity_min_library_rate,
     'tag_similarity_smoothing_k': tag_similarity_smoothing_k,

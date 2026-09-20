@@ -6424,3 +6424,48 @@ function saveHoverTip() {
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _renderHoverTipFields);
 else _renderHoverTipFields();
+
+// ── Per-platform artwork source preferences (Settings modal) ─────────────────
+const _ART_KINDS = [['vertical', 'Vertical'], ['horizontal', 'Horizontal'], ['icon', 'Icon']];
+const _ART_CHOICES = [['', 'Default'], ['steam', 'Steam'], ['sgdb', 'SteamGridDB']];
+
+function _renderArtSourcePrefs() {
+    const host = document.getElementById('art-source-prefs');
+    if (!host) return;
+    const prefs = window._ART_PREFS || {};
+    const labels = window._PLAT_LABELS || {};
+    // Steam plus the platforms of installed plugins; _PLAT_LABELS alone also
+    // carries every emulator platform, which would bury the list.
+    const plats = ['steam', ...Object.keys(window._PLUGIN_API || {})].filter((p, i, a) => labels[p] && a.indexOf(p) === i);
+    let rowNo = 60;
+    host.innerHTML = plats.map(plat => {
+        const selects = _ART_KINDS.map(([kind, kLabel]) => {
+            const cur = (prefs[plat] || {})[kind] || '';
+            const opts = _ART_CHOICES.map(([v, t]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${t}</option>`).join('');
+            return `<div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0;">` +
+                `<span style="font-size:0.75rem; color:var(--text-secondary); width:4.6rem;">${kLabel}</span>` +
+                `<select class="nav-dropdown art-src-sel" data-plat="${escHtml(plat)}" data-kind="${kind}" ` +
+                `data-modal-row="${rowNo++}" data-picker-title="${escHtml(labels[plat])}: ${kLabel} art" ` +
+                `style="flex:1; min-width:0;">${opts}</select></div>`;
+        }).join('');
+        return `<div style="margin-bottom:8px;"><div style="font-size:0.82rem; margin-bottom:3px;">${escHtml(labels[plat])}</div>` +
+            `<div style="display:flex; flex-wrap:wrap; gap:8px;">${selects}</div></div>`;
+    }).join('');
+    host.querySelectorAll('select.art-src-sel').forEach(sel => initCustomSelect(sel));
+    // The custom-select wrapper is a div that fires a bubbling 'change' but drops inline handlers.
+    if (!host._artChangeBound) { host.addEventListener('change', saveArtSourcePrefs); host._artChangeBound = true; }
+}
+
+function saveArtSourcePrefs() {
+    const prefs = {};
+    document.querySelectorAll('#art-source-prefs .art-src-sel').forEach(sel => {
+        if (!sel.value) return;
+        (prefs[sel.dataset.plat] = prefs[sel.dataset.plat] || {})[sel.dataset.kind] = sel.value;
+    });
+    window._ART_PREFS = prefs;
+    sendStateUpdate({ art_source_prefs: prefs }, false);
+}
+
+// window._PLAT_LABELS / _PLUGIN_API are defined after this script runs, so wait for load.
+if (document.readyState === 'complete') _renderArtSourcePrefs();
+else window.addEventListener('load', _renderArtSourcePrefs);

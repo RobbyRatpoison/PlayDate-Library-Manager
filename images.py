@@ -112,6 +112,65 @@ def _get_sgdb_key():
     return config.get('sgdb_key') if config else None
 
 
+def _preferred_art_source(kind, appid, source):
+    """The user's per-platform art source preference (state.json
+    `art_source_prefs`, {platform: {vertical|horizontal|icon: 'steam'|'sgdb'}}),
+    or None. Only applies when the caller asked for 'auto'; an explicit source
+    (the edit modal's own picker) always wins."""
+    if source != 'auto':
+        return None
+    try:
+        from config import load_state
+        prefs = load_state().get('art_source_prefs')
+        if not prefs:
+            return None
+        platform = 'steam'
+        if int(appid) < 0:
+            from database import get_db
+            db = get_db()
+            try:
+                row = db.execute("SELECT platform FROM games WHERE appid = ?", (int(appid),)).fetchone()
+            finally:
+                db.close()
+            platform = (row['platform'] if row else None) or 'steam'
+        pref = (prefs.get(platform) or {}).get(kind)
+        return pref if pref in ('steam', 'sgdb') else None
+    except Exception as e:
+        log.warning(f"_preferred_art_source: {e}")
+        return None
+
+
+def download_vertical(appid, assets=None, source='auto', sgdb_id=None, game_name=None):
+    """Vertical art, trying the platform's preferred source first (if one is
+    set) and then the normal auto chain, so a preference never leaves a gap."""
+    pref = _preferred_art_source('vertical', appid, source)
+    if pref:
+        r = _download_vertical(appid, assets, pref, sgdb_id, game_name)
+        if r != 'missing':
+            return r
+    return _download_vertical(appid, assets, source, sgdb_id, game_name)
+
+
+def download_horizontal(appid, assets=None, source='auto', sgdb_id=None, game_name=None):
+    """Horizontal art; same preferred-source-then-auto behavior as download_vertical."""
+    pref = _preferred_art_source('horizontal', appid, source)
+    if pref:
+        r = _download_horizontal(appid, assets, pref, sgdb_id, game_name)
+        if r != 'missing':
+            return r
+    return _download_horizontal(appid, assets, source, sgdb_id, game_name)
+
+
+def download_icon(appid, icon_hash, source='auto', sgdb_id=None, game_name=None):
+    """Icon; same preferred-source-then-auto behavior as download_vertical."""
+    pref = _preferred_art_source('icon', appid, source)
+    if pref:
+        r = _download_icon(appid, icon_hash, pref, sgdb_id, game_name)
+        if r != 'missing':
+            return r
+    return _download_icon(appid, icon_hash, source, sgdb_id, game_name)
+
+
 def _get_steam_assets(appid):
     """
     Fetches the full asset manifest for a game via IStoreBrowseService.
@@ -195,7 +254,7 @@ def _steam_search_appid(name):
     return None
 
 
-def download_vertical(appid, assets=None, source='auto', sgdb_id=None, game_name=None):
+def _download_vertical(appid, assets=None, source='auto', sgdb_id=None, game_name=None):
     """
     Downloads vertical capsule art for a game.
     source: 'auto' (Steam → SGDB fallback), 'steam' (Steam only), 'sgdb' (SGDB only)
@@ -282,7 +341,7 @@ def download_vertical(appid, assets=None, source='auto', sgdb_id=None, game_name
     return 'missing'
 
 
-def download_horizontal(appid, assets=None, source='auto', sgdb_id=None, game_name=None):
+def _download_horizontal(appid, assets=None, source='auto', sgdb_id=None, game_name=None):
     """
     Downloads horizontal header art for a game.
     source: 'auto' (Steam → SGDB fallback), 'steam' (Steam only), 'sgdb' (SGDB only)
@@ -362,7 +421,7 @@ def download_horizontal(appid, assets=None, source='auto', sgdb_id=None, game_na
     return 'missing'
 
 
-def download_icon(appid, icon_hash, source='auto', sgdb_id=None, game_name=None):
+def _download_icon(appid, icon_hash, source='auto', sgdb_id=None, game_name=None):
     """
     Downloads the game icon.
     source: 'auto' (SGDB first, then Steam fallback), 'steam' (Steam only), 'sgdb' (SGDB only)

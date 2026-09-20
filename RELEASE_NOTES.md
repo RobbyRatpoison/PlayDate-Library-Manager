@@ -5,6 +5,7 @@
 
 - Added an optional, customizable info tooltip when hovering a game cover in the Library. (suggested by Colosso)
 - Added Metacritic scores from Steam, available to sort and filter by. (suggested by Colosso)
+- Added per-library artwork source settings, choosing Steam or SteamGridDB for each art type. (suggested by Colosso)
 
 ### Fixes
 
