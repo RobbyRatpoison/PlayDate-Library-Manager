@@ -1174,6 +1174,7 @@ def fetch_store_data(appid, session=None):
             'genres':       ",".join(g['description'] for g in data.get('genres', [])),
             'categories':   ",".join(c['description'] for c in data.get('categories', [])),
             'is_free':      1 if data.get('is_free') else 0,
+            'metacritic_score': (data.get('metacritic') or {}).get('score'),
         }
 
         return extracted

@@ -615,6 +615,7 @@ def inject_config_status():
         hltb_match_threshold=state.get('hltb_match_threshold', 99),
         hide_duplicates=state.get('hide_duplicates', True),
         require_double_click_launch=state.get('require_double_click_launch', False),
+        hover_tooltip=state.get('hover_tooltip', DEFAULT_HOVER_TIP),
         ui_scale=state.get('ui_scale', 100),
         auto_promote_unfinished=state.get('auto_promote_unfinished', True),
         auto_complete_on_100pct=state.get('auto_complete_on_100pct', True),
@@ -1186,6 +1187,12 @@ def load_state():
     with _state_lock:
         return _load_state_unlocked()
 
+# Fields the optional library-card hover tooltip can show (order = display order).
+HOVER_TIP_FIELDS = ('cover_alt', 'description', 'playtime', 'last_played', 'date_added',
+                    'release_date', 'platform', 'community_score', 'metacritic',
+                    'developers', 'publishers')
+DEFAULT_HOVER_TIP = {'enabled': False, 'fields': list(HOVER_TIP_FIELDS)}
+
 def save_state(updates):
     with _state_lock:
         state = _load_state_unlocked()
@@ -1200,6 +1207,11 @@ def save_state(updates):
                 if key == 'filter_tree' and isinstance(val, dict) and 'saved_filter' not in val:
                     val = _compact_tree_pv(_compact_appid_list_refs(val))
                 state[key] = val
+        if isinstance(updates.get("hover_tooltip"), dict):
+            _ht = updates["hover_tooltip"]
+            _want = set(_ht.get("fields") or [])
+            state["hover_tooltip"] = {"enabled": bool(_ht.get("enabled")),
+                                      "fields": [f for f in HOVER_TIP_FIELDS if f in _want]}
         if "hltb_match_threshold" in updates:
             state["hltb_match_threshold"] = int(updates["hltb_match_threshold"])
         if "ui_scale" in updates:

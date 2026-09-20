@@ -88,7 +88,7 @@
                             style="width:100%;box-sizing:border-box;background:#0e1923;border:1px solid #2a3f55;color:#c2c8cc;font-family:monospace;font-size:0.82rem;padding:0.5rem 0.625rem;border-radius:0.3125rem;resize:vertical;min-height:4.375rem;outline:none;"
                             oninput="onCustomSqlInput()" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='#2a3f55'"></textarea>
                         <div id="fm-custom-sql-hint" style="font-size:0.75rem;color:#666;margin-top:4px;">
-                            Use standard SQLite syntax. Column names: appid, name, completion_status, tags, groups, genres, categories, is_free, installed, release_date, date_added, last_played, playtime_forever, review_percentage, weighted_percentage, review_score, total_reviews, positive_reviews, unlocked_achievements, total_achievements, developers, publishers, protondb_tier, protondb_confidence, hltb_main, hltb_extras, hltb_completionist.
+                            Use standard SQLite syntax. Column names: appid, name, completion_status, tags, groups, genres, categories, is_free, installed, release_date, date_added, last_played, playtime_forever, review_percentage, weighted_percentage, metacritic_score, review_score, total_reviews, positive_reviews, unlocked_achievements, total_achievements, developers, publishers, protondb_tier, protondb_confidence, hltb_main, hltb_extras, hltb_completionist.
                         </div>
                         <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
                             <button type="button" onclick="parseSqlToTree()"
@@ -476,6 +476,7 @@ const FM_FILTER_CONFIG = {
     'playtime_forever':   { label: 'Playtime (mins)',      type: 'number', comparisons: {'>':'more than','<':'less than','=':'exactly','IS NULL':'not set','IS NOT NULL':'is set'} },
     'review_percentage':  { label: 'Review %',             type: 'number', comparisons: {'>':'over','<':'under','=':'is','IS NULL':'not set','IS NOT NULL':'is set'} },
     'weighted_percentage':{ label: 'Weighted Review %',    type: 'number', comparisons: {'>':'over','<':'under','=':'is','IS NULL':'not set','IS NOT NULL':'is set'} },
+    'metacritic_score':   { label: 'Metacritic Score',    type: 'number', comparisons: {'>':'over','<':'under','=':'is','IS NULL':'not set','IS NOT NULL':'is set'} },
     'review_score':       { label: 'Review Score',         type: 'select', comparisons: {'=':'is','!=':'is not','IS NULL':'not set','IS NOT NULL':'is set'},
                             options: ["Overwhelmingly Positive","Very Positive","Positive","Mostly Positive","Mixed","Mostly Negative","Negative","Very Negative","Overwhelmingly Negative","No Reviews","Not Enough Reviews"] },
     'developers':         { label: 'Developer',            type: 'text',   comparisons: {'LIKE':'contains','=':'exactly matches','IS NULL':'not set','IS NOT NULL':'is set'} },
@@ -930,7 +931,7 @@ function addSimpleRow(data = null) {
 
 // ── Column-vs-column comparison helpers ─────────────────────────
 const _COL_COMPARE_OPS = new Set(['=','!=','>','<','>=','<=']);
-const _COL_COMPARE_NUMERIC = ['playtime_forever','review_percentage','weighted_percentage','unlocked_achievements','total_achievements','total_reviews','positive_reviews'];
+const _COL_COMPARE_NUMERIC = ['playtime_forever','review_percentage','weighted_percentage','metacritic_score','unlocked_achievements','total_achievements','total_reviews','positive_reviews'];
 const _COL_COMPARE_DATE    = ['release_date','date_added','last_played'];
 
 function _compatibleCols(colName) {

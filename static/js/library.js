@@ -182,6 +182,7 @@
         date_added:          'DESC',
         review_percentage:   'DESC',
         weighted_percentage: 'DESC',
+        metacritic_score:    'DESC',
         hltb_main:           'ASC',
         hltb_extras:         'ASC',
         hltb_completionist:  'ASC',
@@ -1706,14 +1707,80 @@ async function stopBulkDateImport() {
     document.getElementById('bdi-status').textContent = 'Cancelled.';
 }
 
-// ── PAGYWOSG hover tooltip ────────────────────────────────────────────────────
+// ── Card hover tooltip (PAGYWOSG quals + optional game info) ─────────────────
 (function() {
-    if (!_serverFilterTree?.pagywosg) return;
+    const _pagOn  = !!_serverFilterTree?.pagywosg;
+    const _tipCfg = window.HOVER_TIP && window.HOVER_TIP.enabled ? window.HOVER_TIP : null;
+    if (!_pagOn && !_tipCfg) return;
 
     const tooltip        = document.getElementById('pag-hover-tooltip');
     const gpTooltip      = document.getElementById('pag-gamepad-tooltip');
     const grid           = document.getElementById('game-grid');
-    const sgGroup        = _pagExtractSgGroup(_serverFilterTree);
+    const sgGroup        = _pagOn ? _pagExtractSgGroup(_serverFilterTree) : null;
+    const _tipFields     = new Set(_tipCfg ? _tipCfg.fields : []);
+
+    // GAMES carries dates as 'YYYY-MM-DD' strings (library.py's ts_to_date), not timestamps.
+    function _tipDate(s) {
+        if (!s) return null;
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? null : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+    }
+
+    const _descCache = new Map(); // appid -> plain-text description or null
+
+    // Fetches the store blurb after the tooltip has stayed put briefly, so
+    // sweeping the mouse across the grid doesn't fire a request per card.
+    function _hydrateDesc(el, appid, reposition) {
+        const slot = el.querySelector('.ht-desc');
+        if (!slot) return;
+        const apply = text => {
+            if (!slot.isConnected) return;
+            if (text) { slot.textContent = text; slot.style.display = 'block'; }
+            else slot.remove();
+            reposition();
+        };
+        if (_descCache.has(appid)) { apply(_descCache.get(appid)); return; }
+        setTimeout(() => {
+            if (!slot.isConnected) return;
+            fetch(`/api/game-description/${appid}`).then(r => r.json()).then(d => {
+                let t = d.status === 'success' && d.description
+                    ? (new DOMParser().parseFromString(d.description, 'text/html').documentElement.textContent || '').trim()
+                    : null;
+                if (t && t.length > 280) t = t.slice(0, 277).trimEnd() + '...';
+                _descCache.set(appid, t || null);
+                apply(t);
+            }).catch(() => {});
+        }, 300);
+    }
+
+    function _buildInfoHtml(game) {
+        if (!_tipCfg) return null;
+        const dim = 'color:var(--text-secondary);';
+        const rows = [];
+        const row = (label, value) => { if (value) rows.push(`<div><span style="${dim}">${label}:</span> ${escHtml(String(value))}</div>`); };
+        let html = '';
+        if (_tipFields.has('cover_alt')) {
+            const horiz = _artOrientation === 'horizontal';
+            const v = _imgVersions.has(game.appid) ? _imgVersions.get(game.appid) : _imgV;
+            const kind = horiz ? 'vertical' : 'horizontal';
+            const size = horiz ? 'width:140px;aspect-ratio:2/3;' : 'width:290px;aspect-ratio:460/215;';
+            html += `<img src="/static/img/library/${kind}/${game.appid}.jpg?v=${v}" alt="" style="display:block;${size}object-fit:cover;border-radius:4px;margin-bottom:6px;" onerror="this.remove()">`;
+        }
+        if (_tipFields.has('description')) html += '<div class="ht-desc" style="display:none;margin-bottom:6px;"></div>';
+        if (_tipFields.has('playtime')) row('Time played', game.playtime_forever > 0 ? fmtHours(game.playtime_forever) : 'Never played');
+        if (_tipFields.has('last_played')) row('Last played', _tipDate(game.last_played) || 'Never');
+        if (_tipFields.has('date_added')) row('Date added', _tipDate(game.date_added));
+        if (_tipFields.has('release_date')) row('Released', _tipDate(game.release_date));
+        if (_tipFields.has('platform')) row('Library', (window._PLAT_LABELS || {})[game.platform || 'steam'] || game.platform || 'steam');
+        if (_tipFields.has('community_score') && game.review_percentage != null && game.review_percentage !== '') {
+            row('Steam community', `${game.review_score ? game.review_score + ' ' : ''}(${game.review_percentage}%)`);
+        }
+        if (_tipFields.has('metacritic') && game.metacritic_score != null) row('Metacritic', game.metacritic_score);
+        if (_tipFields.has('developers') && game.developers) row('Developer', game.developers.split(',').join(', '));
+        if (_tipFields.has('publishers') && game.publishers) row('Publisher', game.publishers.split(',').join(', '));
+        html += rows.join('');
+        return html || null;
+    }
 
     function _hltbMin(game) {
         const vals = [game.hltb_main, game.hltb_extras, game.hltb_completionist]
@@ -1721,7 +1788,7 @@ async function stopBulkDateImport() {
         return vals.length ? Math.min(...vals) : null;
     }
 
-    function _buildTooltip(game) {
+    function _buildPagHtml(game) {
         const isWin = sgGroup ? _pagCsvContains(game.groups, sgGroup) : false;
         const isSantaGift = (_serverFilterTree.pagywosg_verified?.[String(game.appid)] || []).some(e => e.auto && e.pool === 'wins');
 
@@ -1765,6 +1832,15 @@ async function stopBulkDateImport() {
         }
 
         return html;
+    }
+
+    function _buildTooltip(game) {
+        const pag  = _pagOn ? _buildPagHtml(game) : null;
+        const info = _buildInfoHtml(game);
+        if (!pag && !info) return null;
+        if (!pag) return info;
+        if (!info) return pag;
+        return info + `<div style="margin-top:6px; border-top:1px solid var(--border); padding-top:6px;">${pag}</div>`;
     }
 
     let _hoveredAppid = null;
@@ -1829,6 +1905,7 @@ async function stopBulkDateImport() {
         gpTooltip.innerHTML = html;
         gpTooltip.style.display = 'block';
         _positionGpTooltip(card);
+        _hydrateDesc(gpTooltip, appid, () => { if (_gpTooltipCard === card) _positionGpTooltip(card); });
 
         // Track card position each frame so the tooltip follows the scroll animation.
         _gpTooltipCard = card;
@@ -1879,6 +1956,7 @@ async function stopBulkDateImport() {
         tooltip.style.visibility = '';
         tooltip.style.opacity = '1';
         _hoveredAppid = appid;
+        _hydrateDesc(tooltip, appid, () => { if (_hoveredAppid === appid) _positionHoverTooltip(card); });
     });
 
     grid.addEventListener('mouseleave', () => _hideTooltip());
@@ -1921,6 +1999,7 @@ async function stopBulkDateImport() {
             tooltip.style.visibility = '';
             tooltip.style.opacity = '1';
             _hoveredAppid = appid;
+            _hydrateDesc(tooltip, appid, () => { if (_hoveredAppid === appid) _positionHoverTooltip(card); });
         }, 150);
     }, { passive: true });
 })();

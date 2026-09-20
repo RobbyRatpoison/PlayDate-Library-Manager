@@ -466,6 +466,8 @@ def backfill_metadata(appid, *, force=False, rerun=False):
             out['tags'] = tags['tags']
         if row['release_date'] is None and store.get('release_date') is not None:
             out['release_date'] = store['release_date']
+        if row['metacritic_score'] is None and store.get('metacritic_score') is not None:
+            out['metacritic_score'] = store['metacritic_score']
         if row['is_free'] is None and 'is_free' in store:
             out['is_free'] = store['is_free']
         # Review set is a group, only if the game has no score at all.

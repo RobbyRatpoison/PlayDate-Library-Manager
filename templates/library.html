@@ -651,7 +651,7 @@
     </style>
     {% set _non_default_sort = state.sort not in ('name', '') or state.order != 'ASC' %}
     {% set _has_plat_filter = hidden_platforms | length > 0 %}
-    {%- set _sort_labels = {'name': 'Alphabetical', 'playtime_forever': 'Hours Played', 'release_date': 'Release Date', 'last_played': 'Recently Played', 'date_added': 'Date Added', 'review_percentage': 'Review Score', 'weighted_percentage': 'Weighted Score', 'hltb_main': 'HLTB: Main Story', 'hltb_extras': 'HLTB: Main + Extras', 'hltb_completionist': 'HLTB: Completionist', 'hltb_min': 'HLTB: Shortest', 'hltb_max': 'HLTB: Longest', 'achievement_percent': 'Achievement %', 'achievement_remaining': 'Achievements Remaining', 'total_reviews': 'Total Reviews', 'tag_similarity': 'Tag Similarity', 'random': 'Random'} -%}
+    {%- set _sort_labels = {'name': 'Alphabetical', 'playtime_forever': 'Hours Played', 'release_date': 'Release Date', 'last_played': 'Recently Played', 'date_added': 'Date Added', 'review_percentage': 'Review Score', 'weighted_percentage': 'Weighted Score', 'metacritic_score': 'Metacritic Score', 'hltb_main': 'HLTB: Main Story', 'hltb_extras': 'HLTB: Main + Extras', 'hltb_completionist': 'HLTB: Completionist', 'hltb_min': 'HLTB: Shortest', 'hltb_max': 'HLTB: Longest', 'achievement_percent': 'Achievement %', 'achievement_remaining': 'Achievements Remaining', 'total_reviews': 'Total Reviews', 'tag_similarity': 'Tag Similarity', 'random': 'Random'} -%}
     {%- set _group_labels = {'installed': 'Installed', 'completion_status': 'Completion', 'release_date': 'Release Year', 'date_added': 'Year Added', 'review_percentage': 'Review Score', 'weighted_percentage': 'Weighted Score', 'platform': 'Platform'} -%}
     {%- set _plat_labels = platform_labels() -%}
     {%- set ns = namespace(filter_label=none, has_real_filter=false, search_term=none) -%}
@@ -929,6 +929,7 @@
     window.CURRENT_SORT = {{ state.sort | tojson }};
     window.CURRENT_ORDER = {{ state.order | tojson }};
     window._artOrientation = '{{ state.get("artwork_orientation", "vertical") }}';
+    window.HOVER_TIP = {{ state.get('hover_tooltip') | tojson }};
     window._requireDblClick = {{ state.get('require_double_click_launch', false) | tojson }};
     window.CARD_BADGES = {{ (state.card_badges if state.get('card_badges', {}).get('enabled', {}).get('library', True) else none) | tojson }};
     window.EDIT_BUTTON = {{ (state.edit_button if state.get('edit_button', {}).get('pages', {}).get('library', True) else none) | tojson }};

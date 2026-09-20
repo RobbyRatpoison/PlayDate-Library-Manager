@@ -727,6 +727,19 @@
             </div>
         </div>
         <div class="hub-section">
+            <div class="hub-section-label">Card Tooltip</div>
+            <div style="padding:8px 10px;">
+                <div data-modal-row="30" onclick="var cb=this.querySelector('input');cb.checked=!cb.checked;saveHoverTip();"
+                     style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:0.85rem; color:var(--text-primary);">
+                    <input type="checkbox" id="hover-tip-enabled" {% if hover_tooltip.enabled %}checked{% endif %}
+                           onclick="event.stopPropagation()" onchange="saveHoverTip()" style="width:auto; margin:0;">
+                    Show an info tooltip when hovering a game cover
+                </div>
+                <div style="font-size:0.75rem; color:#8f98a0; margin-top:3px; padding-left:22px;">Off by default. Library page, grid view. Also shows for the gamepad-focused card. Pick the details to include:</div>
+                <div id="hover-tip-fields" style="padding-left:22px; margin-top:6px;"></div>
+            </div>
+        </div>
+        <div class="hub-section">
             <div class="hub-section-label">Completion Sync</div>
             <div style="padding:8px 10px;">
                 <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:0.85rem; color:var(--text-primary);">
@@ -1057,6 +1070,7 @@
      Sections are rendered from TUNE_SECTIONS in modal_tools.js; each starts
      collapsed. Initial values come from the server-rendered state below. -->
 <script>
+window._HOVER_TIP = {{ hover_tooltip | tojson }};
 window._TUNE_INIT = {{ {
     'tag_similarity_min_library_rate': tag_similarity_min_library_rate,
     'tag_similarity_smoothing_k': tag_similarity_smoothing_k,

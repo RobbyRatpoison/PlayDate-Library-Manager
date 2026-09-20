@@ -6391,3 +6391,36 @@ function _grmStopPoll() {
     if (_grmRafId) { cancelAnimationFrame(_grmRafId); _grmRafId = null; }
 }
 
+
+
+// ── Card hover tooltip settings (Settings modal) ─────────────────────────────
+const _HOVER_TIP_LABELS = {
+    cover_alt: 'Other-orientation cover', description: 'Short description (Steam / plugin)',
+    playtime: 'Time played', last_played: 'Last played', date_added: 'Date added',
+    release_date: 'Release date', platform: 'Library (Steam, Epic, GOG...)',
+    community_score: 'Steam community score', metacritic: 'Metacritic score',
+    developers: 'Developer', publishers: 'Publisher',
+};
+
+function _renderHoverTipFields() {
+    const host = document.getElementById('hover-tip-fields');
+    if (!host || !window._HOVER_TIP) return;
+    const on = new Set(window._HOVER_TIP.fields || []);
+    host.innerHTML = Object.keys(_HOVER_TIP_LABELS).map((k, i) =>
+        `<div data-modal-row="${31 + i}" onclick="var cb=this.querySelector('input');cb.checked=!cb.checked;saveHoverTip();" ` +
+        `style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.82rem; padding:2px 0; color:var(--text-primary);">` +
+        `<input type="checkbox" data-tip-field="${k}" ${on.has(k) ? 'checked' : ''} onclick="event.stopPropagation()" ` +
+        `onchange="saveHoverTip()" style="width:auto; margin:0;">${escHtml(_HOVER_TIP_LABELS[k])}</div>`
+    ).join('');
+}
+
+function saveHoverTip() {
+    const fields = [...document.querySelectorAll('#hover-tip-fields input[data-tip-field]:checked')]
+        .map(cb => cb.dataset.tipField);
+    const enabled = !!document.getElementById('hover-tip-enabled')?.checked;
+    window._HOVER_TIP = { enabled, fields };
+    sendStateUpdate({ hover_tooltip: window._HOVER_TIP }, false);
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _renderHoverTipFields);
+else _renderHoverTipFields();

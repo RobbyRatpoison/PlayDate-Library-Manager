@@ -96,7 +96,7 @@ SAFE_COLUMNS = frozenset({
     'protondb_tier', 'protondb_confidence',
     'hltb_main', 'hltb_extras', 'hltb_completionist',
     'platform', 'platform_id', 'duplicate_of',
-    'tag_similarity',
+    'tag_similarity', 'metacritic_score',
 })
 
 # Columns the bulk-edit route is allowed to write. A frozenset of literals so
@@ -148,6 +148,7 @@ VIRTUAL_SORT_COLS = {
     # sort) so an unscored game (NULL, before the first recalculation) sorts
     # last regardless of direction instead of ASC dumping it first.
     'tag_similarity': 'tag_similarity',
+    'metacritic_score': 'metacritic_score',   # NULL = no Metacritic entry; sorts last either way
 }
 
 import re as _re
@@ -170,7 +171,7 @@ _SQL_ALLOWED_FUNCTIONS = {
 _INTEGER_COLUMNS = {
     'appid', 'installed', 'unlocked_achievements', 'total_achievements',
     'review_percentage', 'weighted_percentage', 'total_reviews',
-    'positive_reviews', 'is_free',
+    'positive_reviews', 'is_free', 'metacritic_score',
 }
 
 def _auto_cast_int_division(sql):
@@ -860,6 +861,8 @@ def scrape_single(appid):
     # untouched by the edit form.
     data_out = {}
     if store_data:
+        from database import update_game_data as _ugd
+        _ugd(appid, metacritic_score=store_data.get('metacritic_score'))
         data_out.update({
             "developers":   store_data.get('developers', ''),
             "publishers":   store_data.get('publishers', ''),
