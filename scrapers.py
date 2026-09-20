@@ -1137,6 +1137,22 @@ def clean_description(text):
     return re.sub(r'\n{3,}', '\n\n', text).strip()
 
 
+DESCRIPTION_RETRY_DAYS = 14
+
+
+def description_lookup_due(checked, today=None, days=DESCRIPTION_RETRY_DAYS):
+    """Whether an on-demand description lookup should hit the store again.
+    `checked` is the YYYY-MM-DD a previous lookup found nothing (NULL/'' = never
+    asked). Unparseable values count as due, so a bad marker can't stick forever."""
+    if not checked:
+        return True
+    try:
+        then = datetime.strptime(str(checked)[:10], '%Y-%m-%d').date()
+    except ValueError:
+        return True
+    return ((today or datetime.now().date()) - then).days >= days
+
+
 # Scrape Storefront API (Devs, Pubs, Release Date)
 def fetch_store_data(appid, session=None):
     """
