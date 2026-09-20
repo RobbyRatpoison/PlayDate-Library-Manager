@@ -26,7 +26,7 @@ const TUTORIAL_SECTIONS = [
             {
                 title: 'Gamepad friendly',
                 body: `<p>Every menu, modal, and library view in PlayDate can be driven entirely with a gamepad - this app is built with Steam Deck in mind. D-pad/stick to move, A to confirm, B to back out.</p>
-                       <p>Gamepad support can be toggled, remapped, or diagnosed from the hamburger menu → System.</p>`,
+                       <p>Gamepad support can be toggled, remapped, or diagnosed from Settings → Gamepad.</p>`,
             },
         ],
     },
@@ -67,6 +67,50 @@ const TUTORIAL_SECTIONS = [
         ],
     },
     {
+        id: 'editing-games',
+        title: 'Editing a Game',
+        steps: [
+            {
+                title: 'The edit panel',
+                body: `<p>Open any game (grid card, or the detail pane in list view) to edit its completion status, tags, groups, developers, publishers, release date, and Date Added. Renaming a game makes PlayDate re-resolve its metadata from the new name.</p>`,
+            },
+            {
+                title: 'Syncing data',
+                body: `<p><strong>Sync Steam Data</strong> re-fetches a single game's store data, reviews, and tags. On non-Steam games the button uses that platform's own label.</p>
+                       <p><strong>Fill Missing Data</strong> only fills fields that are currently empty (tags, review score, genres, developer, release date), by matching the game to a Steam page or PCGamingWiki. Your own edits and plugin data are never overwritten.</p>`,
+            },
+            {
+                title: 'Cover art',
+                body: `<p>Art comes from Steam first, then SteamGridDB as a fallback for anything Steam lacks (and for non-Steam games). Add a free SteamGridDB API key under Settings → Account to enable it. Art is cached locally and only re-fetched when you ask.</p>`,
+            },
+            {
+                title: 'Duplicates and folders',
+                body: `<p>The <strong>Duplicate of</strong> row lets you point a game at the copy you'd rather keep visible, on any platform. <strong>Open Folder</strong> opens the install location in your file manager.</p>`,
+            },
+        ],
+    },
+    {
+        id: 'completion-status',
+        title: 'Completion Status',
+        steps: [
+            {
+                title: 'The five statuses',
+                body: `<ul>
+                         <li><strong>Never Played</strong> - untouched.</li>
+                         <li><strong>Unfinished</strong> - started, not done.</li>
+                         <li><strong>Beaten</strong> - your own call that you finished it.</li>
+                         <li><strong>Completed</strong> - 100% of achievements.</li>
+                         <li><strong>Won't Play</strong> - you judge it terrible or broken. Not just "not interested".</li>
+                       </ul>
+                       <p>Pick 6 and tag-similarity sorting treat these as real taste signals, so being honest here gives better suggestions.</p>`,
+            },
+            {
+                title: 'Automatic updates',
+                body: `<p>Settings → Library → <strong>Completion Sync</strong> can promote Never Played to Unfinished once you have playtime, mark a game Completed at 100% achievements, and drop Completed back to Beaten if a developer later adds achievements. Each is a separate toggle.</p>`,
+            },
+        ],
+    },
+    {
         id: 'date-import',
         title: 'Importing Purchase Dates',
         steps: [
@@ -91,6 +135,21 @@ const TUTORIAL_SECTIONS = [
             {
                 title: 'Rerolling and filtering',
                 body: `<p>Not feeling any of the six? Reroll for a new set. You can also apply a filter first (e.g. only GOG games, or only under 10 hours) to narrow the pool Pick 6 draws from.</p>`,
+            },
+        ],
+    },
+    {
+        id: 'hltb',
+        title: 'HowLongToBeat',
+        steps: [
+            {
+                title: 'Completion times',
+                body: `<p>PlayDate can match your games to HowLongToBeat and store how long each takes to finish. You can then sort and filter by it, for example to find something short for tonight.</p>`,
+            },
+            {
+                title: 'Reviewing matches',
+                body: `<p>Hamburger menu → <strong>HLTB</strong> lists matches by confidence. Confident ones are applied automatically. Weaker ones wait for you to confirm, pick another result, or search by hand. <strong>No page</strong> marks a game as having no HLTB entry so it isn't suggested again.</p>
+                       <p><strong>Confirm all above threshold</strong> runs in the background with a progress button in the menu, so you can close the window.</p>`,
             },
         ],
     },
@@ -131,16 +190,45 @@ const TUTORIAL_SECTIONS = [
         ],
     },
     {
+        id: 'community-extras',
+        title: 'More Community Tools',
+        steps: [
+            {
+                title: 'SteamGifts wins',
+                body: `<p>Community Tools → <strong>Sync SteamGifts Wins</strong> imports your giveaway wins and tags received ones with a "Won on SteamGifts" group. It needs the PlayDate Companion userscript, because SteamGifts blocks direct scraping.</p>
+                       <p>A normal sync is incremental. <strong>Full refresh</strong> re-checks every win and prunes stale ones. Wins that don't match a library game are listed with a reason, and some can be adopted in one click.</p>`,
+            },
+            {
+                title: 'Play or Pay',
+                body: `<p><strong>Sync Play or Pay Picks</strong> pulls the current picks into a saved filter, and cleans up groups left over from earlier cycles.</p>`,
+            },
+            {
+                title: 'Monthly in a Month and Secret Santa',
+                body: `<p>The <strong>Monthly in a Month</strong> builder makes a filter for candidate games by completion status, and can check them against the community sheet. <strong>Secret Santa / Snowballs</strong> has its own helper for that event.</p>`,
+            },
+        ],
+    },
+    {
         id: 'plugins',
         title: 'Plugins',
         steps: [
             {
                 title: 'Beyond Steam',
-                body: `<p>Steam is built into PlayDate directly. Everything else comes from plugins - and PlayDate ships with a handful already built in: GOG, Epic Games, EA App, Ubisoft Connect, Humble Bundle, itch.io, Amazon Games, Battle.net, IndieGala, and Rockstar Games. No separate download needed to use any of them.</p>`,
+                body: `<p>Steam is built into PlayDate directly. Everything else comes from plugins, which are optional and installed on demand. PlayDate has official plugins for GOG, Epic Games, EA App, Ubisoft Connect, Humble Bundle, itch.io, Amazon Games, Battle.net, IndieGala, Rockstar Games, Legacy Games, and Xbox / Game Pass.</p>`,
             },
             {
                 title: 'Installing and managing plugins',
-                body: `<p>Hamburger menu → <strong>Plugins</strong> shows everything bundled in, and also lets you install additional third-party plugins from a zip file or a GitHub URL, check for updates, and uninstall (with the option to remove that platform's games too).</p>`,
+                body: `<p>Hamburger menu → <strong>Plugins</strong> has a <strong>Plugin Catalog</strong> where each official plugin installs with one click. It's sorted into Working, Untested, and Broken for the OS you're running, based on real reports. You can also install a third-party plugin from a zip file or a GitHub URL.</p>
+                       <p>The same screen checks for updates (with an <strong>Update All</strong> button) and uninstalls plugins, with the option to remove that platform's games too. Installing, updating, or removing a plugin shows a <strong>Restart Now</strong> button.</p>`,
+            },
+            {
+                title: 'Launchers on Linux',
+                body: `<p>Some plugins need the store's own launcher. On Linux, PlayDate can set up a Wine or Proton prefix and install that launcher for you: open the plugin's card and click <strong>Configure Launcher</strong>. A green "Launcher ready" badge means it's set up; an amber warning explains what's missing.</p>
+                       <p>Proton needs <strong>umu-run</strong> installed on the host. If it's missing, PlayDate falls back to a system Wine or tells you what to install.</p>`,
+            },
+            {
+                title: 'Signing in',
+                body: `<p>Plugins that need a login offer a sign-in window inside PlayDate. If a store's bot detection blocks that window on a captcha page, there's usually a paste option too: sign in in your normal browser, then paste the resulting code or key back into PlayDate.</p>`,
             },
             {
                 title: 'Duplicate detection',
@@ -163,6 +251,74 @@ const TUTORIAL_SECTIONS = [
         ],
     },
     {
+        id: 'cleanup',
+        title: 'Blacklist & Junk Finder',
+        steps: [
+            {
+                title: 'Removing games for good',
+                body: `<p>Removing a game from the library adds it to the <strong>blacklist</strong>, so it doesn't come back on the next sync. Hamburger menu → <strong>Blacklist / Junk Finder</strong> shows the list, and you can remove entries from it to allow them back.</p>`,
+            },
+            {
+                title: 'Find Library Junk',
+                body: `<p>Imports sometimes pull in soundtracks, DLC, dev kits, and store apps. <strong>Find Library Junk</strong> scans for them by title pattern across every platform. Its <strong>Deep Plugin Scan</strong> re-checks a platform against its store, which is slower, so it only runs when you click it. Review the results and remove what you don't want.</p>`,
+            },
+            {
+                title: 'Duplicate entries',
+                body: `<p>Settings → Library → <strong>Find Duplicate Entries</strong> catches one store game imported twice, usually claimed in two bundles. This is separate from cross-platform duplicates, which the Duplicates settings handle.</p>`,
+            },
+        ],
+    },
+    {
+        id: 'data',
+        title: 'Backup & Data',
+        steps: [
+            {
+                title: 'Backup and restore',
+                body: `<p>Hamburger menu → <strong>Data</strong> → <strong>Backup &amp; Restore</strong> saves your library and settings to one zip you can restore later. PlayDate offers a backup before updating unless you made one in the last 24 hours.</p>`,
+            },
+            {
+                title: 'Imports and exports',
+                body: `<p>The Data menu also imports from another SQLite database or a Playnite backup (for Date Added), exports your library to CSV with the columns you choose, and shares saved filters through <strong>Filter Import / Export</strong>.</p>`,
+            },
+        ],
+    },
+    {
+        id: 'settings',
+        title: 'Settings Tour',
+        steps: [
+            {
+                title: 'Account',
+                body: `<p>Your Steam API key and SteamID, SteamGridDB key, SteamGifts username, and account switching. Without a Steam API key PlayDate still works from local Steam files, but achievements are skipped.</p>`,
+            },
+            {
+                title: 'Appearance and Library',
+                body: `<p><strong>Appearance</strong> covers theme colors, background image, and Edit Home Layout. <strong>Library</strong> covers completion sync, duplicate handling and platform priority, launch behavior, artwork sources, and the optional <strong>card tooltip</strong> shown when hovering a cover.</p>`,
+            },
+            {
+                title: 'Tuning',
+                body: `<p>Settings → <strong>Tuning</strong> exposes the formulas behind the suggestions with live sliders and graphs: tag similarity, how much to trust reviews with few votes, and the Pick 6 caps and blend. Saving recalculates the stored values. The six Pick 6 signal weights live on the Pick 6 page.</p>`,
+            },
+            {
+                title: 'Advanced and support',
+                body: `<p>Advanced has the window-resize tool for Steam Deck and, on Linux, the renderer toggle. It also has <strong>Send Log to Developer</strong> for when something breaks; your API keys are never included.</p>`,
+            },
+        ],
+    },
+    {
+        id: 'linux-deck',
+        title: 'Linux & Steam Deck',
+        steps: [
+            {
+                title: 'Smoother scrolling on NVIDIA',
+                body: `<p>On Linux, the default renderer can scroll the library grid choppily on NVIDIA's proprietary driver under Wayland. Settings → Advanced → <strong>Renderer</strong> switches to Qt/QtWebEngine, which fixes it. Source installs download it on demand; Flatpak swaps to a separate Qt build and carries your data over. It isn't offered on Steam Deck.</p>`,
+            },
+            {
+                title: 'Flatpak updates',
+                body: `<p>Prefer a <code>--user</code> Flatpak install. A <code>--system</code> install can't update itself from inside PlayDate because it needs administrator approval. If that happens, PlayDate shows the exact command to run yourself.</p>`,
+            },
+        ],
+    },
+    {
         id: 'gamepad-settings',
         title: 'Gamepad & Settings',
         steps: [
@@ -172,11 +328,11 @@ const TUTORIAL_SECTIONS = [
             },
             {
                 title: 'Configuring gamepad input',
-                body: `<p>Hamburger menu → <strong>System</strong> has the gamepad toggle, button remapping, and a diagnostics view if a controller isn't behaving the way you expect.</p>`,
+                body: `<p>Settings → <strong>Gamepad</strong> has the gamepad toggle, button remapping, and a diagnostics view if a controller isn't behaving the way you expect.</p>`,
             },
             {
                 title: 'More settings',
-                body: `<p>Also worth knowing about: <strong>Appearance</strong> (theme colors, background image) and <strong>Data</strong> (backup/restore, CSV export, imports), both in the hamburger menu.</p>`,
+                body: `<p>Also worth knowing about: <strong>Appearance</strong> (theme colors, background image) and <strong>Data</strong> (backup/restore, CSV export, imports), under Settings and the hamburger menu.</p>`,
             },
         ],
     },
