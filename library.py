@@ -942,12 +942,12 @@ def search_games():
         if platform:
             rows = db.execute(
                 "SELECT appid, name, platform FROM games WHERE name LIKE ? AND platform = ? "
-                "ORDER BY name LIMIT 20",
+                "ORDER BY name COLLATE NOCASE LIMIT 20",
                 (f'%{q}%', platform)
             ).fetchall()
         else:
             rows = db.execute(
-                "SELECT appid, name, platform FROM games WHERE name LIKE ? ORDER BY name LIMIT 20",
+                "SELECT appid, name, platform FROM games WHERE name LIKE ? ORDER BY name COLLATE NOCASE LIMIT 20",
                 (f'%{q}%',)
             ).fetchall()
         db.close()
@@ -1644,7 +1644,7 @@ def steam_junk_scan():
                 "SELECT platform_id FROM blacklist WHERE platform_id IS NOT NULL"
             ).fetchall()}
             rows = db.execute(
-                "SELECT appid, name, platform, is_free, playtime_forever FROM games ORDER BY name"
+                "SELECT appid, name, platform, is_free, playtime_forever FROM games ORDER BY name COLLATE NOCASE"
             ).fetchall()
         finally:
             db.close()

@@ -1085,7 +1085,7 @@ def games_by_group():
         rows = db.execute(
             "SELECT appid, name FROM games "
             "WHERE platform = 'steam' AND duplicate_of IS NULL "
-            "AND ',' || groups || ',' LIKE ? ORDER BY name",
+            "AND ',' || groups || ',' LIKE ? ORDER BY name COLLATE NOCASE",
             (f'%,{group},%',)
         ).fetchall()
         db.close()

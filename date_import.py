@@ -129,7 +129,7 @@ def bulk_date_import_start():
     appids = data.get('appids', [])
     db  = get_db()
     if scope == 'all':
-        rows = db.execute('SELECT appid, name, platform FROM games ORDER BY name').fetchall()
+        rows = db.execute('SELECT appid, name, platform FROM games ORDER BY name COLLATE NOCASE').fetchall()
     elif appids:
         ph   = ','.join('?' * len(appids))
         rows = db.execute(f'SELECT appid, name, platform FROM games WHERE appid IN ({ph})', appids).fetchall()

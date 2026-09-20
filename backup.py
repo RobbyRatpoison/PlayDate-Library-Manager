@@ -383,7 +383,7 @@ def _build_csv_rows(filter_tree=None, columns=None):
         f"playtime_forever, last_played, date_added, installed, "
         f"review_score, review_percentage, developers, publishers, "
         f"release_date, unlocked_achievements, total_achievements "
-        f"FROM games WHERE {where} ORDER BY name ASC",
+        f"FROM games WHERE {where} ORDER BY name COLLATE NOCASE ASC",
         params
     ).fetchall()
     db.close()
