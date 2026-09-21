@@ -40,7 +40,18 @@ const TUTORIAL_SECTIONS = [
             },
             {
                 title: 'Editing the layout',
-                body: `<p>Hamburger menu → <strong>Edit Home Layout</strong> lets you add, remove, and reorder shelves, choose what each one shows (a saved filter or a built-in one), how it's sorted, and whether two shelves sit side by side.</p>`,
+                body: `<p>Hamburger menu → <strong>Settings</strong> → <strong>Appearance</strong> → <strong>Edit Home Layout</strong> puts Home into edit mode. <strong>＋ ADD SHELF</strong> adds a shelf, the ⠿ handle drags one to a new spot, and ✕ removes it. <strong>✎ Edit</strong> on a shelf chooses what it shows (a saved filter, a built-in one, or a widget) and how it's sorted.</p>
+                       <p>Nothing is kept until you press <strong>SAVE LAYOUT</strong>; <strong>CANCEL</strong> throws your changes away and <strong>RESET</strong> goes back to the default layout.</p>`,
+            },
+            {
+                title: 'Sizes, columns and game counts',
+                body: `<p>Every shelf has a <strong>Height</strong> and a <strong>Games</strong> count. You can also drag the bottom edge of a row to resize it. <strong>Games</strong> is how many covers the shelf loads, and setting it to <strong>0 removes the limit</strong>: the shelf loads every match and scrolls sideways.</p>
+                       <p><strong>＋ COLUMN</strong> splits a shelf into columns: click it, then click a shelf to add another one beside it. Each column has its own <strong>Width</strong>, or drag the divider between columns to resize them.</p>`,
+            },
+            {
+                title: 'Widgets',
+                body: `<p>A shelf doesn't have to show games. In <strong>✎ Edit</strong>, pick a widget instead: a <strong>Clock</strong>, a <strong>Completion Chart</strong> of your completion statuses, or an <strong>Achievement Chart</strong>, plus any widgets a plugin adds.</p>
+                       <p>Widgets sit in the layout like any shelf, so you can resize them or put one in a column next to a game shelf.</p>`,
             },
             {
                 title: 'Random shelves',
