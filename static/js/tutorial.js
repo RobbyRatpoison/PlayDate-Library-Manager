@@ -61,8 +61,9 @@ const TUTORIAL_SECTIONS = [
             },
             {
                 title: 'Shelf priority',
-                body: `<p>A game only appears on one shelf. Shelves are filled in priority order, and a shelf skips any game a higher-priority shelf already took, so it shows its next matches instead. <strong>⇅ SHELF PRIORITY</strong> in edit mode lets you drag shelves into the order you want them to claim games.</p>
-                       <p>The switch beside each shelf takes it out of this entirely: it shows every game that matches, even ones shown elsewhere, and doesn't take games away from other shelves.</p>`,
+                body: `<p>By default, a game only shows up on one shelf on your Home page. If a game fits several shelves, it goes on the one with the highest priority, and the other shelves show their next matching games instead.</p>
+                       <p><strong>⇅ SHELF PRIORITY</strong> in edit mode lets you drag shelves into the order you want, with the most important shelf at the top.</p>
+                       <p>Each shelf also has a switch to turn this off. A shelf with the switch off shows every game that matches its filter, even ones that appear on other shelves, and it never takes a game away from another shelf.</p>`,
             },
             {
                 title: 'Random shelves',
