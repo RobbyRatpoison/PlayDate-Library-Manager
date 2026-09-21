@@ -966,7 +966,7 @@ def search_games():
 @library_bp.route('/api/game/<int:appid>/set-duplicate', methods=['POST'])
 def set_duplicate(appid):
     """Set or clear the duplicate_of field for a game."""
-    from database import update_game_data, invalidate_dup_cache
+    from database import update_game_data, refresh_duplicate_detection
     data         = request.json or {}
     duplicate_of = data.get('duplicate_of')   # appid string, or null/'' to clear
     try:
@@ -988,7 +988,10 @@ def set_duplicate(appid):
                               'hltb_main', 'hltb_extras', 'hltb_completionist')}
                 update_game_data(appid, **hltb_data)
         db.close()
-        invalidate_dup_cache()
+        # The link only says the two are the same game; the platform priority order
+        # decides which copy is shown, so re-run detection now (it also refreshes the
+        # duplicate cache) instead of leaving a link that points the wrong way round.
+        refresh_duplicate_detection()
         return jsonify({'status': 'ok'})
     except Exception as e:
         return api_error('Something went wrong on the server. Check playdate.log for details.', 500, exc=e)

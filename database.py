@@ -393,11 +393,44 @@ def auto_detect_duplicates(platform_priority=None):
                         _log.info(f'Auto-duplicate ({low_plat}→{high_plat}): appid {low_appid} → {high_games[norm]}')
                         updated += 1
 
-        if updated:
-            conn.commit()
+        _align_manual_duplicate_links(conn, platform_priority)
+        conn.commit()
         return updated
     finally:
         conn.close()
+
+
+def _align_manual_duplicate_links(conn, platform_priority):
+    """A link made by hand says "these two are the same game"; it never decides
+    which copy is shown -- the platform priority order does, exactly as it does
+    for automatic matches. So every hand-made link is pointed from the
+    lower-priority platform's copy at the higher-priority one (flipped if it was
+    made the other way round), and the pair is never left pointing at each other,
+    which would hide both. Links between two copies on the same platform are
+    left alone."""
+    def rank(plat):
+        return platform_priority.index(plat) if plat in platform_priority else len(platform_priority)
+
+    manual = conn.execute(
+        "SELECT appid, platform, duplicate_of FROM games "
+        "WHERE duplicate_auto = 0 AND duplicate_of IS NOT NULL AND duplicate_of != ''"
+    ).fetchall()
+    for row in manual:
+        other = conn.execute(
+            "SELECT appid, platform, duplicate_of FROM games WHERE appid = ?", (row['duplicate_of'],)
+        ).fetchone()
+        if not other or rank(row['platform']) == rank(other['platform']):
+            continue
+        if rank(row['platform']) < rank(other['platform']):
+            # Linked from the preferred platform's copy: the link belongs the other way round.
+            conn.execute("UPDATE games SET duplicate_of = NULL WHERE appid = ?", (row['appid'],))
+            conn.execute("UPDATE games SET duplicate_of = ?, duplicate_auto = 0 WHERE appid = ?",
+                         (str(row['appid']), other['appid']))
+            _log.info(f"Manual duplicate link re-pointed by priority: {other['appid']} -> {row['appid']}")
+        elif other['duplicate_of'] == str(row['appid']):
+            # The preferred copy pointing back at this one would hide both.
+            conn.execute("UPDATE games SET duplicate_of = NULL, duplicate_auto = 0 WHERE appid = ?",
+                         (other['appid'],))
 
 
 def refresh_duplicate_detection():
