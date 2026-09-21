@@ -783,7 +783,7 @@
         // Library bulk modals
         'bulk-edit-modal', 'bulk-rescrape-modal', 'bulk-delete-modal',
         // Tools page expanding modals
-        'blacklist-modal',
+        'blacklist-modal', 'add-game-modal',
         // Sub-modals of hamburger items (before their parents)
         'cardOutlinesModal',   // from appearance-modal
         'cardBadgesModal',     // from appearance-modal
@@ -791,7 +791,6 @@
         'theme-modal',         // from appearance-modal
         'theme-picker-modal',  // from appearance-modal
         'dup-entries-modal',   // from library-modal
-        'add-game-modal',      // from library-modal
         'pagywosg-modal',      // from community-modal
         'miam-modal',          // from community-modal
         'santa-modal',         // from community-modal
@@ -2348,7 +2347,6 @@
             ['theme-modal',           'closeThemeModal'],
             ['theme-picker-modal',    'closeThemePickerModal'],
             ['dup-entries-modal',     'closeDupEntriesModal'],
-            ['add-game-modal',        'closeAddGameModal'],
             ['pagywosg-modal',        'closePagModal'],
             ['miam-modal',            'closeMiamModal'],
             ['santa-modal',           'closeSantaModal'],
@@ -2376,6 +2374,7 @@
             ['community-modal',       'closeCommunityModal'],
             ['data-modal',            'closeDataModal'],
             ['blacklist-modal',       'closeBlacklistModal'],
+            ['add-game-modal',        'closeAddGameModal'],
             ['store-names-modal',     'closeStoreNamesModal'],
             ['tutorial-modal',        'closeTutorialModal'],
             // home page edit mode panels
@@ -3202,7 +3201,6 @@
         _watchModal('appearance-modal');
         _watchModal('library-modal');
         _watchModal('dup-entries-modal');
-        _watchModal('add-game-modal');
         _watchModal('gamepad-modal');
         _watchModal('advanced-modal');
         _watchModal('emulators-modal');
@@ -3210,6 +3208,7 @@
         _watchModal('community-modal');
         _watchModal('data-modal');
         _watchModal('blacklist-modal');
+        _watchModal('add-game-modal');
         _watchModal('store-names-modal');
         _watchModal('tutorial-modal');
 

@@ -259,6 +259,7 @@
                 <div id="hamburger-menu">
                     <button id="add-button" class="hamburger-item hamburger-populate">POPULATE PLAYDATE</button>
                     <button id="bulk-progress-btn" class="hamburger-item hamburger-populate" style="display:none"></button>
+                    <button class="hamburger-item" onclick="closeHamburger();openAddGameModal()">Add Game</button>
                     <button id="store-names-btn" class="hamburger-item" style="display:none;color:var(--accent);" onclick="closeHamburger();openStoreNamesModal()"><span id="store-names-btn-label"></span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent,#66c0f4);margin-left:8px;flex-shrink:0;pointer-events:none;"></span></button>
                     <button id="blaeo-sync-btn" class="hamburger-item" style="display:none;color:var(--accent);opacity:0.6;" disabled>BLAEO sync: running...</button>
                     <button id="blaeo-ready-btn" class="hamburger-item" style="display:none;color:var(--accent);" onclick="closeHamburger();openCommunityModal()"><span id="blaeo-ready-label">BLAEO results ready</span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent,#66c0f4);margin-left:8px;flex-shrink:0;pointer-events:none;"></span></button>
