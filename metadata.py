@@ -413,7 +413,7 @@ def backfill_metadata(appid, *, force=False, rerun=False):
     row = db.execute(
         "SELECT name, platform, platform_id, platform_slug, steam_appid, meta_backfill_fetched, "
         "developers, publishers, genres, categories, tags, release_date, "
-        "review_score, is_free, metacritic_score, short_description "
+        "review_score, is_free, metacritic_score, short_description, total_achievements "
         "FROM games WHERE appid = ?", (appid,)
     ).fetchone()
     db.close()
@@ -472,6 +472,8 @@ def backfill_metadata(appid, *, force=False, rerun=False):
             out['short_description'] = store['short_description']
         if row['is_free'] is None and 'is_free' in store:
             out['is_free'] = store['is_free']
+        if is_steam and row['total_achievements'] is None:
+            out.update(_achievement_counts(appid, today))
         # Review set is a group, only if the game has no score at all.
         if _gap('review_score') and reviews.get('total_reviews'):
             out.update(reviews)
@@ -531,6 +533,26 @@ def backfill_metadata(appid, *, force=False, rerun=False):
              f'steam {steam_appid}' if steam_appid else 'pcgw/page-only',
              filled or '(nothing new)')
     return out
+
+
+def _achievement_counts(appid, today):
+    """Achievement counts for a Steam game that has never had any: the account's
+    own progress when Steam gives it, else the public schema's total with 0
+    unlocked (a game the account doesn't own answers 403 for per-player data).
+    {} when neither is available (no API key, or the calls failed). Rate-limit
+    errors propagate so the caller can report them."""
+    from scrapers import fetch_cheevo_data, fetch_achievement_schema_total
+    own = fetch_cheevo_data(appid)
+    if own:
+        counts = {'total_achievements': own.get('total_achievements', 0),
+                  'unlocked_achievements': own.get('unlocked_achievements', 0)}
+    else:
+        total = fetch_achievement_schema_total(appid)
+        if total is None:
+            return {}
+        counts = {'total_achievements': total, 'unlocked_achievements': 0}
+    counts['cheevos_fetched'] = today
+    return counts
 
 
 def _plugin_description(appid, platform, platform_id):

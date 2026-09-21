@@ -1307,6 +1307,11 @@ def fetch_cheevo_data(appid):
             raise RateLimitedError(_parse_retry_after(response))
         if response.status_code == 400:
             return {'total_achievements': 0, 'unlocked_achievements': 0}
+        if response.status_code == 403:
+            # "Profile is not public": what Steam answers for a game the account
+            # doesn't own (or a private profile). Expected, not an error.
+            log.info(f"No player achievement data for {appid} (not owned, or profile private)")
+            return None
         response.raise_for_status()
         json_data = response.json()
 
