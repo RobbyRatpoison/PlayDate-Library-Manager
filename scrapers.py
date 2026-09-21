@@ -1263,6 +1263,31 @@ def fetch_review_data(appid, session=None):
 
 
 # Scrape Achievements API (Total, Unlocked)
+def fetch_achievement_schema_total(appid):
+    """How many achievements a game defines, from Steam's public schema. Needs an
+    API key but not ownership, unlike GetPlayerAchievements (which answers 403
+    "Profile is not public" for a game the account doesn't own). None when there's
+    no key or the call fails; 0 for a game with no achievements."""
+    account = get_active_account()
+    key = ((account or {}).get('api_key') or '').strip()
+    if not key:
+        return None
+    try:
+        resp = requests.get('https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/',
+                            params={'appid': appid, 'key': key}, timeout=15)
+        if resp.status_code == 429:
+            raise RateLimitedError(_parse_retry_after(resp))
+        if not resp.ok:
+            return None
+        stats = (resp.json().get('game') or {}).get('availableGameStats') or {}
+        return len(stats.get('achievements') or [])
+    except RateLimitedError:
+        raise
+    except Exception:
+        log.error(f"Error fetching achievement schema for AppID: {appid}")
+        return None
+
+
 def fetch_cheevo_data(appid):
     account = get_active_account()
     if not account:

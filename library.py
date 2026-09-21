@@ -890,6 +890,14 @@ def scrape_single(appid):
     if cheevo_data:
         data_out["total_achievements"]    = cheevo_data.get('total_achievements', 0)
         data_out["unlocked_achievements"] = cheevo_data.get('unlocked_achievements', 0)
+    elif _account.get('api_key'):
+        # No per-player data (e.g. a game you don't own): use the public schema's
+        # total when it's never been known. Saved here too, like Metacritic above.
+        fallback = _achievement_schema_fields(appid)
+        if fallback:
+            _fill_unowned_achievements(appid)
+            data_out["total_achievements"]    = fallback['total_achievements']
+            data_out["unlocked_achievements"] = fallback['unlocked_achievements']
     if tag_data.get('tags'):
         data_out["tags"] = tag_data['tags']
 
@@ -1031,6 +1039,39 @@ def steam_search():
         return api_error('Could not search Steam. Check your connection and try again.', 502, exc=e)
 
 
+def _achievement_schema_fields(appid):
+    """{'total_achievements', 'unlocked_achievements', 'cheevos_fetched'} for a Steam
+    game whose achievement total has never been known, else {}. Steam won't give
+    per-player achievements for a game the account doesn't own (403), but the
+    public schema still says how many it defines; an unowned game has 0 unlocked.
+    Never touches a game that already has counts, so an owned game with real
+    progress can't be overwritten with zeros."""
+    from datetime import datetime
+    from scrapers import fetch_achievement_schema_total
+    db = get_db()
+    try:
+        row = db.execute("SELECT total_achievements FROM games WHERE appid = ?", (appid,)).fetchone()
+    finally:
+        db.close()
+    if not row or row['total_achievements'] is not None:
+        return {}
+    total = fetch_achievement_schema_total(appid)
+    if total is None:
+        return {}
+    return {'total_achievements': total, 'unlocked_achievements': 0,
+            'cheevos_fetched': datetime.now().strftime('%Y-%m-%d')}
+
+
+def _fill_unowned_achievements(appid):
+    from database import update_game_data
+    try:
+        fields = _achievement_schema_fields(appid)
+        if fields:
+            update_game_data(appid, **fields)
+    except Exception:
+        log.exception(f"add game: achievement schema fallback failed for {appid}")
+
+
 def _enrich_added_game(appid):
     """Fill in a freshly added game with the same jobs a bulk rescrape/art fetch
     runs (store data, reviews, tags, art, ProtonDB, HLTB), one game at a time."""
@@ -1041,6 +1082,7 @@ def _enrich_added_game(appid):
         bulk_art_scrape_games([appid], ['vertical', 'horizontal', 'icon'], 'auto', None, None)
         if appid > 0:
             bulk_protondb_scrape_games([appid], None, None)
+            _fill_unowned_achievements(appid)
         bulk_hltb_scrape_games([appid], None, None)
         status = 'done'
     except Exception:

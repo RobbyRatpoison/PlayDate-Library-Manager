@@ -411,7 +411,7 @@ def backfill_metadata(appid, *, force=False, rerun=False):
 
     db = get_db()
     row = db.execute(
-        "SELECT name, platform, platform_slug, steam_appid, meta_backfill_fetched, "
+        "SELECT name, platform, platform_id, platform_slug, steam_appid, meta_backfill_fetched, "
         "developers, publishers, genres, categories, tags, release_date, "
         "review_score, is_free, metacritic_score, short_description "
         "FROM games WHERE appid = ?", (appid,)
@@ -513,6 +513,14 @@ def backfill_metadata(appid, *, force=False, rerun=False):
         if 'release_date' not in out and row['release_date'] is None and page.get('release_date'):
             out['release_date'] = page['release_date']
 
+    # A description no Steam page supplied (a store exclusive, or a game with no
+    # Steam match): ask the platform's own plugin, as the on-demand description
+    # route does. Counts as a fill, so a game with nothing else isn't stamped no_match.
+    if 'short_description' not in out and _empty(row['short_description']) and not is_steam:
+        desc = _plugin_description(appid, row['platform'], row['platform_id'])
+        if desc:
+            out['short_description'] = desc
+
     filled = [k for k in out if k not in ('steam_appid', 'meta_backfill_fetched')]
     if not filled and not steam_appid:
         # Reached nothing usable anywhere -- record as no_match so we don't keep
@@ -523,6 +531,19 @@ def backfill_metadata(appid, *, force=False, rerun=False):
              f'steam {steam_appid}' if steam_appid else 'pcgw/page-only',
              filled or '(nothing new)')
     return out
+
+
+def _plugin_description(appid, platform, platform_id):
+    """Plain-text description from the platform's plugin (fetch_description), or ''."""
+    try:
+        import plugins as _plugins
+        from scrapers import clean_description
+        plugin = _plugins.get_for_platform(platform)
+        if plugin is not None and hasattr(plugin, 'fetch_description'):
+            return clean_description(plugin.fetch_description(appid, platform_id))
+    except Exception as e:
+        log.warning('backfill %s: plugin description failed: %s', appid, e)
+    return ''
 
 
 # ── Routes ──────────────────────────────────────────────────────────────────

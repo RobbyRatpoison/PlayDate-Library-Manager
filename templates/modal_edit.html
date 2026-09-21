@@ -820,6 +820,18 @@
         safeSet('edit-weighted-pct', game.weighted_percentage);
         safeSet('edit-metacritic', game.metacritic_score);
         safeSet('edit-short-desc', game.short_description);
+        // Not stored yet: the description route fetches it once and saves it, so
+        // the field fills in by itself instead of waiting for a tooltip/list-view
+        // visit or a Fill Missing Data click. Skipped if the user has moved on.
+        if (!game.short_description) {
+            fetch(`/api/game-description/${game.appid}`).then(r => r.json()).then(d => {
+                const el = document.getElementById('edit-short-desc');
+                if (d.status === 'success' && d.description && el && !el.value &&
+                    String(document.getElementById('edit-appid').value) === String(game.appid)) {
+                    el.value = d.description;
+                }
+            }).catch(() => {});
+        }
         safeSet('edit-unlocked-ach', game.unlocked_achievements);
         safeSet('edit-total-ach', game.total_achievements);
 
