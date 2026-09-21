@@ -40,7 +40,7 @@ const TUTORIAL_SECTIONS = [
             },
             {
                 title: 'Editing the layout',
-                body: `<p>Hamburger menu → <strong>Settings</strong> → <strong>Appearance</strong> → <strong>Edit Home Layout</strong> puts Home into edit mode. <strong>＋ ADD SHELF</strong> adds a shelf, the ⠿ handle drags one to a new spot, and ✕ removes it. <strong>✎ Edit</strong> on a shelf chooses what it shows (a saved filter, a built-in one, or a widget) and how it's sorted.</p>
+                body: `<p>Hamburger menu → <strong>Settings</strong> → <strong>Appearance</strong> → <strong>Edit Home Layout</strong> puts Home into edit mode. On the Home page itself, pressing <strong>E</strong> does the same. <strong>＋ ADD SHELF</strong> adds a shelf, the ⠿ handle drags one to a new spot, and ✕ removes it. <strong>✎ Edit</strong> on a shelf chooses what it shows (a saved filter, a built-in one, or a widget) and how it's sorted.</p>
                        <p>Nothing is kept until you press <strong>SAVE LAYOUT</strong>; <strong>CANCEL</strong> throws your changes away and <strong>RESET</strong> goes back to the default layout.</p>`,
             },
             {
