@@ -36,12 +36,18 @@ const TUTORIAL_SECTIONS = [
         steps: [
             {
                 title: 'What are shelves?',
-                body: `<p>The Home page shows your library as a set of horizontal shelves - each one a filtered, sorted row of games, like "Unfinished," "Recently Added," or a random pick.</p>`,
+                body: `<p>The Home page shows your library as a set of horizontal shelves, like "Unfinished," "Recently Added," or a random pick. Each shelf is a <strong>filter</strong> (which games it can show) plus a <strong>sort</strong> (the order they come in).</p>
+                       <p>The filter can be one of PlayDate's built-in quick filters, one of your own saved filters, or a custom filter built just for that shelf. Filters are covered in more detail under Library &amp; Filters.</p>`,
             },
             {
                 title: 'Editing the layout',
-                body: `<p>Hamburger menu → <strong>Settings</strong> → <strong>Appearance</strong> → <strong>Edit Home Layout</strong> puts Home into edit mode. On the Home page itself, pressing <strong>E</strong> does the same. <strong>＋ ADD SHELF</strong> adds a shelf, the ⠿ handle drags one to a new spot, and ✕ removes it. <strong>✎ Edit</strong> on a shelf chooses what it shows (a saved filter, a built-in one, or a widget) and how it's sorted.</p>
+                body: `<p>Hamburger menu → <strong>Settings</strong> → <strong>Appearance</strong> → <strong>Edit Home Layout</strong> puts Home into edit mode. On the Home page itself, pressing <strong>E</strong> does the same. <strong>＋ ADD SHELF</strong> adds a shelf, the ⠿ handle drags one to a new spot, and ✕ removes it. <strong>✎ Edit</strong> on a shelf changes what it shows (see the next step).</p>
                        <p>Nothing is kept until you press <strong>SAVE LAYOUT</strong>; <strong>CANCEL</strong> throws your changes away and <strong>RESET</strong> goes back to the default layout.</p>`,
+            },
+            {
+                title: 'What a shelf shows',
+                body: `<p>In <strong>✎ Edit</strong>, the <strong>Filter</strong> menu picks which games a shelf draws from: a built-in quick filter (All Games, Installed, Not Installed, Never Played / Unfinished, Beaten / Completed, or a single completion status), one of your <strong>saved filters</strong>, or <strong>🔧 Custom Filter…</strong>, which opens the Filter Builder for just that shelf so there's nothing to save. A shelf can also be a widget instead (see Widgets).</p>
+                       <p><strong>Sort by</strong> sets the order, ascending or descending, and <strong>Platforms shown</strong> limits the shelf to the platforms you tick, so one shelf can be Steam only while another shows everything.</p>`,
             },
             {
                 title: 'Sizes, columns and game counts',
@@ -52,6 +58,11 @@ const TUTORIAL_SECTIONS = [
                 title: 'Widgets',
                 body: `<p>A shelf doesn't have to show games. In <strong>✎ Edit</strong>, pick a widget instead: a <strong>Clock</strong>, a <strong>Completion Chart</strong> of your completion statuses, or an <strong>Achievement Chart</strong>, plus any widgets a plugin adds.</p>
                        <p>Widgets sit in the layout like any shelf, so you can resize them or put one in a column next to a game shelf.</p>`,
+            },
+            {
+                title: 'Shelf priority',
+                body: `<p>A game only appears on one shelf. Shelves are filled in priority order, and a shelf skips any game a higher-priority shelf already took, so it shows its next matches instead. <strong>⇅ SHELF PRIORITY</strong> in edit mode lets you drag shelves into the order you want them to claim games.</p>
+                       <p>The switch beside each shelf takes it out of this entirely: it shows every game that matches, even ones shown elsewhere, and doesn't take games away from other shelves.</p>`,
             },
             {
                 title: 'Random shelves',
@@ -68,8 +79,19 @@ const TUTORIAL_SECTIONS = [
                 body: `<p>The Library page defaults to a scrolling grid of cover art. Switch to <strong>list view</strong> from the VIEW menu for a compact, split-pane layout - a scrollable row list on the left and a detail/edit pane on the right, good for quickly working through a lot of games.</p>`,
             },
             {
+                title: 'Search and quick filters',
+                body: `<p>The search box at the top of the Library filters as you type. <strong>FILTERS</strong> opens the filter dialog, whose <strong>Quick</strong> row has one-click presets: All Games, Installed, Not Installed, Never Played / Unfinished, Beaten / Completed, and one for each completion status. While a filter is active, a <strong>✕ CLEAR</strong> button appears in the toolbar.</p>
+                       <p>The platform buttons in the same dialog hide or show whole libraries (Steam, GOG, Epic and so on).</p>`,
+            },
+            {
                 title: 'Building a filter',
-                body: `<p>The filter builder lets you combine conditions - tags, genres, completion status, release date, playtime, and more - into AND/OR groups. Save a filter once you've built it, and it becomes available as a shelf, or reusable anytime from the Library page.</p>`,
+                body: `<p><strong>Simple</strong> mode is a list of conditions - tags, genres, completion status, release date, playtime, review scores, developer and more - combined with <strong>AND</strong> (every condition must match) or <strong>OR</strong> (any one can match).</p>
+                       <p><strong>Advanced</strong> mode adds nested groups, so you can ask for things like "(Puzzle OR Platformer) AND under 10 hours", and expressions where you write your own SQL condition for anything the menus can't say. <strong>APPLY</strong> shows the result and <strong>CLEAR ALL</strong> starts over.</p>`,
+            },
+            {
+                title: 'Saved filters',
+                body: `<p>Once you have a filter you like, save it. The <strong>Saved filters…</strong> menu loads one, and the buttons beside it save the current filter, rename a saved one, or delete it.</p>
+                       <p>A saved filter can be reloaded from the Library, chosen as the filter for a Home shelf, used to narrow the pool Pick 6 draws from, and shared with other people through <strong>Filter Import / Export</strong> in the Data menu.</p>`,
             },
             {
                 title: 'Bulk operations',
