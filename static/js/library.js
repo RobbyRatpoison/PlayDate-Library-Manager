@@ -2363,11 +2363,13 @@ function pickRandomGame() {
             }
         }
 
-        // Description (load lazily)
+        // Description: always start from the stored text (so Cancel discards edits),
+        // and fetch it lazily only when there's none stored yet.
         const descText    = document.getElementById('detail-desc-text');
         const descLoading = document.getElementById('detail-desc-loading');
-        if (!_dpDescLoaded.has(game.appid)) {
-            if (descText)    descText.textContent = '';
+        if (descText) descText.value = game.short_description || '';
+        if (descLoading) descLoading.style.display = 'none';
+        if (!game.short_description && !_dpDescLoaded.has(game.appid)) {
             if (descLoading) descLoading.style.display = '';
             _dpLoadDescription(game.appid);
         }
@@ -2393,6 +2395,7 @@ function pickRandomGame() {
         dpSet('dp-rel',            game.release_date);
         dpSet('dp-review-score',   game.review_score);
         dpSet('dp-review-pct',     game.review_percentage ?? '');
+        dpSet('dp-metacritic',     game.metacritic_score ?? '');
         dpSet('dp-total-reviews',  game.total_reviews ?? '');
         dpSet('dp-last-played',    game.last_played);
         dpSet('dp-date-added',     game.date_added);
@@ -2417,6 +2420,7 @@ function pickRandomGame() {
         // Show content
         document.getElementById('detail-empty').style.display   = 'none';
         document.getElementById('detail-content').style.display = 'flex';
+        _dpFitDesc();   // needs the pane visible to measure
 
         // Reset save button
         const saveBtn = document.getElementById('dp-save-btn');
@@ -2457,6 +2461,15 @@ function pickRandomGame() {
         section.style.display = 'block';
     }
 
+    // The description field grows with its text (up to a cap) instead of scrolling inside a tiny box.
+    function _dpFitDesc() {
+        const el = document.getElementById('detail-desc-text');
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight + 2, 240) + 'px';
+    }
+    document.addEventListener('input', e => { if (e.target && e.target.id === 'detail-desc-text') _dpFitDesc(); });
+
     async function _dpLoadDescription(appid) {
         try {
             // Stored server-side and already in GAMES: no request needed.
@@ -2469,9 +2482,10 @@ function pickRandomGame() {
             const descText    = document.getElementById('detail-desc-text');
             const descLoading = document.getElementById('detail-desc-loading');
             if (descLoading) descLoading.style.display = 'none';
-            if (descText) {
-                descText.textContent = (data.status === 'success' && data.description)
-                    ? data.description : '';
+            // Fill the (editable) field, but never over something the user has typed meanwhile.
+            if (descText && !descText.value && data.status === 'success' && data.description) {
+                descText.value = data.description;
+                _dpFitDesc();
             }
             _dpDescLoaded.add(appid);
         } catch (_) {

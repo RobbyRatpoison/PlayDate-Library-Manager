@@ -275,10 +275,30 @@
             flex-shrink: 0;
             background: var(--bg-surface);
         }
+        /* Editable (saved with the form via its form= attribute) but styled as plain text
+           until hovered or focused, so browsing a game's blurb still reads like a page. */
         #detail-desc-text {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            min-height: 2.4em;
+            margin: 0;
+            padding: 4px 6px;
+            font-family: inherit;
             font-size: 0.84rem;
             color: var(--text-secondary);
             line-height: 1.55;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            resize: vertical;
+        }
+        #detail-desc-text:hover,
+        #detail-desc-text:focus {
+            outline: none;
+            border-color: var(--border);
+            background: var(--bg-input);
+            color: var(--text-primary);
         }
         #detail-desc-loading {
             font-size: 0.8rem;
@@ -779,7 +799,8 @@
                 <!-- Description -->
                 <div id="detail-desc-section">
                     <div id="detail-desc-loading" style="display:none;">Loading description...</div>
-                    <div id="detail-desc-text"></div>
+                    <textarea id="detail-desc-text" name="short_description" form="dp-form" rows="2"
+                              placeholder="No description" data-modal-row="0"></textarea>
                 </div>
                 <!-- Plugin-contributed extra info -->
                 <div id="detail-extra-info-section" style="display:none;">
@@ -800,7 +821,7 @@
                                 <input type="text" name="developers" id="dp-dev" style="width:100%;box-sizing:border-box;" data-modal-row="2">
                                 <label class="dp-label">Publishers</label>
                                 <input type="text" name="publishers" id="dp-pub" style="width:100%;box-sizing:border-box;" data-modal-row="3">
-                                <div style="display:grid; grid-template-columns:1.5fr 1fr; gap:8px;">
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                                     <div>
                                         <label class="dp-label">Release Date</label>
                                         <input type="text" name="release_date" id="dp-rel" placeholder="YYYY-MM-DD" style="width:100%;box-sizing:border-box;" data-modal-row="4">
@@ -815,10 +836,14 @@
                                 </div>
                                 <label class="dp-label">Review Score</label>
                                 <input type="text" name="review_score" id="dp-review-score" style="width:100%;box-sizing:border-box;" data-modal-row="5">
-                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
                                     <div>
                                         <label class="dp-label">Review %</label>
                                         <input type="number" name="review_percentage" id="dp-review-pct" min="0" max="100" style="width:100%;box-sizing:border-box;" data-modal-row="6">
+                                    </div>
+                                    <div>
+                                        <label class="dp-label" data-tooltip="Metacritic critic score, from the Steam store page">Critic %</label>
+                                        <input type="number" name="metacritic_score" id="dp-metacritic" min="0" max="100" style="width:100%;box-sizing:border-box;" data-modal-row="6">
                                     </div>
                                     <div>
                                         <label class="dp-label">Total Reviews</label>
