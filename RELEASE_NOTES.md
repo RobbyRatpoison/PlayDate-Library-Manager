@@ -1,12 +1,12 @@
 # Release Notes
 
-## v1.11.2
+## v1.11.2 - 2026-09-21
 ### New
 
-- Optional, customizable info tooltip when hovering a game cover in the Library. (suggested by Colosso)
-- Metacritic scores from Steam, available to sort and filter by, plus Critic % and an editable Description in the edit window and list mode. (suggested by Colosso)
-- Per-library artwork source settings: choose and reorder Steam, SteamGridDB or the store's own art. (suggested by Colosso)
-- The Playnite import now lets you choose which of date added, last played and time played to import. (suggested by Colosso)
+- Optional, customizable info tooltip when hovering a game cover in the Library. (suggested by woutercools)
+- Metacritic scores from Steam, available to sort and filter by, plus Critic % and an editable Description in the edit window and list mode. (suggested by woutercools)
+- Per-library artwork source settings: choose and reorder Steam, SteamGridDB or the store's own art. (suggested by woutercools)
+- The Playnite import now lets you choose which of date added, last played and time played to import. (suggested by woutercools)
 - Add Game (in the menu): add a game by hand from a Steam search, or as a custom entry. (prompted by Mayanaise)
 - Tutorial rewritten to follow the app page by page, with a search box and links to the dialogs it mentions.
 
