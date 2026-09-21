@@ -159,8 +159,8 @@ def pick_game():
         # Play" -- a tag you finish proportionally *less* than it shows up in
         # your library at all is a real avoidance signal, whether that's
         # active dislike or just a genre that never rises out of the backlog.
-        # An earlier version used "Won't Play" (this project's explicit
-        # terrible/broken marker) as the sole negative pool instead; live
+        # An earlier version used "Won't Play" (a status users pick for any
+        # reason, not only for games they dislike) as the sole negative pool instead; live
         # comparison found both independently surfaced the same core pattern,
         # but this version was judged to track actual avoided tags more
         # strongly, and doesn't depend on there being enough "Won't Play"

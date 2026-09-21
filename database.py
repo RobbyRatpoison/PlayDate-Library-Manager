@@ -478,8 +478,8 @@ def recalculate_tag_similarity():
     profile: those two tags alone carried 35-40% of the old profile vector's
     total magnitude).
 
-    An earlier version of this formula used "Won't Play" (this project's
-    explicit terrible/broken marker) as the negative pool instead of the whole
+    An earlier version of this formula used "Won't Play" (a status users pick
+    for any reason, not only for games they dislike) as the negative pool instead of the whole
     library. Replaced after live comparison: both independently surfaced the
     same core pattern (confirming it's real signal, not an artifact of
     either method), but the library-wide version was judged to track actual
