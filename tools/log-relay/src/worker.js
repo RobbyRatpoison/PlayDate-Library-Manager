@@ -21,7 +21,7 @@
 //
 // Deploy: see README.md in this directory.
 
-const MAX_LOG_BYTES = 1024 * 1024; // matches RotatingFileHandler cap
+const MAX_LOG_BYTES = 4 * 1024 * 1024; // matches RotatingFileHandler cap (app.py) / diagnostics.py's MAX_LOG_BYTES
 const MAX_DIAG_BYTES = 256 * 1024; // matches diagnostics.py's MAX_DIAG_BYTES
 const MAX_MESSAGE_CHARS = 1000;
 const MAX_SHORT_FIELD_CHARS = 100;

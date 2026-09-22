@@ -24,6 +24,9 @@ memory/
 # --- Logs ---
 *.log
 
+# --- Cloudflare Worker local state (tools/log-relay/) ---
+.wrangler/
+
 # --- Media Assets ---
 /static/img/library/
 /static/img/backgrounds/*

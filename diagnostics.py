@@ -37,7 +37,7 @@ diagnostics_bp = Blueprint('diagnostics', __name__)
 # lives only as a secret on the relay, never in source.
 RELAY_URL = 'https://playdate-log-relay.robbyratpoison.workers.dev'
 
-MAX_LOG_BYTES        = 1024 * 1024  # matches the RotatingFileHandler cap (app.py)
+MAX_LOG_BYTES        = 4 * 1024 * 1024  # matches the RotatingFileHandler cap (app.py); also update tools/log-relay/src/worker.js and redeploy it
 MAX_DIAG_BYTES       = 256 * 1024   # generous cap for state.json + counts; guards against a huge saved_filters dict
 SUBMIT_COOLDOWN_SECONDS = 5 * 60
 MAX_MESSAGE_CHARS    = 1000
