@@ -391,7 +391,12 @@ def auto_detect_duplicates(platform_priority=None):
                             "UPDATE games SET duplicate_of = ?, duplicate_auto = 1 WHERE appid = ?",
                             (high_games[norm], low_appid)
                         )
-                        _log.info(f'Auto-duplicate ({low_plat}→{high_plat}): appid {low_appid} → {high_games[norm]}')
+                        # DEBUG, not INFO: this fires once per matched pair and the
+                        # 'database' logger runs at INFO in production (app.py) --
+                        # confirmed live, a library with heavy cross-platform overlap
+                        # logged 145k of these across a few months, nearly half the
+                        # whole log file. Callers already log a one-line summary count.
+                        _log.debug(f'Auto-duplicate ({low_plat}→{high_plat}): appid {low_appid} → {high_games[norm]}')
                         updated += 1
 
         _align_manual_duplicate_links(conn, platform_priority)

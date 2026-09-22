@@ -32,7 +32,30 @@ class _TruncatingFormatter(logging.Formatter):
             msg = msg[:_MAX_MSG_LEN] + f'… [{len(msg) - _MAX_MSG_LEN} chars truncated]'
         return msg
 
-_handler_file   = RotatingFileHandler(LOG_PATH, maxBytes=1_000_000, backupCount=0, encoding='utf-8')
+class _TruncatingRotatingFileHandler(RotatingFileHandler):
+    """RotatingFileHandler with backupCount=0 never actually caps the file --
+    CPython's doRollover() only renames/truncates inside its `if self.backupCount
+    > 0:` block, so with 0 it just closes and reopens the same file, and maxBytes
+    becomes a no-op. Confirmed live: a real playdate.log grew to 29MB/5 months of
+    history despite the maxBytes setting below. Override to truncate in place instead,
+    keeping the single-file (no .1 backup) behavior the rest of the app assumes
+    (e.g. diagnostics.py's log submission)."""
+    def doRollover(self):
+        if self.stream:
+            self.stream.close()
+            self.stream = None
+        open(self.baseFilename, 'w').close()
+        if not self.delay:
+            self.stream = self._open()
+
+# 4MB, not 1MB: with truncation now actually enforced (see above), a cap this
+# small could get overwritten by ordinary background chatter (bulk ops, sync
+# threads) before a user notices a problem and grabs the log -- losing exactly
+# the startup/crash lines a bug report needs. Comfortably under Discord's 8MB
+# webhook attachment limit (see diagnostics.py's MAX_LOG_BYTES, which must
+# match this, and tools/log-relay/src/worker.js's copy, which needs a manual
+# redeploy since it isn't part of this app's build).
+_handler_file   = _TruncatingRotatingFileHandler(LOG_PATH, maxBytes=4_000_000, backupCount=0, encoding='utf-8')
 _handler_stream = logging.StreamHandler()
 _fmt = _TruncatingFormatter('%(asctime)s [%(levelname)s] %(message)s')
 _handler_file.setFormatter(_fmt)
