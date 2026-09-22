@@ -426,6 +426,19 @@
                             <div id="edit-hltb-times" style="font-size:0.85rem; color:#c2c8cc;"></div>
                         </div>
                         <div id="edit-hltb-alt-results" style="flex-direction:column; gap:4px; margin-top:4px; padding:8px; background:var(--bg-input); border:1px solid #2a475e; border-radius:5px;"></div>
+
+                        <div id="custom-launch-row" style="display:none; flex-direction:column; gap:6px; margin-top:10px; padding:10px 14px; background:var(--bg-input); border:1px solid #2a475e; border-radius:5px;">
+                            <label style="font-size:0.78rem; color:#8f98a0; font-weight:bold; text-transform:uppercase; letter-spacing:0.06em;">Launch</label>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                <input type="text" name="platform_executable" id="edit-custom-exe" placeholder="No executable set" style="flex:1;" data-modal-row="8">
+                                <button type="button" id="edit-custom-exe-browse" onclick="chooseCustomExePath()" data-modal-row="8"
+                                    style="font-size:0.72rem; padding:4px 10px; background:transparent; color:#8f98a0; border:1px solid #2a475e; border-radius:4px; cursor:pointer; white-space:nowrap;">Browse…</button>
+                                <button type="button" id="edit-custom-exe-clear" onclick="clearCustomExePath()" data-modal-row="8"
+                                    style="font-size:0.72rem; padding:4px 10px; background:transparent; color:#8f98a0; border:1px solid #2a475e; border-radius:4px; cursor:pointer; white-space:nowrap;">Clear</button>
+                            </div>
+                            <input type="text" name="launch_args" id="edit-custom-args" placeholder="Launch arguments (optional)" data-modal-row="8">
+                            <small class="pill-hint" style="margin:0;">Sets what the Launch button runs for this game. Once set, Installed is marked automatically based on whether the file exists.</small>
+                        </div>
                     </div>
 
                     <!-- PAGYWOSG quals: below both panes -->
@@ -922,11 +935,42 @@ const achLink = document.getElementById('achievements-link');
             if (pdb) pdb.style.display = 'none';
         }
 
+        // Custom games only: no store/plugin behind them, so Launch runs
+        // whatever executable is set here directly.
+        const customLaunchRow = document.getElementById('custom-launch-row');
+        if (customLaunchRow) {
+            customLaunchRow.style.display = (game.platform === 'custom') ? 'flex' : 'none';
+        }
+        safeSet('edit-custom-exe', game.platform_executable);
+        safeSet('edit-custom-args', game.launch_args);
+
         // Duplicate row: any game can be linked to any other
         _initDupRow(game);
 
         const modal = document.getElementById('editModal');
         modal.style.display = 'flex';
+    }
+
+    // ── Custom game launch path ──────────────────────────────────────────────
+    async function chooseCustomExePath() {
+        if (_fileDlgBusy) return;
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.pick_open_path) {
+            _fileDlgBusy = true;
+            let path;
+            try {
+                path = await window.pywebview.api.pick_open_path();
+            } finally {
+                setTimeout(() => { _fileDlgBusy = false; }, 300);
+            }
+            if (!path) return;
+            document.getElementById('edit-custom-exe').value = path;
+        }
+        // No native picker (browser mode) -- the text field still takes a typed path.
+    }
+
+    function clearCustomExePath() {
+        document.getElementById('edit-custom-exe').value = '';
+        document.getElementById('edit-custom-args').value = '';
     }
 
     // ── Duplicate linking ────────────────────────────────────────────────────

@@ -576,11 +576,43 @@ def update_game():
     from utils import get_all_unique_genres, get_all_unique_categories, invalidate_unique_cache
     try:
         old_groups_str = None
-        if 'groups' in data or 'name' in data:
+        if 'groups' in data or 'name' in data or 'platform_executable' in data:
             db = get_db()
-            old_row = db.execute("SELECT groups, name, meta_backfill_fetched FROM games WHERE appid = ?", (appid,)).fetchone()
+            old_row = db.execute(
+                "SELECT groups, name, meta_backfill_fetched, platform FROM games WHERE appid = ?", (appid,)
+            ).fetchone()
             db.close()
             old_groups_str = (old_row['groups'] if old_row else None) or ''
+            # The executable field only exists in the edit form for custom
+            # games (see modal_edit.html) -- but the hidden inputs still
+            # submit with the form even while the row is display:none, so
+            # this must be gated on the game's actual platform, not just on
+            # the key being present, or saving any other platform's game
+            # would clobber install_path/installed with the leftover blank
+            # value. Drives both install_path (so Open Folder keeps working,
+            # same as any other non-Steam platform) and Installed -- a
+            # stale/moved path shouldn't keep showing Installed just because
+            # it once did, and there's no store/plugin sync to catch that for
+            # this platform the way there is for every synced one.
+            if old_row and old_row['platform'] == 'custom':
+                # os.path.isfile() never expands '~' -- that's shell behavior,
+                # not something a raw path string gets for free -- so a path
+                # typed by hand (Browse always returns an absolute path, but
+                # someone typing one directly will naturally write '~/...')
+                # would otherwise always look "not found". Expand and store
+                # the real path so the field also shows what will actually run.
+                exe = os.path.expanduser((data.get('platform_executable') or '').strip())
+                data['platform_executable'] = exe or None
+                data['install_path'] = os.path.dirname(exe) if exe else None
+                if exe:
+                    data['installed'] = 1 if os.path.isfile(exe) else 0
+                # else: leave 'installed' exactly as the manual dropdown above
+                # set it -- a custom game with no executable configured can
+                # still be toggled Installed by hand, same as before this
+                # feature existed (e.g. tracking a physical copy).
+            else:
+                data.pop('platform_executable', None)
+                data.pop('launch_args', None)
             # A renamed game gets a fresh metadata backfill: the old resolution
             # was keyed on the old name, so drop the stamp + cached Steam AppID
             # and let the next startup sweep re-resolve from the new name.

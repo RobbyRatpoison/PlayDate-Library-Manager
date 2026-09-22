@@ -5,6 +5,7 @@ import logging
 import os
 import platform
 import re
+import shlex
 import subprocess
 
 from flask import Blueprint, jsonify, request
@@ -122,7 +123,8 @@ def launch_game(appid):
     # Look up platform and install status for this game
     db = get_db()
     row = db.execute(
-        "SELECT name, platform, platform_id, installed FROM games WHERE appid = ?", (appid_int,)
+        "SELECT name, platform, platform_id, installed, platform_executable, launch_args "
+        "FROM games WHERE appid = ?", (appid_int,)
     ).fetchone()
     db.close()
     game_name     = row['name'] if row else ''
@@ -143,6 +145,53 @@ def launch_game(appid):
             _plugin_registry.notify_game_launched(appid_int, game_platform)
         except Exception as e:
             log.error(f"Failed to launch Steam appid {appid_int}: {e}")
+    elif game_platform == 'custom':
+        # No store/plugin behind these -- launch whatever executable the user
+        # set in the edit modal directly, rather than dispatching to a plugin
+        # that will never claim this platform.
+        # expanduser as a defensive backstop -- update_game() now stores the
+        # already-expanded path, but a row saved before that fix (or edited
+        # directly) could still have a literal '~' in it.
+        exe = os.path.expanduser((row['platform_executable'] or '').strip()) if row else ''
+        if not exe:
+            return jsonify({"status": "not_supported",
+                            "message": "No executable set for this game — edit it to add one."}), 501
+        if not os.path.isfile(exe):
+            return jsonify({"status": "error",
+                            "message": "That executable was not found — it may have moved. Edit the game to update it."}), 404
+        # A .exe on Linux must go through Wine explicitly rather than being
+        # exec'd directly -- relying on a binfmt_misc registration to hand it
+        # to Wine transparently is both non-portable (not every install has
+        # that registered) and, found live testing this: a downloaded/unzipped
+        # .exe essentially never carries the Unix executable bit in the first
+        # place, so a direct exec hits PermissionError before binfmt_misc even
+        # gets a say. `wine` reads the target as a plain file argument, so it
+        # doesn't need that bit set at all. Windows/macOS are unaffected --
+        # the Wine subsystem in this app is Linux-only (see runners/wine.py).
+        import shutil
+        is_windows_exe = os_name == 'Linux' and exe.lower().endswith('.exe')
+        if is_windows_exe and not shutil.which('wine'):
+            return jsonify({"status": "error",
+                            "message": "This is a Windows program — install Wine to run it."}), 501
+        try:
+            args = shlex.split(row['launch_args'] or '', posix=(os_name != 'Windows'))
+            if is_windows_exe:
+                cmd = ['wine', exe] + args
+            elif os_name == 'Darwin' and exe.endswith('.app'):
+                cmd = ['open', exe] + (['--args'] + args if args else [])
+            else:
+                cmd = [exe] + args
+            subprocess.Popen(cmd, cwd=os.path.dirname(exe) or None)
+            log.info(f"Launched custom game appid {appid_int} ({game_name!r}): {exe}")
+            import plugins as _plugin_registry
+            _plugin_registry.notify_game_launched(appid_int, game_platform)
+        except PermissionError:
+            log.error(f"Failed to launch custom appid {appid_int}: {exe} is not marked executable")
+            return jsonify({"status": "error",
+                            "message": "That file isn't marked executable — check its permissions."}), 500
+        except Exception as e:
+            log.error(f"Failed to launch custom appid {appid_int}: {e}")
+            return api_error('Could not launch this game. Check playdate.log for details.', 500, exc=e)
     else:
         import emulators as _emu
         if _emu.is_emulation_platform(game_platform):
