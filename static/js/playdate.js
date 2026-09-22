@@ -157,7 +157,12 @@ function renderCardBadges(game, cfg) {
             } else {
                 const dft = fb === 'default' && window._PLAT_BADGE_DEFAULTS && window._PLAT_BADGE_DEFAULTS[plat];
                 if (dft) {
-                    html += `<img class="card-badge card-badge-circle card-badge-${corner}" src="${escHtml(dft)}" alt="">`;
+                    // custom.png is the app's own icon (a soft rounded-square
+                    // shape), not a tight circular brand mark like the real
+                    // stores' logos -- circle-cropping it chops the corners
+                    // off and looks wrong, so it renders at its natural shape.
+                    const circleCls = plat === 'custom' ? '' : ' card-badge-circle';
+                    html += `<img class="card-badge${circleCls} card-badge-${corner}" src="${escHtml(dft)}" alt="">`;
                 } else if (fb !== 'none') {
                     const label = (window._PLAT_LABELS && window._PLAT_LABELS[plat]) || plat;
                     html += `<span class="card-badge card-badge-${corner} card-badge-text">${escHtml(label)}</span>`;

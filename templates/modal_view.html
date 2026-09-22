@@ -1014,7 +1014,11 @@ function _cbRenderSections() {
             if (icon) {
                 previewSrc = '/static/img/badges/' + icon; previewStyle = '';
             } else if (dft) {
-                previewSrc = dft; previewStyle = 'opacity:0.75;'; previewCls += ' cb-plat-preview-circle';
+                previewSrc = dft; previewStyle = 'opacity:0.75;';
+                // custom.png is the app's own icon (a soft rounded-square
+                // shape, not a tight circular brand mark) -- see the matching
+                // note in renderCardBadges() (playdate.js).
+                if (pid !== 'custom') previewCls += ' cb-plat-preview-circle';
                 tag = '<span class="cb-plat-tag">default</span>';
             }
             const row = document.createElement('div');
