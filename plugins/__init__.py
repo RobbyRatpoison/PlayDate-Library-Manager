@@ -580,7 +580,7 @@ _CORE_PLATFORM_LABELS = {
     'epic_games':  'Epic Games',
     'ea_app':      'EA App',
     'ubisoft':     'Ubisoft',
-    'custom':      'Custom',   # games added by hand (Add Game), no store behind them
+    'custom':      'Manual',   # games added by hand (Add Game), no store behind them -- 'custom' is the stored platform value/id, unchanged; only the display label reads "Manual"
 }
 
 
