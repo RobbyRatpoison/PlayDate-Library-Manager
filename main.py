@@ -216,6 +216,15 @@ os.environ.setdefault("PYWEBVIEW_GUI", "qt" if _USE_QT else "gtk")
 if not _USE_QT:
     if not _USE_GTK4:
         os.environ.setdefault("WEBKIT_DISABLE_COMPOSITING_MODE", "1")
+        # NVIDIA's proprietary driver: WebKitGTK's DMA-BUF renderer leaves the
+        # window blank (issue #5, NVIDIA + X11 Flatpak; the page itself loads
+        # fine in a browser). /proc/driver/nvidia/version only exists for the
+        # proprietary driver, and is visible inside the Flatpak sandbox.
+        # setdefault so WEBKIT_DISABLE_DMABUF_RENDERER=0 still overrides.
+        if os.path.exists("/proc/driver/nvidia/version"):
+            os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
+            log.info("NVIDIA proprietary driver detected: WEBKIT_DISABLE_DMABUF_RENDERER=%s",
+                     os.environ["WEBKIT_DISABLE_DMABUF_RENDERER"])
     else:
         os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
     os.environ.setdefault("GDK_PROGRAM_CLASS", "PlayDate")
