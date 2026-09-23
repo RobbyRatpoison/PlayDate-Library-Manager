@@ -1131,7 +1131,12 @@ def clean_description(text):
     if not text:
         return ''
     import html as _html
-    text = _html.unescape(re.sub(r'<[^>]+>', ' ', str(text)))
+    # Bounded repetition, not `[^>]+`: an unbounded class here is quadratic on
+    # adversarial input with no closing '>' (e.g. a huge run of '<') -- each
+    # failed match backtracks across the whole remaining string before the
+    # engine retries at the next start position. No real tag/attribute list
+    # is anywhere near this long. Flagged by CodeQL (py/polynomial-redos).
+    text = _html.unescape(re.sub(r'<[^>]{1,1000}>', ' ', str(text)))
     text = re.sub(r'[ \t\r\f\v]+', ' ', text)
     text = re.sub(r' ?\n ?', '\n', text)
     return re.sub(r'\n{3,}', '\n\n', text).strip()
