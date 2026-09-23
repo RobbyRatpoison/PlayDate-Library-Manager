@@ -5,7 +5,7 @@ import os
 import re
 import sqlite3
 
-from config import BASE_DIR, CONFIG_PATH
+from config import BASE_DIR, CONFIG_PATH, save_config_data
 
 log = logging.getLogger(__name__)
 
@@ -49,12 +49,15 @@ def mark_background_done(version: int):
     try:
         with open(CONFIG_PATH) as f:
             cfg = json.load(f)
-    except Exception:
-        cfg = {}
+    except Exception as e:
+        # Don't fabricate a blank config and overwrite whatever is actually
+        # on disk with it -- if the file is unreadable, run()'s own read at
+        # startup already moved it aside; nothing safe to write here.
+        log.error(f"config.json is unreadable ({e}) -- not marking background migration v{version}")
+        return
     if (cfg.get('background_migration_version') or 0) < version:
         cfg['background_migration_version'] = version
-        with open(CONFIG_PATH, 'w') as f:
-            json.dump(cfg, f, indent=4)
+        save_config_data(cfg)
         log.info(f"Background migration v{version} marked complete")
 
 
@@ -71,8 +74,22 @@ def run():
     try:
         with open(CONFIG_PATH) as f:
             cfg = json.load(f)
-    except Exception:
-        cfg = {}
+    except Exception as e:
+        # A malformed config.json (partial write, sync-tool conflict, disk
+        # corruption, etc.) must never crash the app on startup -- confirmed
+        # live, this JSONDecodeError left the app unable to launch at all,
+        # since _m1_multi_account() below re-reads this same file directly
+        # and would hit the identical error a moment later. Move the bad file
+        # aside rather than silently carrying on with cfg={} while the
+        # corrupt file is still sitting at CONFIG_PATH for the next read to
+        # trip over -- every migration below sees "no config" (same as a
+        # fresh install) instead.
+        log.error(f"config.json is unreadable ({e}) -- moving it aside and starting fresh")
+        try:
+            os.replace(CONFIG_PATH, CONFIG_PATH + '.corrupt')
+        except OSError:
+            pass
+        return
 
     prev = cfg.get('migration_version') or 0
     if prev >= CURRENT_VERSION:
@@ -87,8 +104,7 @@ def run():
             raise  # abort — do not advance version past a failed migration
 
     cfg['migration_version'] = CURRENT_VERSION
-    with open(CONFIG_PATH, 'w') as f:
-        json.dump(cfg, f, indent=4)
+    save_config_data(cfg)
     log.info(f"Migrations complete — version {prev} → {CURRENT_VERSION}")
 
 
@@ -112,8 +128,7 @@ def _m1_multi_account():
 
     if not steam_id:
         new_config = {'active_account': None, 'sgdb_key': sgdb_key, 'accounts': {}}
-        with open(CONFIG_PATH, 'w') as f:
-            json.dump(new_config, f, indent=4)
+        save_config_data(new_config)
         return
 
     old_db = os.path.join(BASE_DIR, 'games.db')
@@ -132,8 +147,7 @@ def _m1_multi_account():
             }
         }
     }
-    with open(CONFIG_PATH, 'w') as f:
-        json.dump(new_config, f, indent=4)
+    save_config_data(new_config)
 
 
 @migration(2)
