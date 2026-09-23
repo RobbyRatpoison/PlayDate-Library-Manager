@@ -1,6 +1,6 @@
 # Release Notes
 
-## v1.11.3
+## v1.11.3 - 2026-09-22
 ### New
 
 - Manually added games can now be launched directly, using an executable set in the edit window; installed status updates automatically based on it.
