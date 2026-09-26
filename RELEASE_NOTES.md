@@ -1,6 +1,6 @@
 # Release Notes
 
-## v1.11.5
+## v1.11.5 - 2026-09-25
 ### New
 
 - The info tooltip can now also be shown on the Home page, from its own option in the Card Tooltip settings. (suggested by woutercools)
