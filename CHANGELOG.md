@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.11.4 - 2026-09-23
+### Fixes
+
+- Fixed PlayDate opening to a blank window on some NVIDIA systems. (reported by woutercools)
+
 ## v1.11.3 - 2026-09-22
 ### New
 

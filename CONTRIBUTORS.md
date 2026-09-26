@@ -160,6 +160,9 @@ People who've helped make PlayDate better - bug reports, feature suggestions, te
 - Suggested choosing the cover art source per library and art type - led to the Artwork Sources settings
 - Suggested a customizable info tooltip when hovering a game cover - led to the Card Tooltip setting
 - Suggested showing the Metacritic score - led to Metacritic scores, fetched from Steam
+- Reported a gap on the right side of the window when UI scaling is above 100%
+- Suggested a better info tooltip layout for horizontal covers - led to the cover-beside-text layout
+- Suggested an option to show the info tooltip on the Home page - led to the Home page tooltip setting
 
 **Celine**
 - Startup crash (`JSONDecodeError`) from a corrupted `config.json`, with no window ever opening
