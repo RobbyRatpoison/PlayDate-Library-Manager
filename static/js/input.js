@@ -991,14 +991,16 @@
         if (container) {
             const cRect = container.getBoundingClientRect();
             const topBound = Math.max(cRect.top, navH);
+            // Rects are screen px but an element's scrollTop is zoomed px.
+            const z = pdZoom();
             startPos = container.scrollTop;
             if (block === 'center') {
                 const visibleMid = topBound + (cRect.bottom - topBound) / 2;
-                targetPos = startPos + rect.top - visibleMid + (rect.height / 2);
+                targetPos = startPos + (rect.top - visibleMid + (rect.height / 2)) / z;
             } else if (rect.top < topBound) {
-                targetPos = startPos + (rect.top - topBound - PAD);
+                targetPos = startPos + (rect.top - topBound - PAD) / z;
             } else if (rect.bottom > cRect.bottom) {
-                targetPos = startPos + (rect.bottom - cRect.bottom + PAD);
+                targetPos = startPos + (rect.bottom - cRect.bottom + PAD) / z;
             } else {
                 return;
             }
@@ -1042,10 +1044,11 @@
         const cRect = container.getBoundingClientRect();
         const startPos = container.scrollLeft;
         let targetPos;
+        const z = pdZoom();   // rects are screen px, scrollLeft is zoomed px
         if (rect.left < cRect.left) {
-            targetPos = startPos + (rect.left - cRect.left);
+            targetPos = startPos + (rect.left - cRect.left) / z;
         } else if (rect.right > cRect.right) {
-            targetPos = startPos + (rect.right - cRect.right);
+            targetPos = startPos + (rect.right - cRect.right) / z;
         } else {
             return;
         }

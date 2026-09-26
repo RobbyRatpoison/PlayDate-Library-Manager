@@ -4293,7 +4293,7 @@ function closeAppearanceModal() {
 
 function _onUiScaleSlider(el) {
     document.getElementById('ui-scale-val').textContent = el.value + '%';
-    document.getElementById('ui-scale-style').textContent = 'html { zoom: ' + el.value + '%; }';
+    document.getElementById('ui-scale-style').textContent = 'html { zoom: ' + el.value + '%; --ui-zoom: ' + (el.value / 100) + '; }';
     const pct = (el.value - el.min) / (el.max - el.min) * 100;
     el.style.setProperty('--slider-pct', pct + '%');
 }
@@ -6453,7 +6453,8 @@ function saveHoverTip() {
     const fields = [...document.querySelectorAll('#hover-tip-fields input[data-tip-field]:checked')]
         .map(cb => cb.dataset.tipField);
     const enabled = !!document.getElementById('hover-tip-enabled')?.checked;
-    window._HOVER_TIP = { enabled, fields };
+    const home = !!document.getElementById('hover-tip-home')?.checked;
+    window._HOVER_TIP = { enabled, home, fields };
     sendStateUpdate({ hover_tooltip: window._HOVER_TIP }, false);
 }
 

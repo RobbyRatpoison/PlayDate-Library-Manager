@@ -29,7 +29,7 @@ def api_error(message, status=500, *, exc=None, log_label=None):
         log.error("%s: %s", log_label or message, exc, exc_info=True)
     return jsonify({"status": "error", "message": message}), status
 
-__version__ = "1.11.3"
+__version__ = "1.11.5"
 # Full tag this build came from (e.g. "1.6.5-beta.2"), overwritten by CI —
 # __version__ above is always the bare X.Y.Z (stripped of any -beta/-rc
 # suffix, since Inno Setup/display code assume that), so it alone can't tell
@@ -1192,7 +1192,7 @@ def load_state():
 HOVER_TIP_FIELDS = ('cover_alt', 'description', 'playtime', 'last_played', 'date_added',
                     'release_date', 'platform', 'community_score', 'metacritic',
                     'developers', 'publishers')
-DEFAULT_HOVER_TIP = {'enabled': False, 'fields': list(HOVER_TIP_FIELDS)}
+DEFAULT_HOVER_TIP = {'enabled': False, 'home': False, 'fields': list(HOVER_TIP_FIELDS)}
 
 def save_state(updates):
     with _state_lock:
@@ -1212,6 +1212,7 @@ def save_state(updates):
             _ht = updates["hover_tooltip"]
             _want = set(_ht.get("fields") or [])
             state["hover_tooltip"] = {"enabled": bool(_ht.get("enabled")),
+                                      "home": bool(_ht.get("home")),
                                       "fields": [f for f in HOVER_TIP_FIELDS if f in _want]}
         if isinstance(updates.get("art_source_prefs"), dict):
             _clean = {}

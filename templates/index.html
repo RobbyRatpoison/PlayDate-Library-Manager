@@ -40,8 +40,8 @@
            for the justify-content change out from under a scrollLeft that had
            already settled. Unconditional flex-start sidesteps the whole class
            of bug instead of chasing it further. Underfull shelves (pool <
-           what's visible) now left-align rather than center -- a visible, but
-           deliberate, tradeoff for reliability. */
+           what's visible) are centred by auto margins on the first/last card
+           instead (see below), which are inert once the row overflows. */
         justify-content: flex-start; gap: 6px;
         height: 100%;
         /* Horizontal scroll for pools bigger than what fits. When the pool
@@ -52,6 +52,11 @@
         padding: 3px 0; box-sizing: border-box;
     }
     .shelf-grid::-webkit-scrollbar { display: none; }
+    /* Centre an underfull shelf without justify-content:center: auto margins
+       on the first/last card absorb the free space when the row fits, and
+       resolve to 0 when it overflows, so card #1 stays at scrollLeft 0. */
+    .shelf-grid > :first-child { margin-left: auto; }
+    .shelf-grid > :last-child  { margin-right: auto; }
     /* No native scroll-snap here (deliberately removed) -- it doesn't just
        fight a JS-driven .scrollLeft write mid-animation (the documented
        reason the old .no-snap toggle-class existed), it also independently
@@ -630,6 +635,14 @@
 </div>
 <div id="dedup-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:599;" onclick="closeDedupPanel()"></div>
 
+<!-- Card hover tooltip (opt-in, Settings > Library > Card Tooltip > "Also show it on the Home page") -->
+<div id="home-hover-tooltip" style="
+    display:none; position:fixed; left:0; top:0; z-index:9000; pointer-events:none;
+    background:var(--bg-surface); border:1px solid var(--border);
+    border-radius:7px; padding:9px 12px; max-width:560px;
+    font-size:0.95rem; line-height:1.5; box-shadow:0 4px 18px rgba(0,0,0,0.45);
+"></div>
+<script src="{{ url_for('static', filename='js/info_tip.js') }}?v={{ app_version }}"></script>
 <script>
 const _imgV = Date.now(); // cache-buster for JS-rendered cards (shuffle/refill), matching library.js
 
@@ -848,8 +861,8 @@ function drawPieCanvases(selector, counts, order, colors) {
                 if (hit) {
                     _pieTooltip.innerHTML = `<span class="pie-tooltip-swatch" style="background:${hit.color}"></span>${hit.status} — ${hit.count}`;
                     _pieTooltip.style.display = 'block';
-                    _pieTooltip.style.left = (e.clientX + 14) + 'px';
-                    _pieTooltip.style.top  = (e.clientY - 10) + 'px';
+                    _pieTooltip.style.left = (e.clientX / pdZoom() + 14) + 'px';
+                    _pieTooltip.style.top  = (e.clientY / pdZoom() - 10) + 'px';
                 } else {
                     _pieTooltip.style.display = 'none';
                 }
@@ -928,7 +941,7 @@ function _updateScrollHints(grid) {
 function _cardStep(grid) {
     const caps = grid.querySelectorAll('.shelf-capsule-wrap');
     if (!caps.length) return null;
-    const cw = caps[0].getBoundingClientRect().width;
+    const cw = pdRect(caps[0]).width;   // zoomed px, same unit as scrollLeft
     return cw ? cw + 6 : null;
 }
 
@@ -1093,7 +1106,7 @@ function computeFitCount(grid) {
     const caps = grid.querySelectorAll('.shelf-capsule-wrap');
     if (!caps.length) return null;
     const gw = grid.clientWidth;
-    const cw = caps[0].getBoundingClientRect().width;
+    const cw = pdRect(caps[0]).width;
     if (!cw || !gw) return null;
     return Math.floor((gw + 6) / (cw + 6));
 }
@@ -1122,8 +1135,8 @@ function _clampShelfEdge(grid) {
     if (!caps.length) { wrap.style.maxWidth = ''; wrap.style.alignSelf = ''; return; }
     wrap.style.maxWidth = 'none';
     wrap.style.alignSelf = '';
-    const avail = wrap.getBoundingClientRect().width;
-    const cw = caps[0].getBoundingClientRect().width;
+    const avail = pdRect(wrap).width;
+    const cw = pdRect(caps[0]).width;
     if (!avail || !cw) return;
     const GAP = 6; // matches .shelf-grid's gap: 6px
     const fitCount = Math.max(1, Math.floor((avail + GAP) / (cw + GAP)));
@@ -2567,5 +2580,55 @@ setInterval(async () => {
         });
     } catch { /* silently ignore network errors */ }
 }, 5000);
+
+// ── Card hover tooltip (opt-in) ──────────────────────────────────────────────
+(function() {
+    const cfg = {{ state.get('hover_tooltip') | tojson }};
+    if (!cfg || !cfg.enabled || !cfg.home) return;
+    const tip = document.getElementById('home-hover-tooltip');
+    const games = new Map();      // appid -> full game row (fetched on first hover)
+    const info = window.PDInfoTip.make(cfg, {
+        orientation: () => 'vertical',   // Home shelves only show vertical covers
+        imgVersion:  () => _imgV,
+        getGame:     appid => games.get(appid),
+    });
+    let hovered = null;
+
+    function hide() { tip.style.display = 'none'; tip.innerHTML = ''; hovered = null; }
+
+    function place(card) {
+        const { x, y } = window.PDInfoTip.place(tip, card);
+        tip.style.left = x + 'px';
+        tip.style.top  = y + 'px';
+    }
+
+    function show(card, appid, game) {
+        const html = info.buildInfo(game);
+        if (!html) return;
+        tip.innerHTML = info.wrap(html);
+        tip.style.display = 'block';
+        place(card);
+        info.hydrateDesc(tip, appid, () => { if (hovered === appid) place(card); });
+    }
+
+    document.addEventListener('mouseover', e => {
+        if (document.body.classList.contains('edit-mode') || window._inputMgr?.active) { if (hovered) hide(); return; }
+        const card = e.target.closest('.shelf-capsule-wrap[data-appid]');
+        const appid = card ? parseInt(card.dataset.appid) : null;
+        if (appid === hovered) return;
+        hide();
+        if (!appid) return;
+        hovered = appid;
+        if (games.has(appid)) { show(card, appid, games.get(appid)); return; }
+        fetch(`/api/game/${appid}`).then(r => r.json()).then(d => {
+            if (d.status !== 'success') return;
+            games.set(appid, d.game);
+            if (hovered === appid) show(card, appid, d.game);
+        }).catch(() => {});
+    });
+    document.addEventListener('pointerleave', hide);
+    document.addEventListener('mouseout', e => { if (!e.relatedTarget) hide(); });
+    window.addEventListener('scroll', hide, { passive: true, capture: true });
+})();
 </script>
 {% endblock %}

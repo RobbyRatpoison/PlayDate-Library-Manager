@@ -933,15 +933,15 @@
         display:none; position:fixed; left:0; top:0; z-index:9000; pointer-events:none;
         opacity:0;
         background:var(--bg-surface); border:1px solid var(--border);
-        border-radius:7px; padding:9px 12px; max-width:320px;
-        font-size:0.8rem; line-height:1.5; box-shadow:0 4px 18px rgba(0,0,0,0.45);
+        border-radius:7px; padding:9px 12px; max-width:560px;
+        font-size:0.95rem; line-height:1.5; box-shadow:0 4px 18px rgba(0,0,0,0.45);
     "></div>
     <!-- PAGYWOSG gamepad tooltip (fixed to focused card) -->
     <div id="pag-gamepad-tooltip" style="
         display:none; position:fixed; left:0; top:0; z-index:9001; pointer-events:none;
         background:var(--bg-surface); border:2px solid var(--accent);
-        border-radius:7px; padding:9px 12px; max-width:320px;
-        font-size:0.8rem; line-height:1.5; box-shadow:0 4px 18px rgba(0,0,0,0.55);
+        border-radius:7px; padding:9px 12px; max-width:560px;
+        font-size:0.95rem; line-height:1.5; box-shadow:0 4px 18px rgba(0,0,0,0.55);
     "></div>
 
 
@@ -973,6 +973,7 @@
     window.BULK_GAME_COUNT = {{ games|length }};
     window.ALL_GAME_COUNT = {{ total_games }};
 </script>
+<script src="{{ url_for('static', filename='js/info_tip.js') }}?v={{ app_version }}"></script>
 <script src="{{ url_for('static', filename='js/library.js') }}?v={{ app_version }}"></script>
 
 <!-- Bulk Delete Modal -->

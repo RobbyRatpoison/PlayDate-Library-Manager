@@ -20,7 +20,10 @@
 }
 
 html {
-    margin-right: calc(100vw - 100%);
+    /* Scrollbar-width compensation. Under html{zoom} 100vw stays unzoomed while
+       100% is zoomed, so divide by the zoom or the difference becomes a huge
+       right margin (--ui-zoom is set next to the zoom rule). */
+    margin-right: calc(100vw / var(--ui-zoom, 1) - 100%);
     overflow-x: hidden;
     font-size: clamp(11px, 0.625vw, 20px);
 }

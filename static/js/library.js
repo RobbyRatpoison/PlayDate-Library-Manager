@@ -282,7 +282,7 @@
     function _scrollPreviewTopGame() {
         const cards = document.querySelectorAll('.game-card[data-appid], .list-row[data-appid]');
         for (const card of cards) {
-            if (card.getBoundingClientRect().bottom > 80) {
+            if (pdRect(card).bottom > 80) {
                 return _GAME_MAP.get(parseInt(card.dataset.appid)) || null;
             }
         }
@@ -1717,78 +1717,14 @@ async function stopBulkDateImport() {
     const gpTooltip      = document.getElementById('pag-gamepad-tooltip');
     const grid           = document.getElementById('game-grid');
     const sgGroup        = _pagOn ? _pagExtractSgGroup(_serverFilterTree) : null;
-    const _tipFields     = new Set(_tipCfg ? _tipCfg.fields : []);
 
-    // GAMES carries dates as 'YYYY-MM-DD' strings (library.py's ts_to_date), not timestamps.
-    function _tipDate(s) {
-        if (!s) return null;
-        const d = new Date(s);
-        return isNaN(d.getTime()) ? null : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
-    }
-
-    const _descCache = new Map(); // appid -> plain-text description or null
-
-    // Fetches the store blurb after the tooltip has stayed put briefly, so
-    // sweeping the mouse across the grid doesn't fire a request per card.
-    function _hydrateDesc(el, appid, reposition) {
-        const slot = el.querySelector('.ht-desc');
-        if (!slot) return;
-        const apply = text => {
-            if (!slot.isConnected) return;
-            if (text) { slot.textContent = text; slot.style.display = 'block'; }
-            else slot.remove();
-            reposition();
-        };
-        // Steam blurbs top out near 300 chars; the cap only trims long plugin descriptions.
-        const clip = t => {
-            if (!t || t.length <= 400) return t;
-            const cut = t.slice(0, 397);
-            return cut.slice(0, cut.lastIndexOf(' ') > 300 ? cut.lastIndexOf(' ') : 397).trimEnd() + '...';
-        };
-        // Stored server-side (GAMES.short_description): show it with no request.
-        const stored = _GAME_MAP.get(appid)?.short_description;
-        if (stored) { apply(clip(stored)); return; }
-        if (_descCache.has(appid)) { apply(_descCache.get(appid)); return; }
-        setTimeout(() => {
-            if (!slot.isConnected) return;
-            // Not stored yet: the endpoint fetches it once and saves it for next time.
-            fetch(`/api/game-description/${appid}`).then(r => r.json()).then(d => {
-                const t = d.status === 'success' && d.description ? clip(d.description) : null;
-                if (t && _GAME_MAP.get(appid)) _GAME_MAP.get(appid).short_description = d.description;
-                _descCache.set(appid, t || null);
-                apply(t);
-            }).catch(() => {});
-        }, 300);
-    }
-
-    function _buildInfoHtml(game) {
-        if (!_tipCfg) return null;
-        const dim = 'color:var(--text-secondary);';
-        const rows = [];
-        const row = (label, value) => { if (value) rows.push(`<div><span style="${dim}">${label}:</span> ${escHtml(String(value))}</div>`); };
-        let html = '';
-        if (_tipFields.has('cover_alt')) {
-            const horiz = _artOrientation === 'horizontal';
-            const v = _imgVersions.has(game.appid) ? _imgVersions.get(game.appid) : _imgV;
-            const kind = horiz ? 'vertical' : 'horizontal';
-            const size = horiz ? 'width:140px;aspect-ratio:2/3;' : 'width:290px;aspect-ratio:460/215;';
-            html += `<img src="/static/img/library/${kind}/${game.appid}.jpg?v=${v}" alt="" style="display:block;${size}object-fit:cover;border-radius:4px;margin-bottom:6px;" onerror="this.remove()">`;
-        }
-        if (_tipFields.has('description')) html += '<div class="ht-desc" style="display:none;margin-bottom:6px;"></div>';
-        if (_tipFields.has('playtime')) row('Time played', game.playtime_forever > 0 ? fmtHours(game.playtime_forever) : 'Never played');
-        if (_tipFields.has('last_played')) row('Last played', _tipDate(game.last_played) || 'Never');
-        if (_tipFields.has('date_added')) row('Date added', _tipDate(game.date_added));
-        if (_tipFields.has('release_date')) row('Released', _tipDate(game.release_date));
-        if (_tipFields.has('platform')) row('Library', (window._PLAT_LABELS || {})[game.platform || 'steam'] || game.platform || 'steam');
-        if (_tipFields.has('community_score') && game.review_percentage != null && game.review_percentage !== '') {
-            row('Steam community', `${game.review_score ? game.review_score + ' ' : ''}(${game.review_percentage}%)`);
-        }
-        if (_tipFields.has('metacritic') && game.metacritic_score != null) row('Metacritic', game.metacritic_score);
-        if (_tipFields.has('developers') && game.developers) row('Developer', game.developers.split(',').join(', '));
-        if (_tipFields.has('publishers') && game.publishers) row('Publisher', game.publishers.split(',').join(', '));
-        html += rows.join('');
-        return html || null;
-    }
+    // Info panel (cover, description, playtime...) is shared with the Home page: static/js/info_tip.js.
+    const _info = window.PDInfoTip.make(_tipCfg, {
+        orientation: () => _artOrientation,
+        imgVersion:  appid => _imgVersions.has(appid) ? _imgVersions.get(appid) : _imgV,
+        getGame:     appid => _GAME_MAP.get(appid),
+    });
+    const _buildInfoHtml = _info.buildInfo, _hydrateDesc = _info.hydrateDesc;
 
     function _hltbMin(game) {
         const vals = [game.hltb_main, game.hltb_extras, game.hltb_completionist]
@@ -1846,9 +1782,9 @@ async function stopBulkDateImport() {
         const pag  = _pagOn ? _buildPagHtml(game) : null;
         const info = _buildInfoHtml(game);
         if (!pag && !info) return null;
-        if (!pag) return info;
-        if (!info) return pag;
-        return info + `<div style="margin-top:6px; border-top:1px solid var(--border); padding-top:6px;">${pag}</div>`;
+        const body = !pag ? info : !info ? pag
+            : info + `<div style="margin-top:6px; border-top:1px solid var(--border); padding-top:6px;">${pag}</div>`;
+        return _info.wrap(body);
     }
 
     let _hoveredAppid = null;
@@ -1874,22 +1810,7 @@ async function stopBulkDateImport() {
         gpTooltip.innerHTML = '';
     }
 
-    function _positionTooltipBelowCard(el, card) {
-        const rect = card.getBoundingClientRect();
-        const pad = 8;
-        const tw = el.offsetWidth;
-        const th = el.offsetHeight;
-        let x = rect.left + (rect.width - tw) / 2;
-        // Decide above vs below by card position, not tooltip size, so all cards
-        // in the same row flip together rather than based on individual tooltip height.
-        const showAbove = rect.top > window.innerHeight / 2;
-        let y = showAbove ? rect.top - th - pad : rect.bottom + pad;
-        if (x + tw > window.innerWidth - pad) x = window.innerWidth - tw - pad;
-        if (x < pad) x = pad;
-        if (y < pad) y = pad;
-        if (y + th > window.innerHeight - pad) y = window.innerHeight - th - pad;
-        return { x: Math.round(x), y: Math.round(y) };
-    }
+    const _positionTooltipBelowCard = (el, card) => window.PDInfoTip.place(el, card);
 
     function _positionGpTooltip(card) {
         const { x, y } = _positionTooltipBelowCard(gpTooltip, card);
@@ -2120,8 +2041,8 @@ function pickRandomGame() {
     function _adjustListHeight() {
         const ll = document.getElementById('library-list-layout');
         if (!ll || ll.style.display === 'none') return;
-        const top = ll.getBoundingClientRect().top;
-        ll.style.height = (window.innerHeight - top - 2) + 'px';
+        const vp = pdViewport();
+        ll.style.height = (vp.h - pdRect(ll).top - 2) + 'px';
     }
 
     function _initListDivider() {
@@ -2131,7 +2052,7 @@ function pickRandomGame() {
         if (!divider || !listPane || !layout) return;
         let dragging = false, startX = 0, startW = 0;
         divider.addEventListener('mousedown', e => {
-            dragging = true; startX = e.clientX; startW = listPane.offsetWidth;
+            dragging = true; startX = e.clientX / pdZoom(); startW = listPane.offsetWidth;
             divider.classList.add('dragging');
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
@@ -2140,7 +2061,7 @@ function pickRandomGame() {
         document.addEventListener('mousemove', e => {
             if (!dragging) return;
             const totalW  = layout.offsetWidth;
-            const newW    = startW + (e.clientX - startX);
+            const newW    = startW + (e.clientX / pdZoom() - startX);
             const minW    = 200;
             const maxW    = Math.floor(totalW * 0.5);
             listPane.style.width = Math.min(Math.max(newW, minW), maxW) + 'px';
@@ -2313,8 +2234,8 @@ function pickRandomGame() {
             row.classList.add('selected');
             const gameList = document.getElementById('game-list');
             if (gameList) {
-                const listRect = gameList.getBoundingClientRect();
-                const rowRect  = row.getBoundingClientRect();
+                const listRect = pdRect(gameList);
+                const rowRect  = pdRect(row);
                 const rowH     = row.offsetHeight;
                 const listH    = gameList.clientHeight;
                 const target   = Math.max(0, gameList.scrollTop + rowRect.top - listRect.top - (listH - rowH) / 2);

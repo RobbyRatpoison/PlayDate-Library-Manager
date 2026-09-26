@@ -273,7 +273,10 @@
 
     function showMenu(x, y) {
         menu.classList.add('visible');
-        const vw = window.innerWidth, vh = window.innerHeight;
+        // x/y are clientX/Y (screen px); the menu's left/top are zoomed px.
+        const vp = pdViewport();
+        x /= vp.z; y /= vp.z;
+        const vw = vp.w, vh = vp.h;
         const mw = menu.offsetWidth  || 220;
         const mh = menu.offsetHeight || 160;
         menu.style.left = (x + mw > vw ? vw - mw - 6 : x) + 'px';
@@ -687,9 +690,10 @@
         sub.style.top   = '';
         sub.style.bottom = '';
 
-        const parentRect = this.getBoundingClientRect();
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
+        const parentRect = pdRect(this);
+        const vp = pdViewport();
+        const vw = vp.w;
+        const vh = vp.h;
         const subW = sub.offsetWidth  || 160;
         const subH = sub.offsetHeight || 130;
 

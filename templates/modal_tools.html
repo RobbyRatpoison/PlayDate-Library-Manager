@@ -735,7 +735,13 @@
                            onclick="event.stopPropagation()" onchange="saveHoverTip()" style="width:auto; margin:0;">
                     Show an info tooltip when hovering a game cover
                 </div>
-                <div style="font-size:0.75rem; color:#8f98a0; margin-top:3px; padding-left:22px;">Off by default. Library page, grid view. Also shows for the gamepad-focused card. Pick the details to include:</div>
+                <div style="font-size:0.75rem; color:#8f98a0; margin-top:3px; padding-left:22px;">Off by default. Library page, grid view (Home is a separate option below). Also shows for the gamepad-focused card. Pick the details to include:</div>
+                <div data-modal-row="29" onclick="var cb=this.querySelector('input');cb.checked=!cb.checked;saveHoverTip();"
+                     style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.82rem; padding:6px 0 2px 22px; color:var(--text-primary);">
+                    <input type="checkbox" id="hover-tip-home" {% if hover_tooltip.home %}checked{% endif %}
+                           onclick="event.stopPropagation()" onchange="saveHoverTip()" style="width:auto; margin:0;">
+                    Also show it on the Home page
+                </div>
                 <div id="hover-tip-fields" style="padding-left:22px; margin-top:6px;"></div>
             </div>
         </div>

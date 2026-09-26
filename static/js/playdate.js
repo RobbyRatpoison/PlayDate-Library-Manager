@@ -16,6 +16,20 @@ function _makeStorage(getter, mem) {
     };
 }
 
+// ── UI scale (html { zoom }) helpers ─────────────────────────────────────────
+// Under zoom, getBoundingClientRect(), innerWidth/Height, clientX/Y and
+// window.scrollY are in screen px, while offset*/client*/scroll* sizes, an
+// element's scrollTop/scrollLeft and every CSS length (style.left...) are in
+// zoomed px (screen px / zoom). Anything combining the two must convert first;
+// these return screen-space values in the zoomed space CSS uses. (Measured the
+// same in Chromium and WebKitGTK.)
+function pdZoom() { return parseFloat(getComputedStyle(document.documentElement).zoom) || 1; }
+function pdViewport() { const z = pdZoom(); return { w: window.innerWidth / z, h: window.innerHeight / z, z }; }
+function pdRect(el) {
+    const z = pdZoom(), r = el.getBoundingClientRect();
+    return { left: r.left / z, top: r.top / z, right: r.right / z, bottom: r.bottom / z, width: r.width / z, height: r.height / z };
+}
+
 // ── Tooltip manager ──────────────────────────────────────────────────────────
 (function () {
     const tt = document.createElement('div');
@@ -38,14 +52,15 @@ function _makeStorage(getter, mem) {
         tt.style.visibility = 'visible';
         requestAnimationFrame(() => {
             if (_cur !== el) return;
-            const r  = el.getBoundingClientRect();
+            const r  = pdRect(el);
             const tw = tt.offsetWidth;
             const th = tt.offsetHeight;
             let top  = r.top - th - 6;
             let left = ('tooltipRight' in el.dataset) ? r.right - tw : r.left;
             if (top < 4)  top  = r.bottom + 6;
             if (left < 4) left = 4;
-            if (left + tw > window.innerWidth - 4) left = window.innerWidth - tw - 4;
+            const vw = pdViewport().w;
+            if (left + tw > vw - 4) left = vw - tw - 4;
             tt.style.top  = top  + 'px';
             tt.style.left = left + 'px';
             tt.style.opacity = '1';
@@ -640,7 +655,7 @@ function initCustomSelect(nativeSelect) {
         });
         div.classList.add('open');
         // Position fixed so the panel escapes overflow:hidden ancestors
-        const rect = btn.getBoundingClientRect();
+        const rect = pdRect(btn);
         panel.style.position = 'fixed';
         panel.style.top = rect.bottom + 'px';
         panel.style.left = rect.left + 'px';
@@ -1092,12 +1107,12 @@ function openColorPicker(anchor, currentHex, onChange) {
     hexInput.value = initOut.toUpperCase();
 
     // Position
-    const rect = anchor.getBoundingClientRect();
+    const rect = pdRect(anchor), vp = pdViewport();
     const popW = 220, popH = 280;
     let top = rect.bottom + 4, left = rect.left;
-    if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+    if (left + popW > vp.w - 8) left = vp.w - popW - 8;
     if (left < 8) left = 8;
-    if (top + popH > window.innerHeight - 8) top = rect.top - popH - 4;
+    if (top + popH > vp.h - 8) top = rect.top - popH - 4;
     pop.style.top = top + 'px';
     pop.style.left = left + 'px';
 
