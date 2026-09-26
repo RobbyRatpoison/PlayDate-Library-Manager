@@ -9,7 +9,7 @@ from config import BASE_DIR, CONFIG_PATH, save_config_data
 
 log = logging.getLogger(__name__)
 
-CURRENT_VERSION    = 12
+CURRENT_VERSION    = 13
 BACKGROUND_VERSION = 11
 
 _migrations:            dict[int, callable] = {}
@@ -570,6 +570,33 @@ def _m12_gog_release_date_strings():
                 cursor.executemany("UPDATE games SET release_date = ? WHERE rowid = ?", updates)
             if nulls:
                 cursor.executemany("UPDATE games SET release_date = NULL WHERE rowid = ?", nulls)
+            conn.commit()
+        finally:
+            conn.close()
+
+
+@migration(13)
+def _m13_retry_description_lookups():
+    """Let Steam games whose description lookup "found nothing" try again.
+
+    Steam sometimes answers appdetails under a different key than the appid
+    asked for (Cloudbuilt 262390 -> "307550"), which the lookup read as "no
+    store data" and stamped short_description_checked, blocking a retry for 14
+    days. The lookup is fixed (scrapers.appdetails_entry); this clears the
+    stamps it wrongly left. A game with genuinely no blurb just re-stamps on
+    its next hover.
+    """
+    for db_path in _all_db_files():
+        conn = sqlite3.connect(db_path, timeout=10)
+        try:
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(games)")}
+            if 'short_description_checked' not in cols:
+                continue   # column doesn't exist yet, so nothing was ever stamped
+            conn.execute(
+                "UPDATE games SET short_description_checked = NULL "
+                "WHERE platform = 'steam' AND short_description_checked IS NOT NULL "
+                "AND (short_description IS NULL OR short_description = '')"
+            )
             conn.commit()
         finally:
             conn.close()

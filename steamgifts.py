@@ -383,7 +383,8 @@ def _appdetails_lite(appid: int, session, cache: dict) -> dict:
         r = session.get(
             f'https://store.steampowered.com/api/appdetails?appids={appid}&l=english',
             timeout=10)
-        entry = (r.json() or {}).get(key, {})
+        from scrapers import appdetails_entry
+        entry = appdetails_entry(r.json(), appid)
         if entry.get('success'):
             d = entry['data']
             out.update(ok=True, type=d.get('type'), name=d.get('name'))

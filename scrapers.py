@@ -1123,6 +1123,24 @@ def _scrape_store_page_date(appid, session=None):
         return None
 
 
+def appdetails_entry(json_data, appid):
+    """The `{success, data}` entry for appid from a Steam appdetails response.
+
+    Normally keyed by the requested appid, but Steam sometimes answers under a
+    different key (Cloudbuilt 262390 comes back keyed "307550", its DLC, with
+    data.steam_appid still 262390). Fall back to the single entry whose own
+    steam_appid matches so those games aren't treated as missing."""
+    if not isinstance(json_data, dict):
+        return {}
+    entry = json_data.get(str(appid))
+    if entry:
+        return entry
+    for e in json_data.values():
+        if isinstance(e, dict) and str((e.get('data') or {}).get('steam_appid')) == str(appid):
+            return e
+    return {}
+
+
 def clean_description(text):
     """Store blurb -> plain text: strips tags, decodes entities, collapses runs of
     spaces (paragraph breaks are kept, capped at one blank line). Returns '' for
@@ -1175,12 +1193,13 @@ def fetch_store_data(appid, session=None):
         response.raise_for_status()
         json_data = response.json()
 
-        # The API returns data keyed by the appid string
-        if not json_data or not json_data.get(str(appid), {}).get('success'):
+        # The API returns data keyed by the appid string (usually; see appdetails_entry)
+        entry = appdetails_entry(json_data, appid)
+        if not entry.get('success'):
             log.info(f"Could not find store data for {appid}")
             return None
 
-        data = json_data[str(appid)]['data']
+        data = entry['data']
 
         # Prefer local appinfo.vdf dates (no HTTP): original_release_date matches
         # the store page display date; steam_release_date is the Steam launch date.

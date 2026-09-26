@@ -1210,7 +1210,7 @@ def game_description(appid):
     import plugins as _plugins
     import requests as _r
     from datetime import datetime
-    from scrapers import clean_description, description_lookup_due
+    from scrapers import clean_description, description_lookup_due, appdetails_entry
     from database import update_game_data as _ugd
     db = get_db()
     row = db.execute("SELECT platform, platform_id, short_description, short_description_checked FROM games WHERE appid = ?", (appid,)).fetchone()
@@ -1240,7 +1240,7 @@ def game_description(appid):
             )
             if resp.ok:
                 answered = True
-                app_data = resp.json().get(str(appid), {})
+                app_data = appdetails_entry(resp.json(), appid)
                 if app_data.get('success'):
                     desc = clean_description(app_data.get('data', {}).get('short_description', ''))
         if desc:
