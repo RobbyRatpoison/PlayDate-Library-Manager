@@ -63,9 +63,9 @@ window.PDInfoTip = {
                 // Horizontal library: the tall cover sits beside the text instead of above it.
                 // Horizontal art uses the same 616:353 frame as the library's own horizontal cards
                 // (a 460:215 frame cropped it). The tall cover stretches to the text's height,
-                // its width following from the 2:3 ratio. Height is capped at 300px (the 200px max
+                // its width following from the 2:3 ratio. Height is capped at 390px (the 260px max
                 // width at 2:3), so a tall tooltip leaves the cover uncropped instead of trimming its sides.
-                const size = horiz ? 'align-self:stretch;height:auto;min-height:210px;max-height:300px;width:auto;max-width:200px;aspect-ratio:2/3;flex:none;'
+                const size = horiz ? 'align-self:stretch;height:auto;min-height:270px;max-height:390px;width:auto;max-width:260px;aspect-ratio:2/3;flex:none;'
                                    : 'width:290px;aspect-ratio:616/353;margin-bottom:6px;';
                 cover = `<img src="/static/img/library/${kind}/${game.appid}.jpg?v=${opts.imgVersion(game.appid)}" alt="" style="display:block;${size}object-fit:cover;border-radius:4px;" onerror="this.remove()">`;
             }
@@ -89,7 +89,7 @@ window.PDInfoTip = {
         }
 
         // Wrapper caps the content width (the tooltip boxes themselves allow 560px).
-        function wrap(body) { return `<div style="max-width:${wide() ? 510 : 330}px;">${body}</div>`; }
+        function wrap(body) { return `<div style="max-width:${wide() ? 550 : 330}px;">${body}</div>`; }
 
         return { wide, buildInfo, hydrateDesc, wrap };
     },
