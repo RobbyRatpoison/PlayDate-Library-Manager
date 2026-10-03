@@ -42,7 +42,7 @@
             <button onclick="addSimpleRow()" style="background:none;border:1px dashed #3a5570;color:#8f98a0;padding:0.375rem 1rem;border-radius:0.3125rem;cursor:pointer;font-size:0.85rem;margin-top:4px;transition:all 0.2s;"
                 onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
                 onmouseout="this.style.borderColor='#3a5570';this.style.color='#8f98a0'">
-                + Add Filter
+                + Filter
             </button>
         </div>
 
@@ -59,7 +59,7 @@
                 </div>
                 <div class="fmg-rows"></div>
                 <div class="fmg-actions">
-                    <button class="fmg-add-cond" onclick="addAdvancedRow(this.closest('.fmg-container'))">+ Condition</button>
+                    <button class="fmg-add-cond" onclick="addAdvancedRow(this.closest('.fmg-container'))">+ Filter</button>
                     <button class="fmg-add-group" onclick="addAdvancedGroup(this.closest('.fmg-container'))">+ Group</button>
                     <button class="fmg-add-cond" onclick="addAdvancedExprRow(this.closest('.fmg-container'))">+ Expression</button>
                     <span class="fmg-logic-toggle" onclick="toggleGroupLogic(this.closest('.fmg-container'))" style="margin-left:8px;">AND</span>
@@ -1291,7 +1291,7 @@ function addAdvancedGroup(parentGroupEl, existingTree = null) {
         </div>
         <div class="fmg-rows"></div>
         <div class="fmg-actions">
-            <button class="fmg-add-cond" onclick="addAdvancedRow(this.closest('.fmg-container'))">+ Condition</button>
+            <button class="fmg-add-cond" onclick="addAdvancedRow(this.closest('.fmg-container'))">+ Filter</button>
             <button class="fmg-add-group" onclick="addAdvancedGroup(this.closest('.fmg-container'))">+ Group</button>
             <button class="fmg-add-cond" onclick="addAdvancedExprRow(this.closest('.fmg-container'))">+ Expression</button>
             <span class="fmg-logic-toggle ${logic==='OR'?'or-mode':''}" onclick="toggleGroupLogic(this.closest('.fmg-container'))" style="margin-left:8px;">${logic}</span>
@@ -1309,7 +1309,7 @@ function addAdvancedGroup(parentGroupEl, existingTree = null) {
             else if (item.type === 'saved_filter_ref') addAdvancedRow(groupEl, item);
         });
     }
-    // No auto-add — user clicks + Condition when ready
+    // No auto-add — user clicks + Filter when ready
 
     updateSqlPreview();
     return groupEl;
