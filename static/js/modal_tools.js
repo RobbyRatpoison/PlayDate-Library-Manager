@@ -6452,9 +6452,10 @@ function _renderHoverTipFields() {
 function saveHoverTip() {
     const fields = [...document.querySelectorAll('#hover-tip-fields input[data-tip-field]:checked')]
         .map(cb => cb.dataset.tipField);
-    const enabled = !!document.getElementById('hover-tip-enabled')?.checked;
+    const library = !!document.getElementById('hover-tip-library')?.checked;
     const home = !!document.getElementById('hover-tip-home')?.checked;
-    window._HOVER_TIP = { enabled, home, fields };
+    const pick6 = !!document.getElementById('hover-tip-pick6')?.checked;
+    window._HOVER_TIP = { library, home, pick6, fields };
     sendStateUpdate({ hover_tooltip: window._HOVER_TIP }, false);
 }
 

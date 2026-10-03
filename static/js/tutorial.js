@@ -148,8 +148,8 @@ const TUTORIAL_SECTIONS = [
             },
             {
                 title: 'Card badges, outlines and tooltips',
-                body: `<p>${tutOpen('appearance', 'Settings → Appearance')} can show ${tutOpen('card-badges', '<strong>card badges</strong>')} in a cover's corners (platform, installed, achievement %, review score, HowLongToBeat time) and ${tutOpen('card-outlines', '<strong>card outlines</strong>')}: colored borders from rules you put in order, where the first matching rule wins.</p>
-                       <p>Under ${tutOpen('library', 'Settings → Library')} you can also turn on a <strong>card tooltip</strong> that shows details when you hover a cover in the grid, and choose which details it includes.</p>`,
+                body: `<p>${tutOpen('appearance', 'Settings → Appearance')} can show ${tutOpen('card-badges', '<strong>card badges</strong>')} in a cover's corners (library, installed, achievement %, review score, HowLongToBeat time) and ${tutOpen('card-outlines', '<strong>card outlines</strong>')}: colored borders from rules you put in order, where the first matching rule wins.</p>
+                       <p>Under ${tutOpen('library', 'Settings → Library')} you can also turn on a <strong>card tooltip</strong> that shows details when you hover a cover, and choose which pages it appears on (Library, Home and Pick 6) and which details it includes.</p>`,
             },
         ],
     },

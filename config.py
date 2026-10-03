@@ -850,6 +850,11 @@ def _load_state_unlocked():
             _shelf.pop('custom_sql', None)
             dirty = True
 
+    # Migrate hover_tooltip {enabled, home, fields} -> per-page {library, home, pick6, fields}
+    if isinstance(state.get('hover_tooltip'), dict) and 'library' not in state['hover_tooltip']:
+        state['hover_tooltip'] = normalize_hover_tip(state['hover_tooltip'])
+        dirty = True
+
     # Migrate saved filters: wrap bare trees as {id, tree} and assign missing UUIDs
     saved = state.get('saved_filters', {})
     for name, val in list(saved.items()):
@@ -1192,7 +1197,20 @@ def load_state():
 HOVER_TIP_FIELDS = ('cover_alt', 'description', 'playtime', 'last_played', 'date_added',
                     'release_date', 'platform', 'community_score', 'metacritic',
                     'developers', 'publishers')
-DEFAULT_HOVER_TIP = {'enabled': False, 'home': False, 'fields': list(HOVER_TIP_FIELDS)}
+DEFAULT_HOVER_TIP = {'library': False, 'home': False, 'pick6': False, 'fields': list(HOVER_TIP_FIELDS)}
+
+
+def normalize_hover_tip(ht):
+    """Current-shape hover_tooltip from a saved one. Before the per-page toggles it was
+    {enabled, home, fields}: `enabled` meant the Library page, and Home only showed it when
+    both were on, so a legacy value keeps exactly that behavior."""
+    ht = ht if isinstance(ht, dict) else {}
+    legacy = 'library' not in ht
+    library = bool(ht.get('enabled')) if legacy else bool(ht.get('library'))
+    home = bool(ht.get('home')) and (library or not legacy)
+    want = set(ht['fields']) if isinstance(ht.get('fields'), list) else set(HOVER_TIP_FIELDS)
+    return {'library': library, 'home': home, 'pick6': bool(ht.get('pick6')),
+            'fields': [f for f in HOVER_TIP_FIELDS if f in want]}
 
 def save_state(updates):
     with _state_lock:
@@ -1210,10 +1228,10 @@ def save_state(updates):
                 state[key] = val
         if isinstance(updates.get("hover_tooltip"), dict):
             _ht = updates["hover_tooltip"]
-            _want = set(_ht.get("fields") or [])
-            state["hover_tooltip"] = {"enabled": bool(_ht.get("enabled")),
+            state["hover_tooltip"] = {"library": bool(_ht.get("library")),
                                       "home": bool(_ht.get("home")),
-                                      "fields": [f for f in HOVER_TIP_FIELDS if f in _want]}
+                                      "pick6": bool(_ht.get("pick6")),
+                                      "fields": [f for f in HOVER_TIP_FIELDS if f in set(_ht.get("fields") or [])]}
         if isinstance(updates.get("art_source_prefs"), dict):
             _clean = {}
             for _plat, _kinds in updates["art_source_prefs"].items():

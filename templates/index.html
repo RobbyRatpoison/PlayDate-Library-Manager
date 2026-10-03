@@ -635,7 +635,7 @@
 </div>
 <div id="dedup-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:599;" onclick="closeDedupPanel()"></div>
 
-<!-- Card hover tooltip (opt-in, Settings > Library > Card Tooltip > "Also show it on the Home page") -->
+<!-- Card hover tooltip (opt-in, Settings > Library > Card Tooltip > Home page) -->
 <div id="home-hover-tooltip" style="
     display:none; position:fixed; left:0; top:0; z-index:9000; pointer-events:none;
     background:var(--bg-surface); border:1px solid var(--border);
@@ -2584,7 +2584,7 @@ setInterval(async () => {
 // ── Card hover tooltip (opt-in) ──────────────────────────────────────────────
 (function() {
     const cfg = {{ state.get('hover_tooltip') | tojson }};
-    if (!cfg || !cfg.enabled || !cfg.home) return;
+    if (!cfg || !cfg.home) return;
     const tip = document.getElementById('home-hover-tooltip');
     const games = new Map();      // appid -> full game row (fetched on first hover)
     const info = window.PDInfoTip.make(cfg, {

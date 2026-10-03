@@ -556,6 +556,14 @@
     </div>
 </div>
 
+<!-- Card hover tooltip (opt-in, Settings > Library > Card Tooltip > Pick 6 page) -->
+<div id="pick-hover-tooltip" style="
+    display:none; position:fixed; left:0; top:0; z-index:9000; pointer-events:none;
+    background:var(--bg-surface); border:1px solid var(--border);
+    border-radius:7px; padding:9px 12px; max-width:560px;
+    font-size:0.95rem; line-height:1.5; box-shadow:0 4px 18px rgba(0,0,0,0.45);
+"></div>
+<script src="{{ url_for('static', filename='js/info_tip.js') }}?v={{ app_version }}"></script>
 <script>
 const _imgV = Date.now(); // cache-buster, matching library.js
 const _activeFilterName = {{ filter_name | tojson }};
@@ -904,5 +912,55 @@ function enforceCardRatio() {
 window.addEventListener('resize', enforceCardRatio);
 document.addEventListener('DOMContentLoaded', _initSliderFills);
 document.addEventListener('DOMContentLoaded', refreshStatusAvailability);
+
+// ── Card hover tooltip (opt-in) ──────────────────────────────────────────────
+(function() {
+    const cfg = {{ state.get('hover_tooltip') | tojson }};
+    if (!cfg || !cfg.pick6) return;
+    const tip = document.getElementById('pick-hover-tooltip');
+    const games = new Map();      // appid -> full game row (fetched on first hover)
+    const info = window.PDInfoTip.make(cfg, {
+        orientation: () => 'vertical',   // Pick 6 cards only show vertical covers
+        imgVersion:  () => _imgV,
+        getGame:     appid => games.get(appid),
+    });
+    let hovered = null;
+
+    function hide() { tip.style.display = 'none'; tip.innerHTML = ''; hovered = null; }
+
+    function place(card) {
+        const { x, y } = window.PDInfoTip.place(tip, card);
+        tip.style.left = x + 'px';
+        tip.style.top  = y + 'px';
+    }
+
+    function show(card, appid, game) {
+        const html = info.buildInfo(game);
+        if (!html) return;
+        tip.innerHTML = info.wrap(html);
+        tip.style.display = 'block';
+        place(card);
+        info.hydrateDesc(tip, appid, () => { if (hovered === appid) place(card); });
+    }
+
+    document.addEventListener('mouseover', e => {
+        if (window._inputMgr?.active) { if (hovered) hide(); return; }
+        const card = e.target.closest('.result-card[data-appid]');
+        const appid = card ? parseInt(card.dataset.appid) : null;
+        if (appid === hovered) return;
+        hide();
+        if (!appid) return;
+        hovered = appid;
+        if (games.has(appid)) { show(card, appid, games.get(appid)); return; }
+        fetch(`/api/game/${appid}`).then(r => r.json()).then(d => {
+            if (d.status !== 'success') return;
+            games.set(appid, d.game);
+            if (hovered === appid) show(card, appid, d.game);
+        }).catch(() => {});
+    });
+    document.addEventListener('pointerleave', hide);
+    document.addEventListener('mouseout', e => { if (!e.relatedTarget) hide(); });
+    window.addEventListener('scroll', hide, { passive: true, capture: true });
+})();
 </script>
 {% endblock %}

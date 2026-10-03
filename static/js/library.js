@@ -1710,7 +1710,7 @@ async function stopBulkDateImport() {
 // ── Card hover tooltip (PAGYWOSG quals + optional game info) ─────────────────
 (function() {
     const _pagOn  = !!_serverFilterTree?.pagywosg;
-    const _tipCfg = window.HOVER_TIP && window.HOVER_TIP.enabled ? window.HOVER_TIP : null;
+    const _tipCfg = window.HOVER_TIP && window.HOVER_TIP.library ? window.HOVER_TIP : null;
     if (!_pagOn && !_tipCfg) return;
 
     const tooltip        = document.getElementById('pag-hover-tooltip');
