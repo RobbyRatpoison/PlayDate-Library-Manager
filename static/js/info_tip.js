@@ -66,7 +66,7 @@ window.PDInfoTip = {
                 // its width following from the 2:3 ratio. Height is capped at 390px (the 260px max
                 // width at 2:3), so a tall tooltip leaves the cover uncropped instead of trimming its sides.
                 const size = horiz ? 'align-self:stretch;height:auto;min-height:270px;max-height:390px;width:auto;max-width:260px;aspect-ratio:2/3;flex:none;'
-                                   : 'width:290px;aspect-ratio:616/353;margin-bottom:6px;';
+                                   : 'width:100%;aspect-ratio:616/353;margin-bottom:6px;';
                 cover = `<img src="/static/img/library/${kind}/${game.appid}.jpg?v=${opts.imgVersion(game.appid)}" alt="" style="display:block;${size}object-fit:cover;border-radius:4px;" onerror="this.remove()">`;
             }
             let html = '';
@@ -88,8 +88,13 @@ window.PDInfoTip = {
             return cover + html;
         }
 
-        // Wrapper caps the content width (the tooltip boxes themselves allow 560px).
-        function wrap(body) { return `<div style="max-width:${wide() ? 550 : 330}px;">${body}</div>`; }
+        // Wrapper caps the content width (the tooltip boxes themselves allow 560px). The stacked
+        // layout with a cover is a fixed 330px so the cover (width:100%) fills it edge to edge
+        // instead of leaving a gap beside text that wraps wider than a fixed-size cover.
+        function wrap(body) {
+            if (wide()) return `<div style="max-width:550px;">${body}</div>`;
+            return fields.has('cover_alt') ? `<div style="width:330px;">${body}</div>` : `<div style="max-width:330px;">${body}</div>`;
+        }
 
         return { wide, buildInfo, hydrateDesc, wrap };
     },
