@@ -6463,7 +6463,7 @@ else _renderHoverTipFields();
 
 // ── Per-platform artwork source preferences (Settings modal) ─────────────────
 const _ART_KINDS = [['vertical', 'Vertical'], ['horizontal', 'Horizontal'], ['icon', 'Icon']];
-const _ART_SRC_LABELS = { store: "Store (the platform's own art)", sgdb: 'SteamGridDB', steam: 'Steam' };
+const _ART_SRC_LABELS = { store: "Store (the library's own art)", sgdb: 'SteamGridDB', steam: 'Steam' };
 
 // Steam plus the platforms of installed plugins; _PLAT_LABELS alone also
 // carries every emulator platform, which would bury the list.

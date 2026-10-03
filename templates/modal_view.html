@@ -76,7 +76,7 @@
                 <option value="date_added" {{ 'selected' if state.get('group_by') == 'date_added' }}>Date Added</option>
                 <option value="review_percentage" {{ 'selected' if state.get('group_by') == 'review_percentage' }}>Review Score</option>
                 <option value="weighted_percentage" {{ 'selected' if state.get('group_by') == 'weighted_percentage' }}>Weighted Score</option>
-                <option value="platform" {{ 'selected' if state.get('group_by') == 'platform' }}>Platform</option>
+                <option value="platform" {{ 'selected' if state.get('group_by') == 'platform' }}>Library</option>
             </select>
         </div>
 
@@ -587,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     <div style="flex:1; min-height:0; overflow-y:auto; padding:1.25rem 1.5rem;">
         <p style="color:#8f98a0; font-size:0.8rem; margin:0 0 1rem;">
-            Show small badges in a card's corners. Platform badges use a bundled default icon per platform (or your own uploaded one); the Installed badge is an icon you upload. Achievement %, Review Score, and HLTB Time are text badges — the first two are color-coded by thresholds you set below, HLTB Time just shows the duration.
+            Show small badges in a card's corners. Library badges use a bundled default icon per library (or your own uploaded one); the Installed badge is an icon you upload. Achievement %, Review Score, and HLTB Time are text badges — the first two are color-coded by thresholds you set below, HLTB Time just shows the duration.
         </p>
 
         <div class="cb-corner-grid" id="cb-corner-grid"></div>
@@ -612,10 +612,10 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         </div>
 
-        <!-- Platform icons -->
+        <!-- Library icons -->
         <div id="cb-platform-section" style="display:none; margin-bottom:1rem; padding:0.875rem; background:#1a2332; border-radius:0.5rem; border:1px solid #2a3f55;">
-            <div style="font-size:0.85rem; color:#e2eaf0; margin-bottom:0.25rem;">Platform icons</div>
-            <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:0.5rem;">If a platform below has no custom icon uploaded:</div>
+            <div style="font-size:0.85rem; color:#e2eaf0; margin-bottom:0.25rem;">Library icons</div>
+            <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:0.5rem;">If a library below has no custom icon uploaded:</div>
             <div style="display:flex; gap:1rem; margin-bottom:0.75rem; flex-wrap:wrap;">
                 <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--text-primary); cursor:pointer;">
                     <input type="radio" name="cb-fallback" id="cb-fallback-default" data-modal-row="3" onclick="_cbSetFallback('default')" style="width:auto; margin:0;">
@@ -914,7 +914,7 @@ function _cbRenderCornerGrid() {
         sel.innerHTML = `
             <option value="">${label}: None</option>
             <option value="installed">${label}: Installed</option>
-            <option value="platform">${label}: Platform</option>
+            <option value="platform">${label}: Library</option>
             <option value="achievement_percent">${label}: Achievement %</option>
             <option value="review_score">${label}: Review Score</option>
             <option value="hltb">${label}: HLTB Time</option>

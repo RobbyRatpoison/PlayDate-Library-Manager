@@ -82,7 +82,7 @@ const TUTORIAL_SECTIONS = [
             {
                 title: 'What a shelf shows',
                 body: `<p>In <strong>✎ Edit</strong>, the <strong>Filter</strong> menu picks which games a shelf draws from: a built-in quick filter (All Games, Installed, Not Installed, Never Played / Unfinished, Beaten / Completed, or a single completion status), one of your ${tutGo('library-filters', '<strong>saved filters</strong>', 'Saved filters')}, or <strong>🔧 Custom Filter…</strong>, which opens the ${tutGo('library-filters', 'Filter Builder', 'Building a filter')} for just that shelf so there's nothing to save. A shelf can also be a widget instead (see ${tutGo('home-shelves', 'Widgets', 'Widgets')}).</p>
-                       <p><strong>Sort by</strong> sets the order, ascending or descending, and <strong>Platforms shown</strong> limits the shelf to the platforms you tick, so one shelf can be Steam only while another shows everything.</p>`,
+                       <p><strong>Sort by</strong> sets the order, ascending or descending, and <strong>Libraries shown</strong> limits the shelf to the libraries you tick, so one shelf can be Steam only while another shows everything.</p>`,
             },
             {
                 title: 'Sizes, columns and game counts',
@@ -203,9 +203,9 @@ const TUTORIAL_SECTIONS = [
             },
             {
                 title: 'Duplicate games',
-                body: `<p>If you own the same game on more than one platform, say Steam and GOG, PlayDate links the copies together and shows only one of them. The others stay in your library, just hidden.</p>
-                       <p>Which copy you see depends on the platform priority list in ${tutOpen('library', 'Settings → Library')}. Drag your preferred platforms to the top and press <strong>Save Order</strong>: for every game, the copy on the highest platform in the list is the one that's shown. <strong>Detect Duplicates</strong> re-checks your library, for example after you add games.</p>
-                       <p>PlayDate matches games by name on its own. When it can't, for example because two stores spell a title differently, open either copy and use its <strong>Duplicate of</strong> row to search for the copy on the other platform. From then on they count as one game, and the priority list still decides which one is shown, just as it does for automatic matches. <strong>Unlink</strong> removes a link you made yourself; copies PlayDate matched by name are linked again whenever detection runs.</p>
+                body: `<p>If you own the same game in more than one library, say Steam and GOG, PlayDate links the copies together and shows only one of them. The others stay in your library, just hidden.</p>
+                       <p>Which copy you see depends on the library priority list in ${tutOpen('library', 'Settings → Library')}. Drag your preferred libraries to the top and press <strong>Save Order</strong>: for every game, the copy in the highest library in the list is the one that's shown. <strong>Detect Duplicates</strong> re-checks your library, for example after you add games.</p>
+                       <p>PlayDate matches games by name on its own. When it can't, for example because two stores spell a title differently, open either copy and use its <strong>Duplicate of</strong> row to search for the copy in the other library. From then on they count as one game, and the priority list still decides which one is shown, just as it does for automatic matches. <strong>Unlink</strong> removes a link you made yourself; copies PlayDate matched by name are linked again whenever detection runs.</p>
                        <p>To turn duplicate hiding off completely, untick <strong>Hide duplicate entries</strong> in the same place and every copy is shown.</p>`,
             },
         ],
@@ -357,7 +357,7 @@ const TUTORIAL_SECTIONS = [
             {
                 title: 'Installing and managing plugins',
                 body: `<p>Hamburger menu → ${tutOpen('plugins', '<strong>Plugins</strong>')} has a <strong>Plugin Catalog</strong> where each official plugin installs with one click. It's sorted into Working, Untested, and Broken for the OS you're running, based on real reports. You can also install a third-party plugin from a zip file or a GitHub URL.</p>
-                       <p>The same screen checks for updates (with an <strong>Update All</strong> button) and uninstalls plugins, with the option to remove that platform's games too. Installing, updating, or removing a plugin shows a <strong>Restart Now</strong> button.</p>`,
+                       <p>The same screen checks for updates (with an <strong>Update All</strong> button) and uninstalls plugins, with the option to remove that library's games too. Installing, updating, or removing a plugin shows a <strong>Restart Now</strong> button.</p>`,
             },
             {
                 title: 'Launchers on Linux',
@@ -370,7 +370,7 @@ const TUTORIAL_SECTIONS = [
             },
             {
                 title: 'Duplicate detection',
-                body: `<p>Own the same game on two platforms? PlayDate links the copies and shows only one, chosen by your platform priority order. See ${tutGo('editing-games', 'Duplicate games', 'Duplicate games')} for how to set that order, link copies by hand, or turn it off.</p>`,
+                body: `<p>Own the same game in two libraries? PlayDate links the copies and shows only one, chosen by your library priority order. See ${tutGo('editing-games', 'Duplicate games', 'Duplicate games')} for how to set that order, link copies by hand, or turn it off.</p>`,
             },
         ],
     },
@@ -399,11 +399,11 @@ const TUTORIAL_SECTIONS = [
             },
             {
                 title: 'Find Library Junk',
-                body: `<p>Imports sometimes pull in soundtracks, DLC, dev kits, and store apps. <strong>Find Library Junk</strong> scans for them by title pattern across every platform. Its <strong>Deep Plugin Scan</strong> re-checks a platform against its store, which is slower, so it's kept separate from the quick scan. Review the results and remove what you don't want.</p>`,
+                body: `<p>Imports sometimes pull in soundtracks, DLC, dev kits, and store apps. <strong>Find Library Junk</strong> scans for them by title pattern across every library. Its <strong>Deep Plugin Scan</strong> re-checks a library against its store, which is slower, so it's kept separate from the quick scan. Review the results and remove what you don't want.</p>`,
             },
             {
                 title: 'Duplicate entries',
-                body: `<p>${tutOpen('library', 'Settings → Library')} → <strong>Find Duplicate Entries</strong> catches one store game imported twice, usually claimed in two bundles. This is separate from cross-platform duplicates (see ${tutGo('editing-games', 'Duplicate games', 'Duplicate games')}).</p>`,
+                body: `<p>${tutOpen('library', 'Settings → Library')} → <strong>Find Duplicate Entries</strong> catches one store game imported twice, usually claimed in two bundles. This is separate from cross-library duplicates (see ${tutGo('editing-games', 'Duplicate games', 'Duplicate games')}).</p>`,
             },
         ],
     },
@@ -433,7 +433,7 @@ const TUTORIAL_SECTIONS = [
             },
             {
                 title: 'Appearance and Library',
-                body: `<p>${tutOpen('appearance', '<strong>Appearance</strong>')} covers theme colors, background image, and Edit Home Layout. ${tutOpen('library', '<strong>Library</strong>')} covers completion sync, duplicate handling and platform priority, launch behavior, ${tutGo('cover-art', 'artwork sources', 'Choosing sources for each library')}, and the optional <strong>card tooltip</strong> shown when hovering a cover.</p>`,
+                body: `<p>${tutOpen('appearance', '<strong>Appearance</strong>')} covers theme colors, background image, and Edit Home Layout. ${tutOpen('library', '<strong>Library</strong>')} covers completion sync, duplicate handling and library priority, launch behavior, ${tutGo('cover-art', 'artwork sources', 'Choosing sources for each library')}, and the optional <strong>card tooltip</strong> shown when hovering a cover.</p>`,
             },
             {
                 title: 'Tuning',

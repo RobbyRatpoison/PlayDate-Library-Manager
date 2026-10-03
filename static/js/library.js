@@ -485,7 +485,7 @@
     const _GROUP_BY_LABELS = {
         installed: 'Installed', completion_status: 'Completion', release_date: 'Release Year',
         date_added: 'Year Added', review_percentage: 'Review Score',
-        weighted_percentage: 'Weighted Score', platform: 'Platform',
+        weighted_percentage: 'Weighted Score', platform: 'Library',
     };
 
     function _getGroupKey(game) {

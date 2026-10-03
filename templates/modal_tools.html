@@ -696,9 +696,9 @@
                            style="width:auto; margin:0;" data-modal-row="0">
                     Hide duplicate entries
                 </label>
-                <div style="font-size:0.75rem; color:#8f98a0; margin-top:3px; padding-left:22px;">When multiple platforms have the same game, the highest-ranked version is kept.</div>
+                <div style="font-size:0.75rem; color:#8f98a0; margin-top:3px; padding-left:22px;">When multiple libraries have the same game, the highest-ranked version is kept.</div>
                 <div style="margin-top:10px;">
-                    <div style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:6px;">Platform priority <span style="font-weight:normal; opacity:0.6;">(drag to reorder — top = preferred)</span></div>
+                    <div style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:6px;">Library priority <span style="font-weight:normal; opacity:0.6;">(drag to reorder — top = preferred)</span></div>
                     <ul id="platform-priority-list"></ul>
                     <div style="display:flex; gap:8px; align-items:center;">
                         <button class="nav-btn" data-modal-row="20" onclick="savePlatformPriority()" style="font-size:0.8rem;">Save Order</button>
@@ -707,7 +707,7 @@
                     </div>
                 </div>
                 <div style="margin-top:12px; border-top:1px solid var(--border); padding-top:10px;">
-                    <div style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:2px;">Same-platform duplicates</div>
+                    <div style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:2px;">Same-library duplicates</div>
                     <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">One store game imported into the library twice (usually claimed in two bundles).</div>
                     <button class="nav-btn" data-modal-row="20" onclick="openDupEntriesModal()" style="font-size:0.8rem;">Find Duplicate Entries</button>
                 </div>
@@ -1866,7 +1866,7 @@ window._TUNE_INIT = {{ {
             <div class="hub-section-label">Title-Pattern Matches</div>
             <p style="color:var(--text-secondary); font-size:0.83rem; margin:2px 0 8px;">
                 Stores don't tag beta clients, demos, prototypes, soundtracks, or dev kits any differently
-                from real games, so this scans titles across every platform for common patterns. Blacklisted
+                from real games, so this scans titles across every library for common patterns. Blacklisted
                 items are permanently skipped on re-import; whitelisted items are just dismissed from this
                 list and won't be suggested again.
             </p>
@@ -1927,7 +1927,7 @@ window._TUNE_INIT = {{ {
         <!-- Scrollable body -->
         <div style="overflow-y:auto; flex:1; min-height:0; padding:8px 1.875rem 1.875rem; margin-top:-8px;">
         <p style="color:var(--text-secondary); font-size:0.9rem; margin:0 0 14px;">
-            Finds the same store game imported more than once on a single platform &mdash; usually a title
+            Finds the same store game imported more than once in a single library &mdash; usually a title
             claimed in two bundles. One copy of each is kept (an installed copy, else the oldest import); the
             extras are pre-selected for removal. This is a plain delete, not a blacklist, so a future sync can
             still bring the game back.
