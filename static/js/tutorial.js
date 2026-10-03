@@ -133,7 +133,8 @@ const TUTORIAL_SECTIONS = [
             {
                 title: 'Saved filters',
                 body: `<p>Once you have a filter you like, save it. The <strong>Saved filters…</strong> menu loads one, and the buttons beside it save the current filter, rename a saved one, or delete it.</p>
-                       <p>A saved filter can be reloaded from the Library, chosen as the filter for a Home shelf, used to narrow the pool Pick 6 draws from, and shared with other people through ${tutOpen('filter-io', '<strong>Filter Import / Export</strong>')} in the Data menu.</p>`,
+                       <p>A saved filter can be reloaded from the Library, chosen as the filter for a Home shelf, used to narrow the pool Pick 6 draws from, and shared with other people through ${tutOpen('filter-io', '<strong>Filter Import / Export</strong>')} in the Data menu.</p>
+                       <p>A filter can also use other saved filters: add a <strong>Saved Filter</strong> condition and choose "games in" or "games not in", for example to get the overlap of two filters.</p>`,
             },
             {
                 title: 'Selecting games and Bulk Ops',

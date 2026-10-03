@@ -376,9 +376,77 @@ def build_condition_sql(cond, params):
         params.append(val)
         return f"{col} = ?"
 
-def build_tree_sql(node, params):
+def _find_saved_filter(saved_filters, fid=None, name=None):
+    """Return (name, tree_dict, id) of a saved filter looked up by id (stable
+    across renames), falling back to name, or None."""
+    for sname, sf in saved_filters.items():
+        wrapped = sf if isinstance(sf, dict) and 'tree' in sf else {'tree': sf}
+        if (fid and wrapped.get('id') == fid) or (not fid and name and sname == name):
+            return sname, wrapped.get('tree'), wrapped.get('id')
+    return None
+
+
+def _saved_filter_ref_sql(node, params, stack):
+    """SQL for a {type:'saved_filter_ref', id, name, negate} node: the saved
+    filter's own tree, compiled in place. A missing filter matches nothing
+    (not everything, which would silently widen an OR); a filter that
+    (indirectly) references itself also matches nothing."""
+    from config import load_state, _expand_appid_list_refs
+    saved = load_state().get('saved_filters', {})
+    found = _find_saved_filter(saved, node.get('id'), node.get('name'))
+    if not found:
+        return '1=0'
+    _, tree, fid = found
+    key = fid or found[0]
+    if key in stack or len(stack) >= 8 or not isinstance(tree, dict):
+        return '1=0'
+    custom_sql = _strip_sql_wrapper(tree.get('custom_sql', '') or '')
+    if custom_sql:
+        sql = f"({_auto_cast_int_division(custom_sql)})" if is_safe_sql(custom_sql) else '1=0'
+    else:
+        sql = build_tree_sql(_expand_appid_list_refs(tree), params, stack + (key,))
+    if node.get('negate'):
+        return f"NOT ({sql})"
+    return sql
+
+
+def saved_filter_refs(tree):
+    """Every saved_filter_ref node's (id, name) found anywhere in a tree."""
+    out = []
+    if isinstance(tree, dict):
+        if tree.get('type') == 'saved_filter_ref':
+            out.append((tree.get('id'), tree.get('name')))
+        for item in tree.get('items') or []:
+            out.extend(saved_filter_refs(item))
+    return out
+
+
+def saved_filter_would_cycle(saved_filters, tree, own_id, own_name):
+    """True if `tree`, saved as the filter (own_id/own_name), reaches that
+    same filter through its saved_filter_ref nodes."""
+    seen = set()
+    todo = list(saved_filter_refs(tree))
+    while todo:
+        fid, name = todo.pop()
+        found = _find_saved_filter(saved_filters, fid, name)
+        if not found:
+            continue
+        sname, stree, sid = found
+        if (own_id and sid == own_id) or sname == own_name:
+            return True
+        if (sid or sname) in seen:
+            continue
+        seen.add(sid or sname)
+        todo.extend(saved_filter_refs(stree))
+    return False
+
+
+def build_tree_sql(node, params, _stack=()):
     """Recursively build SQL from a filter tree node."""
     node_type = node.get('type', 'condition')
+
+    if node_type == 'saved_filter_ref':
+        return _saved_filter_ref_sql(node, params, _stack)
 
     if node_type == 'condition':
         return build_condition_sql(node, params)
@@ -411,7 +479,7 @@ def build_tree_sql(node, params):
 
         parts = []
         for item in items:
-            sql = build_tree_sql(item, params)
+            sql = build_tree_sql(item, params, _stack)
             if sql and sql != '1=1':
                 parts.append(sql)
 
@@ -1427,6 +1495,9 @@ def save_filter():
             state['saved_filters'] = {}
         existing = state['saved_filters'].get(name, {})
         existing_id = existing.get('id') if isinstance(existing, dict) else None
+        if saved_filter_would_cycle(state['saved_filters'], tree, existing_id, name):
+            return jsonify({"status": "error",
+                            "message": "This filter includes itself (directly or through another saved filter)."}), 400
         import uuid as _uuid
         state['saved_filters'][name] = {
             'id': existing_id or str(_uuid.uuid4()),

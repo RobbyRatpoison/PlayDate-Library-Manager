@@ -504,7 +504,9 @@ const FM_FILTER_CONFIG = {
                                options: ['header','sgdb_grid_wide','custom','missing'] },
     'icon_source':           { label: 'Icon Source',           type: 'select', comparisons: {'=':'is','!=':'is not','IS NULL':'not set','IS NOT NULL':'is set'},
                                options: ['steam','sgdb_icon','custom','missing'] },
-    'platform':              { label: 'Platform',              type: 'select', comparisons: {'=':'is','!=':'is not','IS NULL':'not set','IS NOT NULL':'is set'},
+    'saved_filter':          { label: 'Saved Filter',          type: 'select', comparisons: {'=':'games in','!=':'games not in'},
+                               optionsFor: v => _savedFilterOptions(v) },
+    'platform':              { label: 'Library',               type: 'select', comparisons: {'=':'is','!=':'is not','IS NULL':'not set','IS NOT NULL':'is set'},
                                options: {{ available_platform_options | tojson }} },
 };
 
@@ -803,6 +805,9 @@ function treeToSql(node) {
     if (node.type === 'custom_expr') {
         return node.sql ? `(${node.sql})` : '';
     }
+    if (node.type === 'saved_filter_ref') {
+        return node.name ? `${node.negate ? 'NOT ' : ''}(filter "${node.name}")` : '';
+    }
     if (node.type === 'condition') {
         const col = node.column;
         const op  = node.operator;
@@ -862,7 +867,7 @@ function updateActivePills(tree) {
 }
 
 function flattenConditions(node) {
-    if (node.type === 'condition' || node.type === 'custom_expr' || node.type === 'appid_list') return [node];
+    if (node.type === 'condition' || node.type === 'custom_expr' || node.type === 'appid_list' || node.type === 'saved_filter_ref') return [node];
     if (node.type === 'group') return (node.items||[]).flatMap(flattenConditions);
     return [];
 }
@@ -890,6 +895,7 @@ function buildSimpleFromTree(tree) {
 
 
 function addSimpleRow(data = null) {
+    data = _rowDataFromNode(data);
     const container = document.getElementById('fm-simple-rows');
     const row = document.createElement('div');
     row.className = 'fm-row';
@@ -1016,7 +1022,7 @@ function _buildLiteralInput(container, cfg, op, initVal) {
                 native.appendChild(opt);
             });
         } else {
-            Object.entries(cfg.options).forEach(([v, l]) => {
+            Object.entries(cfg.optionsFor ? cfg.optionsFor(effectiveVal) : cfg.options).forEach(([v, l]) => {
                 const opt = document.createElement('option');
                 opt.value = v; opt.textContent = l;
                 if (v === String(effectiveVal)) opt.selected = true;
@@ -1181,6 +1187,8 @@ function buildAdvancedFromTree(tree) {
             addAdvancedExprRow(root, item);
         } else if (item.type === 'appid_list') {
             addAppidListRow(root, item);
+        } else if (item.type === 'saved_filter_ref') {
+            addAdvancedRow(root, item);
         }
     });
 }
@@ -1220,6 +1228,7 @@ function toggleGroupCollapse(groupEl) {
 }
 
 function addAdvancedRow(groupEl, data = null) {
+    data = _rowDataFromNode(data);
     const rowsEl = groupEl.querySelector(':scope > .fmg-rows');
     const logic  = groupEl.dataset.logic || 'AND';
     addConnectorIfNeeded(rowsEl, logic);
@@ -1297,6 +1306,7 @@ function addAdvancedGroup(parentGroupEl, existingTree = null) {
             else if (item.type === 'group') addAdvancedGroup(groupEl, item);
             else if (item.type === 'custom_expr') addAdvancedExprRow(groupEl, item);
             else if (item.type === 'appid_list') addAppidListRow(groupEl, item);
+            else if (item.type === 'saved_filter_ref') addAdvancedRow(groupEl, item);
         });
     }
     // No auto-add — user clicks + Condition when ready
@@ -1380,6 +1390,51 @@ function addAppidListRow(groupEl, data) {
     rowsEl.appendChild(row);
     updateSqlPreview();
     return row;
+}
+
+// ── Saved filters as a condition ────────────────────────────────
+// Shown as a regular "Saved Filter  games in / games not in  <filter>" row in both modes.
+// In the tree it is {type:'saved_filter_ref', id, name, negate?}: the server
+// compiles the referenced saved filter's own tree in place
+// (library.build_tree_sql), so editing that filter later changes every filter
+// that includes it. The id is what's matched (it survives a rename); name is
+// only a display fallback.
+
+const _fmMissingSavedFilters = {};   // id -> name of references to filters that no longer exist
+
+function _savedFilterNameById(id) {
+    for (const [name, e] of Object.entries(_savedFilters || {})) {
+        if (e && typeof e === 'object' && e.id === id) return name;
+    }
+    return '';
+}
+
+// {id: name} of the saved filters a row may pick, by name. A filter can't
+// include the one being edited (the server also rejects a real cycle on save).
+function _savedFilterOptions(extraId) {
+    const opts = {};
+    Object.entries(_savedFilters || {})
+        .filter(([name, e]) => e && typeof e === 'object' && e.id && name !== _loadedSavedFilterName)
+        .sort((x, y) => x[0].localeCompare(y[0], undefined, { sensitivity: 'base' }))
+        .forEach(([name, e]) => { opts[e.id] = name; });
+    // Keep a reference to a deleted filter visible instead of silently dropping it.
+    if (extraId && !(extraId in opts)) opts[extraId] = `${_fmMissingSavedFilters[extraId] || 'Unknown'} (not available)`;
+    return opts;
+}
+
+function _refToCond(node) {
+    if (node.name && !_savedFilterNameById(node.id)) _fmMissingSavedFilters[node.id] = node.name;
+    return { type: 'condition', column: 'saved_filter', operator: node.negate ? '!=' : '=', value: node.id };
+}
+
+function _rowDataFromNode(node) {
+    return node && node.type === 'saved_filter_ref' ? _refToCond(node) : node;
+}
+
+// A collected row is usable if it names a column and has a value (or needs none).
+function _condIsComplete(cond) {
+    if (cond.type === 'saved_filter_ref') return !!cond.id;
+    return !!(cond.column && (cond.value_col || cond.value || NO_VALUE_OPS.has(cond.operator)));
 }
 
 function addAdvancedExprRow(groupEl, data = null) {
@@ -1800,6 +1855,12 @@ function parseSqlExpression(sql) {
 function collectRowData(rowEl) {
     const col = rowEl.querySelector('.fm-col-select')?.value;
     const op  = rowEl.querySelector('.fm-op-select')?.value;
+    if (col === 'saved_filter') {
+        const id = rowEl.querySelector('.fm-val-input')?.value;
+        const node = { type: 'saved_filter_ref', id, name: _savedFilterNameById(id) || _fmMissingSavedFilters[id] || '' };
+        if (op === '!=') node.negate = true;
+        return node;
+    }
     const valColEl = rowEl.querySelector('.fm-val-col-select');
     if (valColEl) {
         return { type: 'condition', column: col, operator: op, value_col: valColEl.value };
@@ -1834,7 +1895,7 @@ function collectGroupData(groupEl) {
             if (sql) items.push({ type: 'custom_expr', sql });
         } else if (child.classList.contains('fm-row')) {
             const cond = collectRowData(child);
-            if (cond.column && (cond.value_col || cond.value || NO_VALUE_OPS.has(cond.operator))) {
+            if (_condIsComplete(cond)) {
                 items.push(cond);
             }
         } else if (child.classList.contains('fmg-container')) {
@@ -1851,7 +1912,7 @@ function collectTree() {
         const items = [];
         document.querySelectorAll('#fm-simple-rows .fm-row').forEach(row => {
             const cond = collectRowData(row);
-            if (cond.column && (cond.value_col || cond.value || NO_VALUE_OPS.has(cond.operator))) {
+            if (_condIsComplete(cond)) {
                 items.push(cond);
             }
         });
