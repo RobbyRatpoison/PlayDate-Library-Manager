@@ -1,6 +1,6 @@
 # Release Notes
 
-## v1.11.6
+## v1.11.6 - 2026-10-02
 ### New
 
 - Filters can now include other saved filters, using the new "Saved Filter" condition to get the overlap of two filters. (suggested by greatmastermario)
