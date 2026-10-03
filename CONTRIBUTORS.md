@@ -112,6 +112,7 @@ People who've helped make PlayDate better - bug reports, feature suggestions, te
 - Quoted-substring PAGYWOSG AppID categories not being auto-detected
 - Suggested tagging Secret Santa/Snowballs gifts with the year given, as evidence for mod verification
 - Suggested splitting HLTB library sort into separate Main Story/Main + Extras/Completionist options
+- Asked whether two pre-generated filters (e.g. the PAGYWOSG and Play or Pay event filters) could be combined to get their overlap - led to saved filters being usable inside other filters
 
 **onegoodleg**
 - Suggested a completion-status rosette on cards - directly inspired the card-outline feature
@@ -163,6 +164,10 @@ People who've helped make PlayDate better - bug reports, feature suggestions, te
 - Reported a gap on the right side of the window when UI scaling is above 100%
 - Suggested a better info tooltip layout for horizontal covers - led to the cover-beside-text layout
 - Suggested an option to show the info tooltip on the Home page - led to the Home page tooltip setting
+- Reported inconsistent naming (Platform, Sources, Library) for the same thing across the filter window and card tooltip - led to "Library" being used consistently
+- Reported spacing around the cover in the info tooltip (empty gap beside the cover) - led to the cover filling the tooltip's width
+- Suggested toggling the info tooltip separately for Library, Home and Pick 6 - led to the per-page tooltip settings and the Pick 6 tooltip
+- Suggested choosing what each mouse button does on a game card (tooltip, context menu, launch, store page, edit) - planned for a future version
 
 **Celine**
 - Startup crash (`JSONDecodeError`) from a corrupted `config.json`, with no window ever opening

@@ -1,18 +1,16 @@
 # Release Notes
 
-## v1.11.5 - 2026-09-25
+## v1.11.6
 ### New
 
-- The info tooltip can now also be shown on the Home page, from its own option in the Card Tooltip settings. (suggested by woutercools)
+- Filters can now include other saved filters, using the new "Saved Filter" condition to get the overlap of two filters. (suggested by greatmastermario)
 
 ### Improvements
 
-- The info tooltip has a better layout for horizontal covers, with the cover beside the text. (suggested by woutercools)
-- Game cards on Home shelves are now centered when a shelf has room to spare.
+- The info tooltip can now be toggled for the Library, Home and Pick 6 pages. Your current setting carries over. (suggested by woutercools)
 
 ### Fixes
 
-- Fixed a gap on the right side of the window when UI scaling is above 100%. (reported by woutercools)
-- Fixed the right-click menu, tooltips, dropdowns and several other popups appearing in the wrong place when UI scaling is above 100%.
-- Fixed the Home shelves fitting the wrong number of cards, and gamepad scrolling and the list view sizing being off, when UI scaling is above 100%.
-- Fixed some Steam games never getting a description or other store details, and they now retry automatically.
+- Fixed an empty gap to the right of the cover in the info tooltip. The cover now fills the tooltip's full width. (reported by woutercools)
+- Fixed "Platform", "Sources" and "Library" all being used for the same thing. It's now "Library" everywhere. (reported by woutercools)
+- Likewise, the filter editor's add button now says "+ Filter" in both modes.
