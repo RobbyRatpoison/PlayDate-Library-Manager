@@ -150,7 +150,8 @@ const TUTORIAL_SECTIONS = [
             {
                 title: 'Card badges, outlines and tooltips',
                 body: `<p>${tutOpen('appearance', 'Settings → Appearance')} can show ${tutOpen('card-badges', '<strong>card badges</strong>')} in a cover's corners (library, installed, achievement %, review score, HowLongToBeat time) and ${tutOpen('card-outlines', '<strong>card outlines</strong>')}: colored borders from rules you put in order, where the first matching rule wins.</p>
-                       <p>Under ${tutOpen('library', 'Settings → Library')} you can also turn on a <strong>card tooltip</strong> that shows details when you hover a cover, and choose which pages it appears on (Library, Home and Pick 6) and which details it includes.</p>`,
+                       <p>Under ${tutOpen('library', 'Settings → Library')} you can also turn on a <strong>card tooltip</strong> that shows details when you hover a cover, and choose which pages it appears on (Library, Home and Pick 6) and which details it includes.</p>
+                       <p>If hovering gets in the way, set a mouse button to <strong>Show info tooltip</strong> under Mouse Actions (see ${tutGo('getting-started', 'Launching a game', 'Launching a game')}). The tooltip then appears on that click instead of on hover, and stays until you click elsewhere.</p>`,
             },
         ],
     },
@@ -434,7 +435,7 @@ const TUTORIAL_SECTIONS = [
             },
             {
                 title: 'Appearance and Library',
-                body: `<p>${tutOpen('appearance', '<strong>Appearance</strong>')} covers theme colors, background image, and Edit Home Layout. ${tutOpen('library', '<strong>Library</strong>')} covers completion sync, duplicate handling and library priority, launch behavior, ${tutGo('cover-art', 'artwork sources', 'Choosing sources for each library')}, and the optional <strong>card tooltip</strong> shown when hovering a cover.</p>`,
+                body: `<p>${tutOpen('appearance', '<strong>Appearance</strong>')} covers theme colors, background image, and Edit Home Layout. ${tutOpen('library', '<strong>Library</strong>')} covers completion sync, duplicate handling and library priority, what each mouse button does on a cover (Mouse Actions), ${tutGo('cover-art', 'artwork sources', 'Choosing sources for each library')}, and the optional <strong>card tooltip</strong> shown when hovering a cover.</p>`,
             },
             {
                 title: 'Tuning',
@@ -493,7 +494,8 @@ const TUTORIAL_SECTIONS = [
             },
             {
                 title: 'Configuring gamepad input',
-                body: `<p>${tutOpen('gamepad', 'Settings → <strong>Gamepad</strong>')} has the gamepad toggle, button remapping and shortcuts, and a diagnostics view if a controller isn't behaving the way you expect.</p>`,
+                body: `<p>${tutOpen('gamepad', 'Settings → <strong>Gamepad</strong>')} has the gamepad toggle, button remapping and shortcuts, and a diagnostics view if a controller isn't behaving the way you expect.</p>
+                       <p>If a controller's buttons or sticks are wrong or in the wrong place, open the diagnostics view and pick its <strong>Controller layout</strong>. PlayDate remembers your choice for that controller. Auto is the default and picks a known layout when it recognises the controller.</p>`,
             },
         ],
     },
