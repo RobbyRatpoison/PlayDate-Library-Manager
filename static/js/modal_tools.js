@@ -6156,6 +6156,61 @@ function gpdClearSuppression() {
     _gpdRefreshStatic();
 }
 
+// ── Controller layout chooser (Diagnostics) ───────────────────────────────────
+// Lists what this pad can be read as: Auto, Standard (as the browser reports it), the layouts
+// the bundled database has for its vendor/product, and the Xbox-style raw order. The current
+// pick is saved for this controller (gamepad_layout.js, state.json's gamepad_layouts).
+let _gpdLayoutChoices = [];
+let _gpdLayoutSig = '';
+let _gpdLayoutPadId = null;
+
+const _GPD_LAYOUT_STATUS = {
+    database: i => `Using the database layout for ${i.name}`,
+    detected: () => 'Using the Xbox-style order (detected)',
+    saved: () => 'Using your saved layout',
+    standard: () => 'Using the pad as the browser reports it (your choice)',
+    mismatch: () => "Your saved layout doesn't fit this pad, so the browser's own order is used",
+    none: () => 'No layout change needed: using the pad as the browser reports it',
+};
+
+function _gpdRenderLayout(rawGp) {
+    const section = document.getElementById('gpd-layout-section');
+    if (!section) return;
+    // A pad the browser already maps is standard; nothing to choose.
+    if (!rawGp || rawGp.mapping === 'standard' || !window.PDLayout) { section.style.display = 'none'; _gpdLayoutSig = ''; return; }
+    const info = PDLayout.info(rawGp);
+    const saved = (window._GAMEPAD_LAYOUTS || {})[rawGp.id] || null;
+    const sig = [rawGp.id, info.source, info.map, info.candidates.length, info.xboxFits, saved && saved.kind, saved && saved.map].join('|');
+    if (sig === _gpdLayoutSig) return;
+    _gpdLayoutSig = sig;
+    _gpdLayoutPadId = rawGp.id;
+    section.style.display = '';
+
+    const choices = [{ label: 'Auto', rec: { kind: 'auto' }, on: !saved }];
+    choices.push({ label: 'Standard (as reported)', rec: { kind: 'standard' }, on: !!saved && saved.kind === 'standard' });
+    info.candidates.forEach((c, i) => choices.push({
+        label: info.candidates.length > 1 ? `${c.name} (layout ${i + 1})` : c.name,
+        rec: { kind: 'map', map: c.map }, on: !!saved && saved.kind === 'map' && saved.map === c.map,
+    }));
+    if (info.xboxFits) choices.push({ label: 'Xbox-style order', rec: { kind: 'map', map: PDLayout.XBOX_RAW }, on: !!saved && saved.kind === 'map' && saved.map === PDLayout.XBOX_RAW });
+    if (saved && saved.kind === 'map' && !choices.some(c => c.on)) choices.push({ label: 'Custom (saved)', rec: saved, on: true });
+    _gpdLayoutChoices = choices;
+
+    const status = (_GPD_LAYOUT_STATUS[info.source] || _GPD_LAYOUT_STATUS.none)(info);
+    document.getElementById('gpd-layout-status').textContent = status;
+    document.getElementById('gpd-layout-choices').innerHTML = choices.map((c, i) =>
+        `<button class="nav-btn" data-modal-row="0" onclick="gpdPickLayout(${i})" ` +
+        `style="font-size:0.78rem; padding:3px 10px;${c.on ? ' border-color:var(--accent);' : ''}">${c.on ? '&#10003; ' : ''}${escHtml(c.label)}</button>`
+    ).join('');
+}
+
+function gpdPickLayout(i) {
+    const c = _gpdLayoutChoices[i];
+    if (!c || !window.PDLayout || !_gpdLayoutPadId) return;
+    PDLayout.save(_gpdLayoutPadId, c.rec);
+    _gpdLayoutSig = '';   // redraw with the new pick on the next frame
+}
+
 function _gpdStartPoll() {
     if (_gpdRafId) return;
     function poll() {
@@ -6187,6 +6242,7 @@ function _gpdStartPoll() {
         } else {
             mapEl.textContent = '';
         }
+        _gpdRenderLayout(rawGp);
 
         if (!gp) {
             document.getElementById('gpd-buttons').innerHTML = '';

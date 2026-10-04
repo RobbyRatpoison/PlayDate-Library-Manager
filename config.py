@@ -612,6 +612,7 @@ def inject_config_status():
         gamepad_enabled=state.get('gamepad_enabled', True),
         gamepad_suppress_on_launch=state.get('gamepad_suppress_on_launch', True),
         button_remaps=state.get('button_remaps', {}),
+        gamepad_layouts=normalize_gamepad_layouts(state.get('gamepad_layouts', {})),
         hltb_match_threshold=state.get('hltb_match_threshold', 99),
         hide_duplicates=state.get('hide_duplicates', True),
         card_click_rules=normalize_card_click_rules(state['card_click_rules']) if 'card_click_rules' in state else DEFAULT_CARD_CLICK_RULES,
@@ -1222,6 +1223,36 @@ DEFAULT_CARD_CLICK_RULES = [
 ]
 
 
+# A controller's saved gamepad layout (gamepad_layout.js): {controller id: {kind, map?, style?}}.
+# kind 'auto' is the default and is never stored, 'standard' leaves the pad as the browser reports
+# it, 'map' is an SDL mapping string (a database entry, or one a user built in the wizard).
+GAMEPAD_LAYOUT_KINDS = ('standard', 'map')
+GAMEPAD_LABEL_STYLES = ('xbox', 'ps', 'nintendo', 'other')
+_GAMEPAD_MAP_RE = re.compile(r'^[a-z0-9:,.+~_-]{1,1000}$')
+
+
+def normalize_gamepad_layouts(layouts):
+    """Valid entries only, at most 64 controllers."""
+    out = {}
+    for pad_id, rec in (layouts.items() if isinstance(layouts, dict) else []):
+        if not (isinstance(pad_id, str) and 0 < len(pad_id) <= 200 and isinstance(rec, dict)):
+            continue
+        clean = {}
+        if rec.get('kind') in GAMEPAD_LAYOUT_KINDS:
+            clean['kind'] = rec['kind']
+            if rec['kind'] == 'map':
+                if not (isinstance(rec.get('map'), str) and _GAMEPAD_MAP_RE.match(rec['map'])):
+                    continue
+                clean['map'] = rec['map']
+        if rec.get('style') in GAMEPAD_LABEL_STYLES:
+            clean['style'] = rec['style']
+        if clean:
+            out[pad_id] = clean
+        if len(out) >= 64:
+            break
+    return out
+
+
 def normalize_card_click_rules(rules):
     """Valid rules only, in order, at most one per (button, click) pair."""
     out, seen = [], set()
@@ -1268,6 +1299,8 @@ def save_state(updates):
                                       "home": bool(_ht.get("home")),
                                       "pick6": bool(_ht.get("pick6")),
                                       "fields": [f for f in HOVER_TIP_FIELDS if f in set(_ht.get("fields") or [])]}
+        if isinstance(updates.get("gamepad_layouts"), dict):
+            state["gamepad_layouts"] = normalize_gamepad_layouts(updates["gamepad_layouts"])
         if isinstance(updates.get("card_click_rules"), list):
             state["card_click_rules"] = normalize_card_click_rules(updates["card_click_rules"])
         if isinstance(updates.get("art_source_prefs"), dict):

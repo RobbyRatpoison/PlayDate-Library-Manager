@@ -40,6 +40,7 @@
     <style>body::before { background-image: url('/static/img/backgrounds/background.jpg?v={{ background_ts }}'); }</style>
     {% endif %}
     <script src="{{ url_for('static', filename='js/playdate.js') }}?v={{ app_version }}"></script>
+    <script src="{{ url_for('static', filename='js/gamepad_layout.js') }}?v={{ app_version }}"></script>
     <script src="{{ url_for('static', filename='js/card_actions.js') }}?v={{ app_version }}" defer></script>
     <script>
     window.onerror = function(msg, src, line, col, err) {
@@ -54,6 +55,7 @@
     window._GAMEPAD_SUPPRESS_ON_LAUNCH = {{ gamepad_suppress_on_launch | tojson }};
     window._BUTTON_REMAPS              = {{ button_remaps | tojson }};
     window._CARD_RULES                 = {{ card_click_rules | tojson }};
+    window._GAMEPAD_LAYOUTS            = {{ gamepad_layouts | tojson }};
     window._GAMEPAD_DEADZONE           = {{ gamepad_deadzone | tojson }};
     window._GAMEPAD_REPEAT_INITIAL_MS  = {{ gamepad_repeat_initial_ms | tojson }};
     window._GAMEPAD_REPEAT_RATE_MS     = {{ gamepad_repeat_rate_ms | tojson }};
