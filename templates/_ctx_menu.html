@@ -719,6 +719,9 @@
 
     // ── Event listeners ───────────────────────────────────────────────────
     document.addEventListener('contextmenu', buildAndShow);
+    // card_actions.js opens the menu for a game card when the user's click rules say so
+    // (it takes over contextmenu events on the card art, so the listener above never sees them).
+    window.pdCtx = { open: buildAndShow, steamId: _steamId, openUrl };
     document.addEventListener('click', (e) => {
         // Don't hide if the click was inside the context menu itself
         if (menu.contains(e.target)) return;

@@ -6520,6 +6520,145 @@ function openArtSourceEditor(plat) {
 
 function closeArtSourceEditor() {
     document.getElementById('art-source-modal').style.display = 'none';
+// ── Mouse actions on game cards (Settings modal) ─────────────────────────────
+// Rules are {button, click, action}, one per (button, click) pair; card_actions.js runs them.
+const _CARD_BTN_LABELS = { left: 'Left button', middle: 'Middle button', right: 'Right button',
+                           back: 'Back side button', forward: 'Forward side button' };
+const _CARD_CLICK_LABELS = { single: 'single click', double: 'double click' };
+const _CARD_ACTION_LABELS = {
+    launch: 'Launch / install', tooltip: 'Show info tooltip', context_menu: 'Show context menu',
+    store: 'Open store page', open_folder: 'Open install folder', edit: 'Edit game',
+    achievements: 'Open Steam achievements', community_hub: 'Open Steam Community Hub', none: 'Do nothing',
+};
+const _CARD_RULES_DEFAULT = [
+    { button: 'left',  click: 'single', action: 'launch' },
+    { button: 'right', click: 'single', action: 'context_menu' },
+];
+let _cardRuleEditing = null;   // the rule being edited (its slot), or null when adding
+
+const _cardRuleSlot = r => `${_CARD_BTN_LABELS[r.button]}, ${_CARD_CLICK_LABELS[r.click]}`;
+const _cardRulesHaveTip = rules => rules.some(r => r.action === 'tooltip');
+
+function _cardRuleStatus(msg, bad) {
+    const el = document.getElementById('card-rule-status');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.style.color = bad ? '#ff8080' : '#8f98a0';
+}
+
+function _renderCardRules() {
+    const host = document.getElementById('card-rules-list');
+    if (!host) return;
+    const rules = window._CARD_RULES || [];
+    host.innerHTML = rules.length ? rules.map((r, i) =>
+        `<div style="display:flex; align-items:center; gap:8px; padding:4px 8px; margin-bottom:3px; border-radius:6px; background:rgba(255,255,255,0.04); font-size:0.85rem; color:var(--text-primary);">` +
+        `<div style="flex:1;">${escHtml(_cardRuleSlot(r))} <span style="opacity:0.6;">&rarr;</span> ${escHtml(_CARD_ACTION_LABELS[r.action] || r.action)}</div>` +
+        `<button class="nav-btn" data-modal-row="${60 + i}" onclick="editCardRule(${i})" style="font-size:0.78rem; padding:3px 10px;">Edit</button>` +
+        `<button class="nav-btn" data-modal-row="${60 + i}" onclick="removeCardRule(${i})" style="font-size:0.78rem; padding:3px 10px;">Remove</button></div>`
+    ).join('') : `<div style="font-size:0.8rem; color:#8f98a0; padding:4px 8px;">No actions: clicking a cover does nothing.</div>`;
+    _syncHoverTipLock();
+}
+
+// Hover can't show the tooltip while a mouse action does: grey out the page toggles.
+// (Not the disabled attribute: that would take them out of gamepad navigation.)
+function _syncHoverTipLock() {
+    const locked = _cardRulesHaveTip(window._CARD_RULES || []);
+    const pages = document.getElementById('hover-tip-pages');
+    const note = document.getElementById('hover-tip-lock-note');
+    if (pages) pages.style.opacity = locked ? '0.4' : '';
+    if (note) note.style.display = locked ? '' : 'none';
+    window._HOVER_TIP_LOCKED = locked;
+}
+
+// Saves the new rule list. The pages read the rules at load for their tooltip wiring, so a
+// change in whether any rule shows the tooltip reloads the page; anything else applies live.
+function _saveCardRules(rules) {
+    const hadTip = _cardRulesHaveTip(window._CARD_RULES || []);
+    window._CARD_RULES = rules;
+    _renderCardRules();
+    sendStateUpdate({ card_click_rules: rules }, hadTip !== _cardRulesHaveTip(rules));
+}
+
+function _cardRuleForm() {
+    return { button: document.getElementById('card-rule-button').value,
+             click: document.getElementById('card-rule-click').value,
+             action: document.getElementById('card-rule-action').value };
+}
+
+function _setCardRuleForm(r) {
+    for (const [id, key] of [['card-rule-button', 'button'], ['card-rule-click', 'click'], ['card-rule-action', 'action']])
+        document.getElementById(id).value = r[key];
+}
+
+function _cardRuleEditMode(on) {
+    document.getElementById('card-rule-save-btn').textContent = on ? 'Save' : 'Add';
+    document.getElementById('card-rule-cancel-btn').style.display = on ? '' : 'none';
+}
+
+function cancelCardRuleEdit() {
+    _cardRuleEditing = null;
+    _cardRuleEditMode(false);
+    _cardRuleStatus('');
+}
+
+function editCardRule(i) {
+    const r = (window._CARD_RULES || [])[i];
+    if (!r) return;
+    _cardRuleEditing = { button: r.button, click: r.click };
+    _setCardRuleForm(r);
+    _cardRuleEditMode(true);
+    _cardRuleStatus('Editing: ' + _cardRuleSlot(r));
+}
+
+function removeCardRule(i) {
+    const rules = (window._CARD_RULES || []).filter((_, j) => j !== i);
+    cancelCardRuleEdit();
+    _saveCardRules(rules);
+}
+
+function resetCardRules() {
+    cancelCardRuleEdit();
+    _saveCardRules(_CARD_RULES_DEFAULT.map(r => ({ ...r })));
+}
+
+// Add a rule, or save the one being edited. When the chosen button + click is already
+// taken by another rule: offer to replace it, or (when editing, since the edited rule's old
+// slot is then free for the other one) to swap, or cancel.
+async function saveCardRule() {
+    const f = _cardRuleForm();
+    const rules = (window._CARD_RULES || []).map(r => ({ ...r }));
+    const find = (b, c) => rules.find(r => r.button === b && r.click === c);
+    const own = _cardRuleEditing && find(_cardRuleEditing.button, _cardRuleEditing.click);
+    const other = find(f.button, f.click);
+    if (other && other !== own) {
+        const what = `${_cardRuleSlot(other)} is already set to "${_CARD_ACTION_LABELS[other.action]}".`;
+        const choice = own
+            ? await confirmThree(`${what}\n\nReplace it (it is removed), or swap so it takes "${_cardRuleSlot(own)}" instead?`, 'Replace', 'Swap', 'Cancel')
+            : await confirmCustom(`${what}\n\nReplace it?`, 'Replace', 'Cancel');
+        if (!choice) return;
+        if (choice === 'alt') { other.button = own.button; other.click = own.click; }
+        else rules.splice(rules.indexOf(other), 1);
+    }
+    if (own) Object.assign(own, f); else rules.push(f);
+    cancelCardRuleEdit();
+    _saveCardRules(rules);
+}
+
+function _initCardRuleForm() {
+    const act = document.getElementById('card-rule-action');
+    if (!act) return;
+    act.innerHTML = Object.keys(_CARD_ACTION_LABELS)
+        .map(k => `<option value="${k}">${escHtml(_CARD_ACTION_LABELS[k])}</option>`).join('');
+    for (const id of ['card-rule-button', 'card-rule-click', 'card-rule-action']) initCustomSelect(document.getElementById(id));
+    _renderCardRules();
+    // Locked toggles swallow clicks (capture phase, before their own handlers run).
+    document.getElementById('hover-tip-pages')?.addEventListener('click', e => {
+        if (window._HOVER_TIP_LOCKED) { e.stopPropagation(); e.preventDefault(); }
+    }, true);
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _initCardRuleForm);
+else _initCardRuleForm();
+
     _artEditPlat = null;
     _renderArtSourcePrefs();
 }

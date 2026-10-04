@@ -614,7 +614,7 @@ def inject_config_status():
         button_remaps=state.get('button_remaps', {}),
         hltb_match_threshold=state.get('hltb_match_threshold', 99),
         hide_duplicates=state.get('hide_duplicates', True),
-        require_double_click_launch=state.get('require_double_click_launch', False),
+        card_click_rules=normalize_card_click_rules(state['card_click_rules']) if 'card_click_rules' in state else DEFAULT_CARD_CLICK_RULES,
         hover_tooltip=state.get('hover_tooltip', DEFAULT_HOVER_TIP),
         art_source_prefs=state.get('art_source_prefs', {}),
         ui_scale=state.get('ui_scale', 100),
@@ -853,6 +853,17 @@ def _load_state_unlocked():
     # Migrate hover_tooltip {enabled, home, fields} -> per-page {library, home, pick6, fields}
     if isinstance(state.get('hover_tooltip'), dict) and 'library' not in state['hover_tooltip']:
         state['hover_tooltip'] = normalize_hover_tip(state['hover_tooltip'])
+        dirty = True
+
+    # require_double_click_launch -> card_click_rules. Keyed on state.json alone and
+    # idempotent (an old backup carrying the legacy key can be restored at any time):
+    # the legacy key is migrated only when no rules exist yet, and dropped either way.
+    if 'require_double_click_launch' in state:
+        if 'card_click_rules' not in state:
+            state['card_click_rules'] = [dict(r) for r in DEFAULT_CARD_CLICK_RULES]
+            if state['require_double_click_launch']:
+                state['card_click_rules'][0]['click'] = 'double'
+        del state['require_double_click_launch']
         dirty = True
 
     # Migrate saved filters: wrap bare trees as {id, tree} and assign missing UUIDs
@@ -1199,6 +1210,31 @@ HOVER_TIP_FIELDS = ('cover_alt', 'description', 'playtime', 'last_played', 'date
                     'developers', 'publishers')
 DEFAULT_HOVER_TIP = {'library': False, 'home': False, 'pick6': False, 'fields': list(HOVER_TIP_FIELDS)}
 
+# Mouse actions on a game card: a list of {button, click, action} rules (see card_actions.js).
+# The defaults reproduce the behavior from before the rules existed.
+CARD_CLICK_BUTTONS = ('left', 'middle', 'right', 'back', 'forward')
+CARD_CLICK_TYPES = ('single', 'double')
+CARD_CLICK_ACTIONS = ('launch', 'tooltip', 'context_menu', 'store', 'open_folder', 'edit',
+                      'achievements', 'community_hub', 'none')
+DEFAULT_CARD_CLICK_RULES = [
+    {'button': 'left',  'click': 'single', 'action': 'launch'},
+    {'button': 'right', 'click': 'single', 'action': 'context_menu'},
+]
+
+
+def normalize_card_click_rules(rules):
+    """Valid rules only, in order, at most one per (button, click) pair."""
+    out, seen = [], set()
+    for r in rules if isinstance(rules, list) else []:
+        if not isinstance(r, dict):
+            continue
+        key = (r.get('button'), r.get('click'))
+        if (key[0] in CARD_CLICK_BUTTONS and key[1] in CARD_CLICK_TYPES
+                and r.get('action') in CARD_CLICK_ACTIONS and key not in seen):
+            seen.add(key)
+            out.append({'button': key[0], 'click': key[1], 'action': r['action']})
+    return out
+
 
 def normalize_hover_tip(ht):
     """Current-shape hover_tooltip from a saved one. Before the per-page toggles it was
@@ -1219,7 +1255,7 @@ def save_state(updates):
         _PASSTHROUGH = {"filter_tree", "sort", "order", "artwork_orientation", "card_height",
                         "check_for_updates", "check_for_notifications", "beta_updates", "window_state", "fullscreen",
                         "pagywosg_sg_group", "shelves", "group_by",
-                        "card_outlines", "require_double_click_launch"}
+                        "card_outlines"}
         for key in _PASSTHROUGH:
             if key in updates:
                 val = updates[key]
@@ -1232,6 +1268,8 @@ def save_state(updates):
                                       "home": bool(_ht.get("home")),
                                       "pick6": bool(_ht.get("pick6")),
                                       "fields": [f for f in HOVER_TIP_FIELDS if f in set(_ht.get("fields") or [])]}
+        if isinstance(updates.get("card_click_rules"), list):
+            state["card_click_rules"] = normalize_card_click_rules(updates["card_click_rules"])
         if isinstance(updates.get("art_source_prefs"), dict):
             _clean = {}
             for _plat, _kinds in updates["art_source_prefs"].items():

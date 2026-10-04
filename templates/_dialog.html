@@ -46,6 +46,7 @@
     #pd-dialog-btns button:hover { opacity: 0.85; }
     #pd-btn-ok    { background: var(--accent); color: #0e1621; border-color: var(--accent); }
     #pd-btn-cancel { background: transparent; color: #c7d5e0; }
+    #pd-btn-alt   { background: transparent; color: var(--accent); border-color: var(--accent); }
 </style>
 
 <div id="pd-dialog-overlay">
@@ -53,6 +54,7 @@
         <div id="pd-dialog-msg"></div>
         <div id="pd-dialog-btns">
             <button id="pd-btn-cancel" data-modal-row="0">Cancel</button>
+            <button id="pd-btn-alt"    data-modal-row="0" style="display:none;"></button>
             <button id="pd-btn-ok"     data-modal-row="0">OK</button>
         </div>
     </div>
@@ -65,12 +67,16 @@
     const msgEl    = document.getElementById('pd-dialog-msg');
     const btnOk     = document.getElementById('pd-btn-ok');
     const btnCancel = document.getElementById('pd-btn-cancel');
+    const btnAlt    = document.getElementById('pd-btn-alt');
 
     let _resolve = null;
     let _hiddenModal = null; // track any modal hidden while dialog is open
 
-    function _show(message, isConfirm, okLabel, cancelLabel) {
+    function _show(message, isConfirm, okLabel, cancelLabel, altLabel) {
         msgEl.textContent = message;
+        // Optional middle choice; resolves 'alt' (OK is true, Cancel false).
+        btnAlt.style.display = altLabel ? '' : 'none';
+        if (altLabel) btnAlt.textContent = altLabel;
         btnCancel.style.display = isConfirm ? '' : 'none';
         btnOk.textContent     = okLabel     || 'OK';
         btnCancel.textContent = cancelLabel || 'Cancel';
@@ -97,6 +103,7 @@
 
     btnOk.addEventListener('click',     () => _close(true));
     btnCancel.addEventListener('click', () => _close(false));
+    btnAlt.addEventListener('click',    () => _close('alt'));
     overlay.addEventListener('click', e => {
         if (e.target === overlay) _close(false);
     });
@@ -113,5 +120,7 @@
     window.alert         = (msg) => _show(msg, false);
     window.confirm       = (msg) => _show(msg, true);
     window.confirmCustom = (msg, okLabel, cancelLabel) => _show(msg, true, okLabel, cancelLabel);
+    // Three outcomes: true (OK), 'alt', false (Cancel).
+    window.confirmThree  = (msg, okLabel, altLabel, cancelLabel) => _show(msg, true, okLabel, cancelLabel, altLabel);
 })();
 </script>

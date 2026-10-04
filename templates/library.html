@@ -954,8 +954,7 @@
     window.CURRENT_SORT = {{ state.sort | tojson }};
     window.CURRENT_ORDER = {{ state.order | tojson }};
     window._artOrientation = '{{ state.get("artwork_orientation", "vertical") }}';
-    window.HOVER_TIP = {{ state.get('hover_tooltip') | tojson }};
-    window._requireDblClick = {{ state.get('require_double_click_launch', false) | tojson }};
+    window.HOVER_TIP = {{ hover_tooltip | tojson }};
     window.CARD_BADGES = {{ (state.card_badges if state.get('card_badges', {}).get('enabled', {}).get('library', True) else none) | tojson }};
     window.EDIT_BUTTON = {{ (state.edit_button if state.get('edit_button', {}).get('pages', {}).get('library', True) else none) | tojson }};
     window._groupBy = {{ group_by | tojson }};

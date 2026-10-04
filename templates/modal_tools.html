@@ -714,22 +714,38 @@
             </div>
         </div>
         <div class="hub-section">
-            <div class="hub-section-label">Launching</div>
+            <div class="hub-section-label">Mouse Actions</div>
             <div style="padding:8px 10px;">
-                <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:0.85rem; color:var(--text-primary);">
-                    <input type="checkbox" id="require-dblclick-cb"
-                           {% if require_double_click_launch %}checked{% endif %}
-                           onchange="sendStateUpdate({require_double_click_launch: this.checked})"
-                           style="width:auto; margin:0;" data-modal-row="19">
-                    Require double-click to launch/install
-                </label>
-                <div style="font-size:0.75rem; color:#8f98a0; margin-top:3px; padding-left:22px;">Off by default — a single click launches instantly. Applies to Library, Home, and Pick 6. Turn this on to avoid accidental launches from a stray click.</div>
+                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">What each mouse button does on a game cover, on the Library, Home and Pick 6 pages. By default a left click launches or installs and a right click opens the menu. Add an action to change that, for example a double-click to launch so a stray click does nothing. Side buttons are the back/forward buttons some mice have.</div>
+                <div id="card-rules-list"></div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:8px;">
+                    <select id="card-rule-button" class="nav-dropdown" data-modal-row="19">
+                        <option value="left">Left button</option>
+                        <option value="middle">Middle button</option>
+                        <option value="right">Right button</option>
+                        <option value="back">Back side button</option>
+                        <option value="forward">Forward side button</option>
+                    </select>
+                    <select id="card-rule-click" class="nav-dropdown" data-modal-row="19">
+                        <option value="single">Single click</option>
+                        <option value="double">Double click</option>
+                    </select>
+                    <select id="card-rule-action" class="nav-dropdown" data-modal-row="19"></select>
+                    <button class="nav-btn" id="card-rule-save-btn" data-modal-row="19" onclick="saveCardRule()" style="font-size:0.8rem;">Add</button>
+                    <button class="nav-btn" id="card-rule-cancel-btn" data-modal-row="19" onclick="cancelCardRuleEdit()" style="font-size:0.8rem; display:none;">Cancel</button>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+                    <button class="nav-btn" data-modal-row="20" onclick="resetCardRules()" style="font-size:0.8rem;">Reset to Default</button>
+                    <div id="card-rule-status" style="font-size:0.78rem; color:#8f98a0; min-height:1em;"></div>
+                </div>
             </div>
         </div>
         <div class="hub-section">
             <div class="hub-section-label">Card Tooltip</div>
             <div style="padding:8px 10px;">
                 <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:4px;">Show an info tooltip when hovering a game cover. Off by default. Choose the pages it appears on, and the details to include:</div>
+                <div id="hover-tip-lock-note" style="display:none; font-size:0.75rem; color:var(--accent); margin-bottom:4px;">Hovering is off because a mouse action above shows the tooltip instead. The details chosen below still apply.</div>
+                <div id="hover-tip-pages">
                 <div data-modal-row="28" onclick="var cb=this.querySelector('input');cb.checked=!cb.checked;saveHoverTip();"
                      style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:0.85rem; padding:2px 0; color:var(--text-primary);">
                     <input type="checkbox" id="hover-tip-library" {% if hover_tooltip.library %}checked{% endif %}
@@ -747,6 +763,7 @@
                     <input type="checkbox" id="hover-tip-pick6" {% if hover_tooltip.pick6 %}checked{% endif %}
                            onclick="event.stopPropagation()" onchange="saveHoverTip()" style="width:auto; margin:0;">
                     Pick 6 page
+                </div>
                 </div>
                 <div id="hover-tip-fields" style="padding-left:22px; margin-top:6px;"></div>
             </div>

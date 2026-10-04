@@ -515,7 +515,7 @@
             <div class="shelf-grid-wrap">
             <div class="shelf-grid">
                 {% for game in shelf.games %}
-                <div class="shelf-capsule-wrap" data-appid="{{ game.appid }}" data-installed="{{ game.installed or 0 }}" data-name="{{ game.name | e }}" data-status="{{ game.completion_status or "" }}" data-platform="{{ game.platform or 'steam' }}" data-total-achievements="{{ game.total_achievements or 0 }}" data-unlocked-achievements="{{ game.unlocked_achievements or 0 }}" data-review-percentage="{{ game.review_percentage if game.review_percentage is not none else '' }}" data-weighted-percentage="{{ game.weighted_percentage if game.weighted_percentage is not none else '' }}" data-total-reviews="{{ game.total_reviews or 0 }}" data-hltb-main="{{ game.hltb_main or 0 }}" data-hltb-extras="{{ game.hltb_extras or 0 }}" data-hltb-completionist="{{ game.hltb_completionist or 0 }}" {{ 'ondblclick' if state.get('require_double_click_launch') else 'onclick' }}="launchGame({{ game.appid }})"{% if outline_colors is defined and outline_colors.get(game.appid | string) %} style="--outline-color:{{ outline_colors[game.appid | string] }}"{% endif %}>
+                <div class="shelf-capsule-wrap" data-appid="{{ game.appid }}" data-installed="{{ game.installed or 0 }}" data-name="{{ game.name | e }}" data-status="{{ game.completion_status or "" }}" data-platform="{{ game.platform or 'steam' }}" data-total-achievements="{{ game.total_achievements or 0 }}" data-unlocked-achievements="{{ game.unlocked_achievements or 0 }}" data-review-percentage="{{ game.review_percentage if game.review_percentage is not none else '' }}" data-weighted-percentage="{{ game.weighted_percentage if game.weighted_percentage is not none else '' }}" data-total-reviews="{{ game.total_reviews or 0 }}" data-hltb-main="{{ game.hltb_main or 0 }}" data-hltb-extras="{{ game.hltb_extras or 0 }}" data-hltb-completionist="{{ game.hltb_completionist or 0 }}"{% if outline_colors is defined and outline_colors.get(game.appid | string) %} style="--outline-color:{{ outline_colors[game.appid | string] }}"{% endif %}>
                     <div class="shelf-capsule-inner">
                         <img data-src="/static/img/library/vertical/{{ game.appid }}.jpg?v={{ cache_v }}" alt="{{ game.name }}" class="shelf-capsule" draggable="false"
                              onload="_shelfImgLoad(this)"
@@ -568,7 +568,7 @@
         <div class="shelf-grid-wrap">
         <div class="shelf-grid">
             {% for game in shelf.games %}
-            <div class="shelf-capsule-wrap" data-appid="{{ game.appid }}" data-installed="{{ game.installed or 0 }}" data-name="{{ game.name | e }}" data-status="{{ game.completion_status or "" }}" data-platform="{{ game.platform or 'steam' }}" data-total-achievements="{{ game.total_achievements or 0 }}" data-unlocked-achievements="{{ game.unlocked_achievements or 0 }}" data-review-percentage="{{ game.review_percentage if game.review_percentage is not none else '' }}" data-weighted-percentage="{{ game.weighted_percentage if game.weighted_percentage is not none else '' }}" data-total-reviews="{{ game.total_reviews or 0 }}" data-hltb-main="{{ game.hltb_main or 0 }}" data-hltb-extras="{{ game.hltb_extras or 0 }}" data-hltb-completionist="{{ game.hltb_completionist or 0 }}" {{ 'ondblclick' if state.get('require_double_click_launch') else 'onclick' }}="launchGame({{ game.appid }})"{% if outline_colors is defined and outline_colors.get(game.appid | string) %} style="--outline-color:{{ outline_colors[game.appid | string] }}"{% endif %}>
+            <div class="shelf-capsule-wrap" data-appid="{{ game.appid }}" data-installed="{{ game.installed or 0 }}" data-name="{{ game.name | e }}" data-status="{{ game.completion_status or "" }}" data-platform="{{ game.platform or 'steam' }}" data-total-achievements="{{ game.total_achievements or 0 }}" data-unlocked-achievements="{{ game.unlocked_achievements or 0 }}" data-review-percentage="{{ game.review_percentage if game.review_percentage is not none else '' }}" data-weighted-percentage="{{ game.weighted_percentage if game.weighted_percentage is not none else '' }}" data-total-reviews="{{ game.total_reviews or 0 }}" data-hltb-main="{{ game.hltb_main or 0 }}" data-hltb-extras="{{ game.hltb_extras or 0 }}" data-hltb-completionist="{{ game.hltb_completionist or 0 }}"{% if outline_colors is defined and outline_colors.get(game.appid | string) %} style="--outline-color:{{ outline_colors[game.appid | string] }}"{% endif %}>
                 <div class="shelf-capsule-inner">
                     <img data-src="/static/img/library/vertical/{{ game.appid }}.jpg?v={{ cache_v }}" alt="{{ game.name }}" class="shelf-capsule" draggable="false"
                          onload="_shelfImgLoad(this)"
@@ -586,7 +586,7 @@
         <div class="shelf-grid-wrap">
         <div class="shelf-grid">
             {% for game in shelf.games %}
-            <div class="shelf-capsule-wrap" data-appid="{{ game.appid }}" data-installed="{{ game.installed or 0 }}" data-name="{{ game.name | e }}" data-status="{{ game.completion_status or "" }}" data-platform="{{ game.platform or 'steam' }}" data-total-achievements="{{ game.total_achievements or 0 }}" data-unlocked-achievements="{{ game.unlocked_achievements or 0 }}" data-review-percentage="{{ game.review_percentage if game.review_percentage is not none else '' }}" data-weighted-percentage="{{ game.weighted_percentage if game.weighted_percentage is not none else '' }}" data-total-reviews="{{ game.total_reviews or 0 }}" data-hltb-main="{{ game.hltb_main or 0 }}" data-hltb-extras="{{ game.hltb_extras or 0 }}" data-hltb-completionist="{{ game.hltb_completionist or 0 }}" {{ 'ondblclick' if state.get('require_double_click_launch') else 'onclick' }}="launchGame({{ game.appid }})"{% if outline_colors is defined and outline_colors.get(game.appid | string) %} style="--outline-color:{{ outline_colors[game.appid | string] }}"{% endif %}>
+            <div class="shelf-capsule-wrap" data-appid="{{ game.appid }}" data-installed="{{ game.installed or 0 }}" data-name="{{ game.name | e }}" data-status="{{ game.completion_status or "" }}" data-platform="{{ game.platform or 'steam' }}" data-total-achievements="{{ game.total_achievements or 0 }}" data-unlocked-achievements="{{ game.unlocked_achievements or 0 }}" data-review-percentage="{{ game.review_percentage if game.review_percentage is not none else '' }}" data-weighted-percentage="{{ game.weighted_percentage if game.weighted_percentage is not none else '' }}" data-total-reviews="{{ game.total_reviews or 0 }}" data-hltb-main="{{ game.hltb_main or 0 }}" data-hltb-extras="{{ game.hltb_extras or 0 }}" data-hltb-completionist="{{ game.hltb_completionist or 0 }}"{% if outline_colors is defined and outline_colors.get(game.appid | string) %} style="--outline-color:{{ outline_colors[game.appid | string] }}"{% endif %}>
                 <div class="shelf-capsule-inner">
                     <img data-src="/static/img/library/vertical/{{ game.appid }}.jpg?v={{ cache_v }}" alt="{{ game.name }}" class="shelf-capsule" draggable="false"
                          onload="_shelfImgLoad(this)"
@@ -669,7 +669,7 @@ async function _reloadLastPlayedShelves() {
                      data-name="${g.name.replace(/"/g,'&quot;')}"
                      data-status="${(g.completion_status||'').replace(/"/g,'&quot;')}"
                      data-platform="${(g.platform||'steam')}"
-                     ${launchClickAttr(g.appid)}${oc ? ` style="--outline-color:${oc}"` : ''}>
+                     ${oc ? ` style="--outline-color:${oc}"` : ''}>
                     <div class="shelf-capsule-inner">
                         <img data-src="/static/img/library/vertical/${g.appid}.jpg?v=${_imgV}"
                              alt="${g.name.replace(/"/g,'&quot;')}"
@@ -708,7 +708,7 @@ async function shuffleShelf(shelfId, labelEl) {
                  data-name="${g.name.replace(/"/g,'&quot;')}"
                  data-status="${(g.completion_status||'').replace(/"/g,'&quot;')}"
                  data-platform="${g.platform || 'steam'}"
-                 ${launchClickAttr(g.appid)}${oc ? ` style="--outline-color:${oc}"` : ''}>
+                 ${oc ? ` style="--outline-color:${oc}"` : ''}>
                 <div class="shelf-capsule-inner">
                     <img data-src="/static/img/library/vertical/${g.appid}.jpg?v=${_imgV}"
                          alt="${g.name.replace(/"/g,'&quot;')}"
@@ -736,7 +736,6 @@ const _builtinFilters = {{ filter_options | tojson }};
 const _savedFilters   = {{ saved_filters | tojson }};
 const OUTLINE_COLORS  = {{ outline_colors | tojson }};
 window.CARD_BADGES = {{ (state.card_badges if state.get('card_badges', {}).get('enabled', {}).get('home', True) else none) | tojson }};
-window._requireDblClick = {{ state.get('require_double_click_launch', false) | tojson }};
 window.EDIT_BUTTON = {{ (state.edit_button if state.get('edit_button', {}).get('pages', {}).get('home', False) else none) | tojson }};
 // Merged filter list for the dropdown: built-ins first, then saved
 const _filters = {
@@ -1360,7 +1359,7 @@ async function _refillShelfGrid(shelfId, grid, limit) {
                  data-name="${g.name.replace(/"/g,'&quot;')}"
                  data-status="${(g.completion_status||'').replace(/"/g,'&quot;')}"
                  data-platform="${(g.platform||'steam')}"
-                 ${launchClickAttr(g.appid)}${oc ? ` style="--outline-color:${oc}"` : ''}>
+                 ${oc ? ` style="--outline-color:${oc}"` : ''}>
                 <div class="shelf-capsule-inner">
                     <img data-src="/static/img/library/vertical/${g.appid}.jpg?v=${_imgV}"
                          alt="${g.name.replace(/"/g,'&quot;')}"
@@ -2558,7 +2557,6 @@ setInterval(async () => {
                         wrap.dataset.name = g.name;
                         wrap.dataset.status = g.completion_status || '';
                         wrap.dataset.platform = g.platform || 'steam';
-                        wrap.setAttribute(window._requireDblClick ? 'ondblclick' : 'onclick', `launchGame(${g.appid})`);
                         const imgSrc = `/static/img/library/vertical/${g.appid}.jpg?v=${_imgV}`;
                         wrap.innerHTML = `<div class="shelf-capsule-inner">
                             <img data-src="${imgSrc}"
@@ -2583,8 +2581,11 @@ setInterval(async () => {
 
 // ── Card hover tooltip (opt-in) ──────────────────────────────────────────────
 (function() {
-    const cfg = {{ state.get('hover_tooltip') | tojson }};
-    if (!cfg || !cfg.home) return;
+    const cfg = {{ hover_tooltip | tojson }};
+    // A mouse rule that shows the tooltip replaces hovering (the Card Tooltip setting is greyed out then).
+    const clickTip = (window._CARD_RULES || []).some(r => r.action === 'tooltip');
+    const hoverOn = !!(cfg && cfg.home) && !clickTip;
+    if (!cfg || !(hoverOn || clickTip)) return;
     const tip = document.getElementById('home-hover-tooltip');
     const games = new Map();      // appid -> full game row (fetched on first hover)
     const info = window.PDInfoTip.make(cfg, {
@@ -2611,7 +2612,26 @@ setInterval(async () => {
         info.hydrateDesc(tip, appid, () => { if (hovered === appid) place(card); });
     }
 
+    // Show the tooltip for a card on request (a mouse rule); stays until dismissed.
+    window.pdCardTip = {
+        show(el, appid) {
+            const card = el.closest('.shelf-capsule-wrap[data-appid]');
+            if (!card) return false;
+            hide();
+            hovered = appid;
+            if (games.has(appid)) { show(card, appid, games.get(appid)); return true; }
+            fetch(`/api/game/${appid}`).then(r => r.json()).then(d => {
+                if (d.status !== 'success') return;
+                games.set(appid, d.game);
+                if (hovered === appid) show(card, appid, d.game);
+            }).catch(() => {});
+            return true;
+        },
+        hide,
+    };
+
     document.addEventListener('mouseover', e => {
+        if (!hoverOn) return;
         if (document.body.classList.contains('edit-mode') || window._inputMgr?.active) { if (hovered) hide(); return; }
         const card = e.target.closest('.shelf-capsule-wrap[data-appid]');
         const appid = card ? parseInt(card.dataset.appid) : null;

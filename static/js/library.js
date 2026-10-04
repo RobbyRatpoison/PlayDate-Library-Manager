@@ -9,7 +9,6 @@
     const _imgVersions = new Map(); // appid (int) → per-game version after image change
     let _artOrientation = window._artOrientation;
     let _groupBy = window._groupBy;
-    const _requireDblClick = !!window._requireDblClick;
     let _cardSizeTimeout = null;
 
     function _setCardSize(size) {
@@ -247,14 +246,9 @@
             : '';
         // src is intentionally omitted here — set after a scroll-idle delay
         // by scheduleImgLoad() so fast-scrolling cards never trigger a fetch.
-        // Click vs double-click is mutually exclusive (opt-in via View settings,
-        // off by default) -- wiring both would fire launchGame twice per click
-        // when off, or three times on a real double-click.
-        const clickAttr = _requireDblClick
-            ? `ondblclick="launchGame(${game.appid})"`
-            : `onclick="launchGame(${game.appid})"`;
+        // Clicks on the card are handled by card_actions.js (user-configurable rules).
         const html = `
-            <div class="capsule-container" ${clickAttr} style="cursor:pointer;">
+            <div class="capsule-container" style="cursor:pointer;">
                 <img data-src="${src}"
                     data-fallback="${fallback}"
                     alt=""
@@ -1710,7 +1704,11 @@ async function stopBulkDateImport() {
 // ── Card hover tooltip (PAGYWOSG quals + optional game info) ─────────────────
 (function() {
     const _pagOn  = !!_serverFilterTree?.pagywosg;
-    const _tipCfg = window.HOVER_TIP && window.HOVER_TIP.library ? window.HOVER_TIP : null;
+    // A mouse rule that shows the tooltip replaces hovering for the info panel (the
+    // Card Tooltip setting is greyed out then). PAGYWOSG quals still show on hover.
+    const _clickTip = (window._CARD_RULES || []).some(r => r.action === 'tooltip');
+    const _hoverOn  = !!(window.HOVER_TIP && window.HOVER_TIP.library) && !_clickTip;
+    const _tipCfg   = (_hoverOn || _clickTip) ? window.HOVER_TIP : null;
     if (!_pagOn && !_tipCfg) return;
 
     const tooltip        = document.getElementById('pag-hover-tooltip');
@@ -1778,9 +1776,9 @@ async function stopBulkDateImport() {
         return html;
     }
 
-    function _buildTooltip(game) {
+    function _buildTooltip(game, forClick) {
         const pag  = _pagOn ? _buildPagHtml(game) : null;
-        const info = _buildInfoHtml(game);
+        const info = (_hoverOn || forClick) ? _buildInfoHtml(game) : null;
         if (!pag && !info) return null;
         const body = !pag ? info : !info ? pag
             : info + `<div style="margin-top:6px; border-top:1px solid var(--border); padding-top:6px;">${pag}</div>`;
@@ -1828,7 +1826,7 @@ async function stopBulkDateImport() {
         if (!appid || !card.dataset.populated) { _hideGpTooltip(); return; }
         const game = _GAME_MAP.get(appid);
         if (!game) { _hideGpTooltip(); return; }
-        const html = _buildTooltip(game);
+        const html = _buildTooltip(game, !!_tipCfg);
         if (!html) { _hideGpTooltip(); return; }
 
         gpTooltip.innerHTML = html;
@@ -1867,8 +1865,29 @@ async function stopBulkDateImport() {
     });
     _gpFocusObserver.observe(grid, { subtree: true, attributes: true, attributeFilter: ['class'] });
 
+    // Show the tooltip for a card on request (a mouse rule); stays until dismissed.
+    window.pdCardTip = {
+        show(el, appid) {
+            const card = el.closest('.game-card[data-appid]');
+            const game = _GAME_MAP.get(appid);
+            if (!card || !game) return false;
+            const html = _buildTooltip(game, true);
+            if (!html) return false;
+            tooltip.style.display = 'block';
+            tooltip.innerHTML = html;
+            _positionHoverTooltip(card);
+            tooltip.style.visibility = '';
+            tooltip.style.opacity = '1';
+            _hoveredAppid = appid;
+            _hydrateDesc(tooltip, appid, () => { if (_hoveredAppid === appid) _positionHoverTooltip(card); });
+            return true;
+        },
+        hide: _hideTooltip,
+    };
+
     grid.addEventListener('mouseover', e => {
         if (window._inputMgr?.active) return;
+        if (!_hoverOn && !_pagOn) return;
         const card = e.target.closest('.game-card[data-appid]');
         const appid = card ? parseInt(card.dataset.appid) : null;
         if (appid === _hoveredAppid) return;
@@ -2096,7 +2115,6 @@ function pickRandomGame() {
                 const g = _GAME_MAP.get(game.appid); if (g) openDetailPane(g);
             }
         });
-        row.addEventListener('dblclick', () => { if (!_selectMode) launchGame(game.appid); });
         return row;
     }
 

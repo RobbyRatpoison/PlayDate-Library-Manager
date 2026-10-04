@@ -568,7 +568,6 @@
 const _imgV = Date.now(); // cache-buster, matching library.js
 const _activeFilterName = {{ filter_name | tojson }};
 window.CARD_BADGES = {{ (state.card_badges if state.get('card_badges', {}).get('enabled', {}).get('pick6', True) else none) | tojson }};
-window._requireDblClick = {{ state.get('require_double_click_launch', false) | tojson }};
 window.EDIT_BUTTON = {{ (state.edit_button if state.get('edit_button', {}).get('pages', {}).get('pick6', False) else none) | tojson }};
 
 function _pickFilterLinkColor() {
@@ -809,7 +808,7 @@ function makeCard(game, reason, boundsRelaxed, outlineColor) {
     card.dataset.platform = game.platform || 'steam';
     if (outlineColor) card.style.setProperty('--outline-color', outlineColor);
     card.innerHTML = `
-        <div class="result-art" ${launchClickAttr(appid)} style="cursor:pointer;">
+        <div class="result-art" style="cursor:pointer;">
             <img class="result-cover" src="${localSrc}" alt="${escaped}">
             <div class="no-art-name">${escaped}</div>
             ${renderEditButton(appid, window.EDIT_BUTTON)}
@@ -915,8 +914,11 @@ document.addEventListener('DOMContentLoaded', refreshStatusAvailability);
 
 // ── Card hover tooltip (opt-in) ──────────────────────────────────────────────
 (function() {
-    const cfg = {{ state.get('hover_tooltip') | tojson }};
-    if (!cfg || !cfg.pick6) return;
+    const cfg = {{ hover_tooltip | tojson }};
+    // A mouse rule that shows the tooltip replaces hovering (the Card Tooltip setting is greyed out then).
+    const clickTip = (window._CARD_RULES || []).some(r => r.action === 'tooltip');
+    const hoverOn = !!(cfg && cfg.pick6) && !clickTip;
+    if (!cfg || !(hoverOn || clickTip)) return;
     const tip = document.getElementById('pick-hover-tooltip');
     const games = new Map();      // appid -> full game row (fetched on first hover)
     const info = window.PDInfoTip.make(cfg, {
@@ -943,7 +945,26 @@ document.addEventListener('DOMContentLoaded', refreshStatusAvailability);
         info.hydrateDesc(tip, appid, () => { if (hovered === appid) place(card); });
     }
 
+    // Show the tooltip for a card on request (a mouse rule); stays until dismissed.
+    window.pdCardTip = {
+        show(el, appid) {
+            const card = el.closest('.result-card[data-appid]');
+            if (!card) return false;
+            hide();
+            hovered = appid;
+            if (games.has(appid)) { show(card, appid, games.get(appid)); return true; }
+            fetch(`/api/game/${appid}`).then(r => r.json()).then(d => {
+                if (d.status !== 'success') return;
+                games.set(appid, d.game);
+                if (hovered === appid) show(card, appid, d.game);
+            }).catch(() => {});
+            return true;
+        },
+        hide,
+    };
+
     document.addEventListener('mouseover', e => {
+        if (!hoverOn) return;
         if (window._inputMgr?.active) { if (hovered) hide(); return; }
         const card = e.target.closest('.result-card[data-appid]');
         const appid = card ? parseInt(card.dataset.appid) : null;

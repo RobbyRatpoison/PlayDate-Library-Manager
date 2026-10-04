@@ -51,12 +51,13 @@ const TUTORIAL_SECTIONS = [
             {
                 title: 'Launching a game',
                 body: `<p>Click a game's cover, on any page, to play it. A Steam game that isn't installed yet gets Steam's install prompt, and games from other stores start through their own plugin or launcher.</p>
-                       <p>If you tend to click by accident, turn on ${tutOpen('library', 'Settings → Library')} → <strong>Require double-click to launch/install</strong> so a single click does nothing.</p>`,
+                       <p>The mouse buttons are configurable. In ${tutOpen('library', 'Settings → Library')} → <strong>Mouse Actions</strong> you can choose what a left, middle, right or side-button click, or double-click, does on a cover: launch or install, show the info tooltip, open the context menu, store page, install folder or edit window. For example, make launching a double-click so a stray click does nothing.</p>`,
             },
             {
                 title: 'The right-click menu',
-                body: `<p>Right-click any game, on Home, in the Library (grid or list), or in Pick 6, for quick actions without opening it: <strong>Launch</strong> or <strong>Install</strong>, view it in its store, open its achievements or Steam Community Hub (Steam games), set its <strong>completion status</strong> from a submenu, <strong>Edit</strong> it, or <strong>Uninstall</strong> or <strong>Delete</strong> it.</p>
-                       <p>Delete asks whether to blacklist the game, so a later Populate doesn't bring it back.</p>`,
+                body: `<p>By default, right-click any game, on Home, in the Library (grid or list), or in Pick 6, for quick actions without opening it: <strong>Launch</strong> or <strong>Install</strong>, view it in its store, open its achievements or Steam Community Hub (Steam games), set its <strong>completion status</strong> from a submenu, <strong>Edit</strong> it, or <strong>Uninstall</strong> or <strong>Delete</strong> it.</p>
+                       <p>Delete asks whether to blacklist the game, so a later Populate doesn't bring it back.</p>
+                       <p>Which mouse button opens this menu can be changed under Mouse Actions (see Launching a game).</p>`,
             },
             {
                 title: 'Gamepad friendly',
