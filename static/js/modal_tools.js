@@ -6085,12 +6085,14 @@ function _faceButtonColor(physIdx, gpId) {
 // returns nothing there regardless of whether the controller is actually
 // working. The Deck's real state arrives via window._pdPad instead (fed by
 // main.py's evdev reader), which is shaped like a standard Gamepad object.
-function _firstGamepad() {
+// raw = true skips pdStandardizeGamepad(): Diagnostics shows the pad as the browser
+// reports it next to what the app makes of it.
+function _firstGamepad(raw) {
     if (window._STEAM_DECK_SESSION) {
         return (window._pdPad && window._pdPad.connected) ? window._pdPad : null;
     }
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-    for (const g of gamepads) { if (g) return g; }
+    for (const g of gamepads) { if (g) return raw ? g : pdStandardizeGamepad(g); }
     return null;
 }
 
@@ -6160,6 +6162,7 @@ function _gpdStartPoll() {
         _gpdRafId = requestAnimationFrame(poll);
 
         const gp = _firstGamepad();
+        const rawGp = _firstGamepad(true);
 
         // Controller
         const ctrlEl = document.getElementById('gpd-controller');
@@ -6177,9 +6180,10 @@ function _gpdStartPoll() {
         // Mapping
         const mapEl = document.getElementById('gpd-mapping');
         if (gp) {
-            const mapping = gp.mapping || '(none)';
-            mapEl.textContent = `mapping: ${mapping}`;
-            mapEl.style.color = gp.mapping === 'standard' ? 'var(--text-secondary)' : 'var(--text-danger)';
+            const mapping = rawGp.mapping || '(none)';
+            // A pad PlayDate re-orders itself (pdStandardizeGamepad) isn't a problem to flag.
+            mapEl.textContent = gp._pdNormalized ? `mapping: ${mapping} (PlayDate corrects the button and axis order)` : `mapping: ${mapping}`;
+            mapEl.style.color = rawGp.mapping === 'standard' || gp._pdNormalized ? 'var(--text-secondary)' : 'var(--text-danger)';
         } else {
             mapEl.textContent = '';
         }
@@ -6192,6 +6196,7 @@ function _gpdStartPoll() {
             document.getElementById('gpd-lstick').textContent = 'x: --  y: --';
             document.getElementById('gpd-rstick').textContent = 'x: --  y: --';
             document.getElementById('gpd-axes-raw').textContent = '--';
+            document.getElementById('gpd-buttons-raw').textContent = '--';
             return;
         }
 
@@ -6249,7 +6254,12 @@ function _gpdStartPoll() {
         // Full raw axes array — a leaked hat switch (unmapped D-pad) shows up here
         // as extra axes beyond the two known sticks (indices 0-3).
         document.getElementById('gpd-axes-raw').textContent =
-            gp.axes.map((v, i) => `[${i}] ${fmt(v)}`).join('   ');
+            rawGp.axes.map((v, i) => `[${i}] ${fmt(v)}`).join('   ');
+        // Raw button count and which raw indices are held: the ground truth for a button
+        // that seems missing (if it never appears here, the browser isn't sending it).
+        const heldRaw = [...rawGp.buttons].map((b, i) => (b.pressed || b.value > 0.5) ? i : null).filter(i => i !== null);
+        document.getElementById('gpd-buttons-raw').textContent =
+            `${rawGp.buttons.length} buttons   held: ${heldRaw.length ? heldRaw.join(', ') : 'none'}`;
     }
     _gpdRafId = requestAnimationFrame(poll);
 }

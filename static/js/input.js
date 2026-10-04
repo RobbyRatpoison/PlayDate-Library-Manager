@@ -2860,6 +2860,7 @@
         } else {
             const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
             for (const g of gamepads) { if (g) { gp = g; break; } }
+            gp = pdStandardizeGamepad(gp);
         }
         if (!gp) return;
 

@@ -422,6 +422,39 @@ function pdGamepadXYSwapped() {
     return /Linux|X11/.test(ua) && /AppleWebKit/.test(ua) && !/Chrome|Chromium|QtWebEngine/.test(ua);
 }
 
+// A pad the browser has no "standard" mapping for arrives in raw Linux evdev order. For
+// an Xbox-style pad that is: axes LX, LY, LT, RX, RY, RT, HAT-X, HAT-Y; buttons A, B, X, Y,
+// LB, RB, Back, Start, Guide, L3, R3. Read as a standard pad, LT becomes the right stick's
+// x, the right stick shifts a slot, Back/Start read as LT/RT, and L3/R3 as Start/L3 (seen
+// on a pad with +/- buttons). Pads of that shape are recognised by both trigger axes
+// (2 and 5) resting at -1, which no other raw layout does, and latched per pad since a held
+// trigger would otherwise break the check. Returns a standard-shaped copy (flagged
+// _pdNormalized), or the pad itself when it doesn't need one. Used by input.js and the
+// Gamepad Diagnostics/Remap screens so all of them see the same button numbers.
+const _pdXboxRawPads = new Set();
+function pdStandardizeGamepad(gp) {
+    if (!gp || gp.mapping === 'standard' || gp === window._pdPad) return gp;
+    const key = gp.id + '#' + gp.index;
+    if (!_pdXboxRawPads.has(key)) {
+        const looksRaw = gp.axes.length >= 8 && gp.buttons.length >= 11 && gp.axes[2] < -0.99 && gp.axes[5] < -0.99;
+        if (!looksRaw) return gp;
+        _pdXboxRawPads.add(key);
+    }
+    if (gp.axes.length < 8 || gp.buttons.length < 11) return gp;
+    const b = gp.buttons, a = gp.axes;
+    const trigger = v => { const n = Math.max(0, Math.min(1, (v + 1) / 2)); return { pressed: n > 0.5, touched: n > 0.05, value: n }; };
+    const dir = on => ({ pressed: on, touched: on, value: on ? 1 : 0 });
+    return {
+        id: gp.id, index: gp.index, connected: gp.connected, timestamp: gp.timestamp,
+        mapping: 'standard', _pdNormalized: true,
+        axes: [a[0], a[1], a[3], a[4]],
+        buttons: [b[0], b[1], b[2], b[3], b[4], b[5], trigger(a[2]), trigger(a[5]), b[6], b[7], b[9], b[10],
+                  dir(a[7] < -0.5), dir(a[7] > 0.5), dir(a[6] < -0.5), dir(a[6] > 0.5), b[8],
+                  // Extra buttons (paddles, L4/R4...) follow the standard 17, in the pad's own order.
+                  ...Array.from(b).slice(11)],
+    };
+}
+
 // Fire-and-forget preference save — keepalive survives page navigation
 function savePreference(payload) {
     fetch('/api/update_state', {
