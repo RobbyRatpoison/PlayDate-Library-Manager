@@ -1366,7 +1366,9 @@ def save_state(updates):
         if "renderer" in updates and updates["renderer"] in ("gtk", "qt"):
             state["renderer"] = updates["renderer"]
         if "button_remaps" in updates:
-            _valid_actions = {'a','b','x','y','lb','rb','back','start','up','down','left','right'}
+            _valid_actions = {'a','b','x','y','lb','rb','back','start','up','down','left','right',
+                              # unset-by-default shortcuts, and 'none' = a core button that was moved away
+                              'sc_store','sc_folder','sc_achievements','sc_community_hub','none'}
             remaps = updates["button_remaps"]
             if isinstance(remaps, dict):
                 state["button_remaps"] = {

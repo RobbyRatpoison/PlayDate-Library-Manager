@@ -6274,7 +6274,15 @@ const _REMAP_ACTIONS = [
     { action: 'down',  defaultBtn: 13, label: 'Navigate Down' },
     { action: 'left',  defaultBtn: 14, label: 'Navigate Left' },
     { action: 'right', defaultBtn: 15, label: 'Navigate Right' },
+    // Shortcuts act on the game under the focus ring. Unset by default (defaultBtn null), and
+    // unlike the actions above they may be left without a button.
+    { action: 'sc_store',         defaultBtn: null, label: 'Open Store Page',           shortcut: true },
+    { action: 'sc_folder',        defaultBtn: null, label: 'Open Install Folder',       shortcut: true },
+    { action: 'sc_achievements',  defaultBtn: null, label: 'Open Steam Achievements',   shortcut: true },
+    { action: 'sc_community_hub', defaultBtn: null, label: 'Open Steam Community Hub',  shortcut: true },
 ];
+const _grmLabel = a => _REMAP_ACTIONS.find(x => x.action === a).label;
+const _grmIsShortcut = a => !!_REMAP_ACTIONS.find(x => x.action === a).shortcut;
 
 // Map<action, physicalBtnIdx> — UI working state
 let _remapState = new Map();
@@ -6283,6 +6291,7 @@ let _grmRafId = null;
 let _grmPrevBtns = {};
 
 function _grmBtnLabel(physIdx) {
+    if (physIdx == null) return 'Not set';
     const labels = _activeBtnLabels(_firstConnectedGamepadId());
     return labels[physIdx] !== undefined ? labels[physIdx] : String(physIdx);
 }
@@ -6298,11 +6307,18 @@ function _grmBuildState() {
     }
 }
 
+// Raw buttons that are not each action's own default (what gets saved): every changed
+// action, plus 'none' for a core button whose action was moved away and that nothing else
+// took (otherwise the raw button would keep doing its original job as well).
+
 function _grmStateToStorage() {
     const out = {};
+    const taken = new Set([..._remapState.values()].filter(v => v != null));
     for (const { action, defaultBtn } of _REMAP_ACTIONS) {
         const assigned = _remapState.get(action);
-        if (assigned !== defaultBtn) out[String(assigned)] = action;
+        if (assigned === defaultBtn) continue;
+        if (assigned != null) out[String(assigned)] = action;
+        if (defaultBtn != null && !taken.has(defaultBtn)) out[String(defaultBtn)] = 'none';
     }
     return out;
 }
@@ -6312,7 +6328,12 @@ function _grmRenderRows() {
     if (!container) return;
     let html = '';
     const gpId = _firstConnectedGamepadId();
-    for (const { action, label } of _REMAP_ACTIONS) {
+    let shortcutHeader = false;
+    for (const { action, label, shortcut } of _REMAP_ACTIONS) {
+        if (shortcut && !shortcutHeader) {
+            shortcutHeader = true;
+            html += `<div style="margin-top:10px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">Shortcuts: act on the game under the focus ring. Not set until you choose a button.</div>`;
+        }
         const physIdx = _remapState.get(action);
         const btnLabel = _grmBtnLabel(physIdx);
         const faceColor = _faceButtonColor(physIdx, gpId);
@@ -6324,7 +6345,8 @@ function _grmRenderRows() {
                 ? `<span style="font-size:0.8rem; color:var(--accent); font-style:italic;">Press any button...</span>
                    <button class="nav-btn" data-modal-row="${_REMAP_ACTIONS.findIndex(a=>a.action===action)}" onclick="grmCancelCapture()" style="font-size:0.78rem; padding:3px 10px;">Cancel</button>`
                 : `<span style="box-sizing:border-box; display:inline-block; min-width:38px; text-align:center; padding:1px 7px; border-radius:4px; background:rgba(255,255,255,0.1); font-size:0.8rem; color:var(--text-primary); border:${badgeBorder};">${escHtml(btnLabel)}</span>
-                   <button class="nav-btn" data-modal-row="${_REMAP_ACTIONS.findIndex(a=>a.action===action)}" onclick="grmStartCapture('${action}')" style="font-size:0.78rem; padding:3px 10px;">Change</button>`
+                   <button class="nav-btn" data-modal-row="${_REMAP_ACTIONS.findIndex(a=>a.action===action)}" onclick="grmStartCapture('${action}')" style="font-size:0.78rem; padding:3px 10px;">${physIdx == null ? 'Set' : 'Change'}</button>
+                   ${shortcut && physIdx != null ? `<button class="nav-btn" data-modal-row="${_REMAP_ACTIONS.findIndex(a=>a.action===action)}" onclick="grmClear('${action}')" style="font-size:0.78rem; padding:3px 10px;">Clear</button>` : ''}`
             }
         </div>`;
     }
@@ -6363,6 +6385,45 @@ function grmStartCapture(action) {
     _grmRenderRows();
 }
 
+// Give the captured physical button to an action. When another action already has it, ask:
+// a shortcut can be cleared (it just ends up unset), and the two can swap buttons when the
+// action being changed has one to give. An action that must keep a button (everything
+// above the shortcuts) is never cleared, only swapped.
+async function _grmAssign(target, newPhys) {
+    const oldPhys = _remapState.get(target);
+    if (oldPhys === newPhys) { _grmRenderRows(); return; }
+    let owner = null;
+    for (const [act, phys] of _remapState) if (phys === newPhys && act !== target) { owner = act; break; }
+    if (owner) {
+        const ownerIsShortcut = _grmIsShortcut(owner);
+        const canSwap = oldPhys != null;
+        const what = `${_grmBtnLabel(newPhys)} is already used for "${_grmLabel(owner)}".`;
+        const swapTxt = canSwap ? `swap so "${_grmLabel(owner)}" takes ${_grmBtnLabel(oldPhys)}` : '';
+        let choice;
+        if (!ownerIsShortcut && !canSwap) {
+            await alert(`${what}\n\nThat action needs a button. Move it to another button first, or pick a different button for "${_grmLabel(target)}".`);
+            _grmRenderRows();
+            return;
+        }
+        if (ownerIsShortcut && canSwap) choice = await confirmThree(`${what}\n\nClear it, or ${swapTxt}?`, 'Clear it', 'Swap', 'Cancel');
+        else if (ownerIsShortcut) choice = await confirmCustom(`${what}\n\nClear it?`, 'Clear it', 'Cancel');
+        else choice = await confirmCustom(`${what}\n\nSwap so "${_grmLabel(owner)}" takes ${_grmBtnLabel(oldPhys)}?`, 'Swap', 'Cancel');
+        if (!choice) { _grmRenderRows(); return; }
+        const swap = choice === 'alt' || !ownerIsShortcut;
+        _remapState.set(owner, swap ? oldPhys : null);
+    }
+    _remapState.set(target, newPhys);
+    _grmSave();
+    _grmRenderRows();
+}
+
+function grmClear(action) {
+    if (!_grmIsShortcut(action)) return;
+    _remapState.set(action, null);
+    _grmSave();
+    _grmRenderRows();
+}
+
 function grmCancelCapture() {
     if (!_captureAction) return;
     _captureAction = null;
@@ -6371,9 +6432,8 @@ function grmCancelCapture() {
 }
 
 function grmResetDefaults() {
-    _grmBuildState();
-    // Defaults are already set; clear storage
     window._BUTTON_REMAPS = {};
+    _grmBuildState();
     savePreference({ button_remaps: {} });
     if (window._inputMgr) window._inputMgr.setButtonRemaps({});
     _captureAction = null;
@@ -6399,22 +6459,10 @@ function _grmStartPoll() {
             const pressed = btn.pressed || btn.value > 0.5;
             const wasPressed = !!_grmPrevBtns[i];
             if (pressed && !wasPressed) {
-                // Assign this physical button to _captureAction; swap if already taken
                 const target = _captureAction;
-                const newPhys = i;
-                const oldPhys = _remapState.get(target);
-                // Find if newPhys is already used by another action
-                for (const [act, phys] of _remapState) {
-                    if (phys === newPhys && act !== target) {
-                        _remapState.set(act, oldPhys); // swap
-                        break;
-                    }
-                }
-                _remapState.set(target, newPhys);
                 _captureAction = null;
                 if (window._inputMgr) window._inputMgr.setCapturing(false);
-                _grmSave();
-                _grmRenderRows();
+                _grmAssign(target, i);
             }
             _grmPrevBtns[i] = pressed;
         });
@@ -6462,64 +6510,6 @@ function saveHoverTip() {
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _renderHoverTipFields);
 else _renderHoverTipFields();
 
-// ── Per-platform artwork source preferences (Settings modal) ─────────────────
-const _ART_KINDS = [['vertical', 'Vertical'], ['horizontal', 'Horizontal'], ['icon', 'Icon']];
-const _ART_SRC_LABELS = { store: "Store (the library's own art)", sgdb: 'SteamGridDB', steam: 'Steam' };
-
-// Steam plus the platforms of installed plugins; _PLAT_LABELS alone also
-// carries every emulator platform, which would bury the list.
-function _artPlatforms() {
-    const labels = window._PLAT_LABELS || {};
-    return ['steam', ...Object.keys(window._PLUGIN_API || {})].filter((p, i, a) => labels[p] && a.indexOf(p) === i);
-}
-// art_store (from the plugin) lists the art types it can supply from its own store.
-const _artHasStore  = (plat, kind) => !!(window._PLUGIN_API && window._PLUGIN_API[plat] &&
-    (window._PLUGIN_API[plat].art_store || []).includes(kind));
-const _artAllSources = (plat, kind) => _artHasStore(plat, kind) ? ['store', 'sgdb', 'steam'] : ['sgdb', 'steam'];
-
-// Mirrors images.art_source_order()'s defaults for a platform nobody has customised.
-function _artDefaultOrder(plat, kind) {
-    if (plat === 'steam') return kind === 'icon' ? ['sgdb', 'steam'] : ['steam', 'sgdb'];
-    const all = _artAllSources(plat, kind);
-    // A plugin with store art may prefer its own order (art_default); others use the original SGDB, Steam.
-    const pref = (window._PLUGIN_API[plat] && window._PLUGIN_API[plat].art_default) || [];
-    return _artHasStore(plat, kind) && pref.length ? pref.filter(s => all.includes(s)) : all;
-}
-
-// {enabled: sources in the order they're tried, disabled: the rest}
-function _artCurrent(plat, kind) {
-    const saved = ((window._ART_PREFS || {})[plat] || {})[kind];
-    const all = _artAllSources(plat, kind);
-    const enabled = (saved || _artDefaultOrder(plat, kind)).filter(s => all.includes(s));
-    return { enabled, disabled: all.filter(s => !enabled.includes(s)) };
-}
-
-// Settings list: one row per platform (name, Default/Customized, Edit).
-function _renderArtSourcePrefs() {
-    const host = document.getElementById('art-source-prefs');
-    if (!host) return;
-    const labels = window._PLAT_LABELS || {};
-    host.innerHTML = `<div class="art-src-grid">` + _artPlatforms().map((plat, i) => {
-        const custom = Object.keys((window._ART_PREFS || {})[plat] || {}).length > 0;
-        return `<div class="art-src-name">${escHtml(labels[plat])}</div>` +
-            `<div class="art-src-state">${custom ? 'Customized' : 'Default'}</div>` +
-            `<button type="button" class="nav-btn art-src-edit" data-modal-row="${60 + i}" ` +
-            `onclick="openArtSourceEditor(${escHtml(JSON.stringify(plat))})">Edit</button>`;
-    }).join('') + `</div>`;
-}
-
-// ── Per-platform editor: three ordered lists (Vertical / Horizontal / Icon) ──
-let _artEditPlat = null;
-
-function openArtSourceEditor(plat) {
-    _artEditPlat = plat;
-    document.getElementById('art-src-title').textContent = `${(window._PLAT_LABELS || {})[plat] || plat} artwork`;
-    _renderArtEditor();
-    document.getElementById('art-source-modal').style.display = 'flex';
-}
-
-function closeArtSourceEditor() {
-    document.getElementById('art-source-modal').style.display = 'none';
 // ── Mouse actions on game cards (Settings modal) ─────────────────────────────
 // Rules are {button, click, action}, one per (button, click) pair; card_actions.js runs them.
 const _CARD_BTN_LABELS = { left: 'Left button', middle: 'Middle button', right: 'Right button',
@@ -6659,6 +6649,64 @@ function _initCardRuleForm() {
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _initCardRuleForm);
 else _initCardRuleForm();
 
+// ── Per-platform artwork source preferences (Settings modal) ─────────────────
+const _ART_KINDS = [['vertical', 'Vertical'], ['horizontal', 'Horizontal'], ['icon', 'Icon']];
+const _ART_SRC_LABELS = { store: "Store (the library's own art)", sgdb: 'SteamGridDB', steam: 'Steam' };
+
+// Steam plus the platforms of installed plugins; _PLAT_LABELS alone also
+// carries every emulator platform, which would bury the list.
+function _artPlatforms() {
+    const labels = window._PLAT_LABELS || {};
+    return ['steam', ...Object.keys(window._PLUGIN_API || {})].filter((p, i, a) => labels[p] && a.indexOf(p) === i);
+}
+// art_store (from the plugin) lists the art types it can supply from its own store.
+const _artHasStore  = (plat, kind) => !!(window._PLUGIN_API && window._PLUGIN_API[plat] &&
+    (window._PLUGIN_API[plat].art_store || []).includes(kind));
+const _artAllSources = (plat, kind) => _artHasStore(plat, kind) ? ['store', 'sgdb', 'steam'] : ['sgdb', 'steam'];
+
+// Mirrors images.art_source_order()'s defaults for a platform nobody has customised.
+function _artDefaultOrder(plat, kind) {
+    if (plat === 'steam') return kind === 'icon' ? ['sgdb', 'steam'] : ['steam', 'sgdb'];
+    const all = _artAllSources(plat, kind);
+    // A plugin with store art may prefer its own order (art_default); others use the original SGDB, Steam.
+    const pref = (window._PLUGIN_API[plat] && window._PLUGIN_API[plat].art_default) || [];
+    return _artHasStore(plat, kind) && pref.length ? pref.filter(s => all.includes(s)) : all;
+}
+
+// {enabled: sources in the order they're tried, disabled: the rest}
+function _artCurrent(plat, kind) {
+    const saved = ((window._ART_PREFS || {})[plat] || {})[kind];
+    const all = _artAllSources(plat, kind);
+    const enabled = (saved || _artDefaultOrder(plat, kind)).filter(s => all.includes(s));
+    return { enabled, disabled: all.filter(s => !enabled.includes(s)) };
+}
+
+// Settings list: one row per platform (name, Default/Customized, Edit).
+function _renderArtSourcePrefs() {
+    const host = document.getElementById('art-source-prefs');
+    if (!host) return;
+    const labels = window._PLAT_LABELS || {};
+    host.innerHTML = `<div class="art-src-grid">` + _artPlatforms().map((plat, i) => {
+        const custom = Object.keys((window._ART_PREFS || {})[plat] || {}).length > 0;
+        return `<div class="art-src-name">${escHtml(labels[plat])}</div>` +
+            `<div class="art-src-state">${custom ? 'Customized' : 'Default'}</div>` +
+            `<button type="button" class="nav-btn art-src-edit" data-modal-row="${60 + i}" ` +
+            `onclick="openArtSourceEditor(${escHtml(JSON.stringify(plat))})">Edit</button>`;
+    }).join('') + `</div>`;
+}
+
+// ── Per-platform editor: three ordered lists (Vertical / Horizontal / Icon) ──
+let _artEditPlat = null;
+
+function openArtSourceEditor(plat) {
+    _artEditPlat = plat;
+    document.getElementById('art-src-title').textContent = `${(window._PLAT_LABELS || {})[plat] || plat} artwork`;
+    _renderArtEditor();
+    document.getElementById('art-source-modal').style.display = 'flex';
+}
+
+function closeArtSourceEditor() {
+    document.getElementById('art-source-modal').style.display = 'none';
     _artEditPlat = null;
     _renderArtSourcePrefs();
 }

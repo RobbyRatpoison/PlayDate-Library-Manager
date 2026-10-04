@@ -487,12 +487,13 @@ const TUTORIAL_SECTIONS = [
                          <li>${tutBtn('Y', '△', '#f4c20d', '#3bb143')} - edit the focused game.</li>
                          <li>${tutBtn('Start', 'Options')} - launch the focused game, the same as A.</li>
                          <li>${tutBtn('Back', 'Share')} - open or close the hamburger menu.</li>
+                         <li>Any button you choose - shortcuts that open the focused game's store page, install folder, Steam achievements or Steam Community Hub. None are set until you pick a button in Gamepad Controls.</li>
                          <li>${tutBtn('LB', 'L1')} and ${tutBtn('RB', 'R1')} - go to the previous or next page (Home, Library, Pick 6). They don't do anything while a dialog is open.</li>
                        </ul>`,
             },
             {
                 title: 'Configuring gamepad input',
-                body: `<p>${tutOpen('gamepad', 'Settings → <strong>Gamepad</strong>')} has the gamepad toggle, button remapping, and a diagnostics view if a controller isn't behaving the way you expect.</p>`,
+                body: `<p>${tutOpen('gamepad', 'Settings → <strong>Gamepad</strong>')} has the gamepad toggle, button remapping and shortcuts, and a diagnostics view if a controller isn't behaving the way you expect.</p>`,
             },
         ],
     },

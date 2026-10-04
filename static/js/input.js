@@ -2733,8 +2733,52 @@
     // Buttons that fire immediately without needing nav activation first
     const _IMMEDIATE_BTNS = new Set([BTN_IDX.lb, BTN_IDX.rb, BTN_IDX.back]);
 
+    // Gamepad shortcuts (Gamepad Controls, unset by default): a button bound to one of these
+    // runs a card action on the game under the focus ring, same actions as the mouse rules.
+    const _SHORTCUT_ACTIONS = {
+        sc_store: 'store', sc_folder: 'open_folder',
+        sc_achievements: 'achievements', sc_community_hub: 'community_hub',
+    };
+
+    // The card or capsule under the gamepad focus on Home/Library/Pick 6, or null.
+    function _focusedGameEl() {
+        if (_state.zone !== 'content') return null;
+        switch (PAGE) {
+            case 'home': {
+                const rows = _homeRows();
+                return rows[_state.row]?.items[_state.col] || null;
+            }
+            case 'library': {
+                if (_state.row < 0) return null;
+                const item = _libraryNavItems()[_state.row] || null;
+                return item && !_isGroupHeader(item) ? item : null;
+            }
+            case 'pick': {
+                const row = _pickRows()[_state.row];
+                return row?.type === 'results' ? (row.items[_state.col] || null) : null;
+            }
+        }
+        return null;
+    }
+
+    function _runShortcut(name) {
+        const el = _focusedGameEl();
+        const appid = el ? parseInt(el.dataset.appid, 10) : NaN;
+        if (isNaN(appid) || typeof window.pdRunCardAction !== 'function') return;
+        // Home capsules are the card itself; Library and Pick cards hold the art element.
+        const area = el.querySelector('.capsule-container, .result-art') || el;
+        window.pdRunCardAction(_SHORTCUT_ACTIONS[name], appid, area);
+    }
+
     function _onButton(rawIdx, isRepeat) {
         const userAction     = _userRemap[rawIdx];
+        if (_SHORTCUT_ACTIONS[userAction]) {
+            // Only while navigating the page's games; never inside a dialog or text field.
+            if (isRepeat) return;
+            if (!_state.active) { _activate(); return; }
+            _runShortcut(userAction);
+            return;
+        }
         const platformAction = !userAction && _activeMapping?.btns[rawIdx];
         const resolvedAction = userAction || platformAction;
         const effectiveIdx   = resolvedAction ? BTN_IDX[resolvedAction] : rawIdx;
