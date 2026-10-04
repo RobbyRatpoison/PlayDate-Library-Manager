@@ -1,16 +1,19 @@
 # Release Notes
 
-## v1.11.6 - 2026-10-02
+## v1.11.7
 ### New
 
-- Filters can now include other saved filters, using the new "Saved Filter" condition to get the overlap of two filters. (suggested by greatmastermario)
+- Customizable mouse actions: choose what each mouse button does on a game cover, on a single or double click. (suggested by woutercools)
+- Gamepad shortcuts for a game's store page, install folder, Steam achievements and Community Hub.
 
 ### Improvements
 
-- The info tooltip can now be toggled for the Library, Home and Pick 6 pages. Your current setting carries over. (suggested by woutercools)
+- Mouse actions replace "Require double-click to launch/install". Your setting carries over.
+- Picking a gamepad button already in use now asks to swap or clear it.
+- Gamepad Diagnostics now shows the controller's button count and held buttons.
+- The Library settings window is wider.
 
 ### Fixes
 
-- Fixed an empty gap to the right of the cover in the info tooltip. The cover now fills the tooltip's full width. (reported by woutercools)
-- Fixed "Platform", "Sources" and "Library" all being used for the same thing. It's now "Library" everywhere. (reported by woutercools)
-- Likewise, the filter editor's add button now says "+ Filter" in both modes.
+- Fixed "Reset to Defaults" in Gamepad Controls not updating the list until reopened.
+- Fixed some controllers having the wrong buttons and right stick.
