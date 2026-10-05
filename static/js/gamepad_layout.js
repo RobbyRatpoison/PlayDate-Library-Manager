@@ -214,10 +214,33 @@
                      candidates: candidates(gp).map(c => ({ name: c.name, map: c.map })),
                      xboxFits: !!fits(parse(XBOX_RAW), gp) };
         },
-        // Remember a choice for this controller: { kind: 'auto' | 'standard' | 'map', map? }.
+        // Standard control names (SDL fields) for the wizard, and the source <-> string forms.
+        STD_BUTTONS, STD_AXES, parseSource,
+        sourceToString(s) {
+            if (s.t === 'b') return 'b' + s.i;
+            if (s.t === 'h') return `h${s.i}.${s.mask}`;
+            return (s.half > 0 ? '+' : s.half < 0 ? '-' : '') + 'a' + s.i + (s.inv ? '~' : '');
+        },
+        // Button-label style only ('xbox' | 'ps' | 'nintendo' | 'other', or 'auto' to go back to
+        // guessing from the vendor); the saved layout is left as it is.
+        setStyle(id, style) {
+            const all = Object.assign({}, window._GAMEPAD_LAYOUTS || {});
+            const rec = Object.assign({}, all[id] || {});
+            if (style && style !== 'auto') rec.style = style; else delete rec.style;
+            if (rec.kind || rec.style) all[id] = rec; else delete all[id];
+            window._GAMEPAD_LAYOUTS = all;
+            invalidate();
+            if (typeof savePreference === 'function') savePreference({ gamepad_layouts: all });
+        },
+        // Remember a choice for this controller: { kind: 'auto' | 'standard' | 'map', map?, style? }.
+        // The button-label style is kept when a later choice doesn't name one.
         save(id, choice) {
             const all = Object.assign({}, window._GAMEPAD_LAYOUTS || {});
-            if (!choice || choice.kind === 'auto') delete all[id]; else all[id] = choice;
+            const rec = Object.assign({}, choice || {});
+            if (!rec.kind || rec.kind === 'auto') delete rec.kind;
+            const prev = all[id] || {};
+            if (rec.style === undefined && prev.style) rec.style = prev.style;
+            if (!rec.kind && !rec.style) delete all[id]; else all[id] = rec;
             window._GAMEPAD_LAYOUTS = all;
             invalidate();
             if (typeof savePreference === 'function') savePreference({ gamepad_layouts: all });

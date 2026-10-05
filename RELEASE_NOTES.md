@@ -6,6 +6,8 @@
 - Customizable mouse actions: choose what each mouse button does on a game cover, on a single or double click. (suggested by woutercools)
 - Gamepad shortcuts for a game's store page, install folder, Steam achievements and Community Hub.
 - Gamepad Diagnostics can now choose a controller's button and stick layout, remembered per controller.
+- Set up a custom controller layout step by step, with each control highlighted on a drawing.
+- Choose how a controller's buttons are named: Xbox, PlayStation, Nintendo or Other.
 
 ### Improvements
 

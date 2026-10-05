@@ -800,6 +800,7 @@
         'art-source-modal',    // from data-modal
         'filter-io-modal',     // from data-modal
         'gamepad-remap-modal', // from gamepad-modal
+        'gamepad-wizard-modal', // from gamepad-diag-modal
         'gamepad-diag-modal',  // from gamepad-modal
         'send-log-modal',      // from advanced-modal
         'steam-junk-modal',    // from blacklist-modal
@@ -2359,6 +2360,7 @@
             ['art-source-modal',      'closeArtSourceEditor'],
             ['filter-io-modal',       'closeFilterIoModal'],
             ['gamepad-remap-modal',   'closeGamepadRemap'],
+            ['gamepad-wizard-modal',  'closeGamepadWizard'],
             ['gamepad-diag-modal',    'closeGamepadDiag'],
             ['send-log-modal',        'closeSendLogModal'],
             ['steam-junk-modal',      'closeSteamJunkModal'],
@@ -2906,7 +2908,10 @@
                 _gp.prev[i] = pressed;
             });
             const bHeld = _gp.heldSince[BTN_IDX.b];
-            if (bHeld && now - bHeld > GP_DIAG_CLOSE_HOLD_MS) {
+            // Not while the layout wizard is open: it is recording which button B is.
+            const wizard = document.getElementById('gamepad-wizard-modal');
+            const wizardOpen = !!wizard && wizard.style.display !== 'none' && wizard.style.display !== '';
+            if (bHeld && !wizardOpen && now - bHeld > GP_DIAG_CLOSE_HOLD_MS) {
                 delete _gp.heldSince[BTN_IDX.b];
                 if (typeof closeGamepadDiag === 'function') closeGamepadDiag();
             }
@@ -3262,6 +3267,7 @@
 
         // Sub-modals (also registered so _anyWatchedOpen works correctly for nesting)
         _watchModal('gamepad-remap-modal');
+        _watchModal('gamepad-wizard-modal');
         _watchModal('gamepad-diag-modal');
         _watchModal('hltb-modal');
         _watchModal('theme-picker-modal');

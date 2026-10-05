@@ -495,7 +495,8 @@ const TUTORIAL_SECTIONS = [
             {
                 title: 'Configuring gamepad input',
                 body: `<p>${tutOpen('gamepad', 'Settings → <strong>Gamepad</strong>')} has the gamepad toggle, button remapping and shortcuts, and a diagnostics view if a controller isn't behaving the way you expect.</p>
-                       <p>If a controller's buttons or sticks are wrong or in the wrong place, open the diagnostics view and pick its <strong>Controller layout</strong>. PlayDate remembers your choice for that controller. Auto is the default and picks a known layout when it recognises the controller.</p>`,
+                       <p>If a controller's buttons or sticks are wrong or in the wrong place, open the diagnostics view and pick its <strong>Controller layout</strong>. PlayDate remembers your choice for that controller. Auto is the default and picks a known layout when it recognises the controller.</p>
+                       <p>If none of the layouts fit, choose <strong>Set up custom layout</strong>. It highlights one control at a time on a drawing of a controller and waits for you to press or move it on yours. Skip any control your controller doesn't have, then Save. <strong>Button names</strong> (Xbox, PlayStation, Nintendo or Other) changes how buttons are labelled.</p>`,
             },
         ],
     },

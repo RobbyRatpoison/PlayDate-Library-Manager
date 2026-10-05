@@ -6061,8 +6061,40 @@ function _stdFaceIdx(rawIdx) {
     return rawIdx === 2 ? 3 : rawIdx === 3 ? 2 : rawIdx;
 }
 
+// Nintendo naming: same positions, so the bottom button is B and the right one is A.
+const BTN_LABELS_NINTENDO = {
+    0:'B', 1:'A', 2:'Y', 3:'X',
+    4:'L', 5:'R', 6:'ZL', 7:'ZR',
+    8:'Minus', 9:'Plus',
+    10:'L3', 11:'R3',
+    12:'Up', 13:'Down', 14:'Left', 15:'Right',
+    16:'Home',
+};
+
+// Neutral naming for a pad that follows none of those: face buttons by position.
+const BTN_LABELS_OTHER = {
+    0:'Bottom', 1:'Right', 2:'Left', 3:'Top',
+    4:'L1', 5:'R1', 6:'L2', 7:'R2',
+    8:'Select', 9:'Start',
+    10:'L3', 11:'R3',
+    12:'Up', 13:'Down', 14:'Left', 15:'Right',
+    16:'Home',
+};
+
+const _BTN_LABEL_SETS = { xbox: BTN_LABELS, ps: BTN_LABELS_PS, nintendo: BTN_LABELS_NINTENDO, other: BTN_LABELS_OTHER };
+
+// Which naming a pad gets: the user's saved choice (Gamepad Diagnostics, or the layout wizard),
+// else a guess from the vendor id or name.
+function _labelStyleFor(id) {
+    const saved = (window._GAMEPAD_LAYOUTS || {})[id];
+    if (saved && _BTN_LABEL_SETS[saved.style]) return saved.style;
+    if (_isPlayStationPad(id)) return 'ps';
+    if (/057e|nintendo|switch|joy-?con/i.test(id || '')) return 'nintendo';
+    return 'xbox';
+}
+
 function _activeBtnLabels(gpId) {
-    const std = _isPlayStationPad(gpId) ? BTN_LABELS_PS : BTN_LABELS;
+    const std = _BTN_LABEL_SETS[_labelStyleFor(gpId)];
     if (!pdGamepadXYSwapped()) return std;
     return { ...std, 2: std[3], 3: std[2] };
 }
@@ -6074,8 +6106,9 @@ const FACE_BTN_COLORS_XBOX = { 0:'#3bb143', 1:'#e0393e', 2:'#3a7bd5', 3:'#f4c20d
 const FACE_BTN_COLORS_PS   = { 0:'#3a7bd5', 1:'#e0393e', 2:'#e05fa0', 3:'#3bb143' }; // Cross blue, Circle red, Square pink, Triangle green
 
 function _faceButtonColor(physIdx, gpId) {
-    const colors = _isPlayStationPad(gpId) ? FACE_BTN_COLORS_PS : FACE_BTN_COLORS_XBOX;
-    return colors[_stdFaceIdx(physIdx)] || null;
+    const style = _labelStyleFor(gpId);
+    const colors = style === 'ps' ? FACE_BTN_COLORS_PS : style === 'xbox' ? FACE_BTN_COLORS_XBOX : null;   // Nintendo and Other have no brand colors
+    return colors ? (colors[_stdFaceIdx(physIdx)] || null) : null;
 }
 
 // Same source input.js's own poll loop uses. On a real Steam Deck session
@@ -6176,17 +6209,19 @@ const _GPD_LAYOUT_STATUS = {
 function _gpdRenderLayout(rawGp) {
     const section = document.getElementById('gpd-layout-section');
     if (!section) return;
-    // A pad the browser already maps is standard; nothing to choose.
-    if (!rawGp || rawGp.mapping === 'standard' || !window.PDLayout) { section.style.display = 'none'; _gpdLayoutSig = ''; return; }
-    const info = PDLayout.info(rawGp);
+    if (!rawGp || !window.PDLayout) { section.style.display = 'none'; _gpdLayoutSig = ''; return; }
+    // A pad the browser already maps needs no layout choice, only button names.
+    const isStd = rawGp.mapping === 'standard';
+    for (const id of ['gpd-layout-status', 'gpd-layout-choices', 'gpd-layout-help']) document.getElementById(id).style.display = isStd ? 'none' : '';
+    const info = isStd ? { source: 'none', map: null, candidates: [], xboxFits: false } : PDLayout.info(rawGp);
     const saved = (window._GAMEPAD_LAYOUTS || {})[rawGp.id] || null;
-    const sig = [rawGp.id, info.source, info.map, info.candidates.length, info.xboxFits, saved && saved.kind, saved && saved.map].join('|');
+    const sig = [rawGp.id, info.source, info.map, info.candidates.length, info.xboxFits, saved && saved.kind, saved && saved.map, saved && saved.style].join('|');
     if (sig === _gpdLayoutSig) return;
     _gpdLayoutSig = sig;
     _gpdLayoutPadId = rawGp.id;
     section.style.display = '';
 
-    const choices = [{ label: 'Auto', rec: { kind: 'auto' }, on: !saved }];
+    const choices = [{ label: 'Auto', rec: { kind: 'auto' }, on: !saved || !saved.kind }];
     choices.push({ label: 'Standard (as reported)', rec: { kind: 'standard' }, on: !!saved && saved.kind === 'standard' });
     info.candidates.forEach((c, i) => choices.push({
         label: info.candidates.length > 1 ? `${c.name} (layout ${i + 1})` : c.name,
@@ -6194,6 +6229,7 @@ function _gpdRenderLayout(rawGp) {
     }));
     if (info.xboxFits) choices.push({ label: 'Xbox-style order', rec: { kind: 'map', map: PDLayout.XBOX_RAW }, on: !!saved && saved.kind === 'map' && saved.map === PDLayout.XBOX_RAW });
     if (saved && saved.kind === 'map' && !choices.some(c => c.on)) choices.push({ label: 'Custom (saved)', rec: saved, on: true });
+    choices.push({ label: 'Set up custom layout...', action: 'wizard', on: false });
     _gpdLayoutChoices = choices;
 
     const status = (_GPD_LAYOUT_STATUS[info.source] || _GPD_LAYOUT_STATUS.none)(info);
@@ -6202,13 +6238,28 @@ function _gpdRenderLayout(rawGp) {
         `<button class="nav-btn" data-modal-row="0" onclick="gpdPickLayout(${i})" ` +
         `style="font-size:0.78rem; padding:3px 10px;${c.on ? ' border-color:var(--accent);' : ''}">${c.on ? '&#10003; ' : ''}${escHtml(c.label)}</button>`
     ).join('');
+
+    // Button names: Auto guesses from the vendor; the others are the user's pick.
+    const style = saved && saved.style ? saved.style : 'auto';
+    const guess = { xbox: 'Xbox', ps: 'PlayStation', nintendo: 'Nintendo', other: 'Other' }[_labelStyleFor(rawGp.id)];
+    document.getElementById('gpd-style-choices').innerHTML = [['auto', `Auto (${guess})`], ['xbox', 'Xbox'], ['ps', 'PlayStation'], ['nintendo', 'Nintendo'], ['other', 'Other']].map(([key, label]) =>
+        `<button class="nav-btn" data-modal-row="0" onclick="gpdPickStyle('${key}')" ` +
+        `style="font-size:0.78rem; padding:3px 10px;${key === style ? ' border-color:var(--accent);' : ''}">${key === style ? '&#10003; ' : ''}${escHtml(label)}</button>`
+    ).join('');
 }
 
 function gpdPickLayout(i) {
     const c = _gpdLayoutChoices[i];
     if (!c || !window.PDLayout || !_gpdLayoutPadId) return;
+    if (c.action === 'wizard') { if (typeof gpwOpen === 'function') gpwOpen(); return; }
     PDLayout.save(_gpdLayoutPadId, c.rec);
     _gpdLayoutSig = '';   // redraw with the new pick on the next frame
+}
+
+function gpdPickStyle(style) {
+    if (!window.PDLayout || !_gpdLayoutPadId) return;
+    PDLayout.setStyle(_gpdLayoutPadId, style);
+    _gpdLayoutSig = '';
 }
 
 function _gpdStartPoll() {

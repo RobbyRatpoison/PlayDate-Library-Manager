@@ -1180,6 +1180,61 @@ window._TUNE_INIT = {{ {
     </div>
 </div>
 
+<!-- ── GAMEPAD LAYOUT WIZARD (opened from Gamepad Diagnostics) ── -->
+<style>
+    .gpw-svg { width:100%; max-width:420px; display:block; margin:0 auto; }
+    .gpw-body { fill:#1f2a3a; stroke:#56667f; stroke-width:2; }
+    .gpw-ctl rect, .gpw-ctl circle { fill:#2a3547; stroke:#56667f; stroke-width:1.5; }
+    .gpw-lbl { font:bold 11px sans-serif; fill:#cfd8e3; stroke:none; }
+    .gpw-hl { animation:gpwPulse 0.9s ease-in-out infinite alternate; }
+    .gpw-hl rect, .gpw-hl circle { fill:var(--accent); stroke:var(--accent); }
+    .gpw-hl .gpw-lbl { fill:#0e1621 !important; }
+    @keyframes gpwPulse { from { opacity:0.55; } to { opacity:1; } }
+    #gamepad-wizard-modal button.gpw-on { border-color:var(--accent); }
+</style>
+<div id="gamepad-wizard-modal" class="modal-overlay sub-sub-modal" style="display:none; z-index:1003;">
+    <div class="modal-content" style="width:520px; max-width:94vw; max-height:92vh; overflow-y:auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h2 style="margin:0; color:var(--text-primary);">Set up controller layout</h2>
+            <button onclick="closeGamepadWizard()" data-modal-row="0" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">&#x2715;</button>
+        </div>
+
+        <div id="gpw-setup">
+            <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:10px; line-height:1.5;">Pick the shape and button names that match your controller, so the drawing looks like it. You will then be asked to press each control in turn. Anything you skip keeps its current setting.</div>
+            <div id="gpw-setup-diagram" style="margin-bottom:10px;"></div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Shape</div>
+            <div style="display:flex; gap:6px; margin-bottom:10px;">
+                <button id="gpw-shape-xbox" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('xbox')" style="font-size:0.8rem;">Xbox-style (offset sticks)</button>
+                <button id="gpw-shape-ps" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('ps')" style="font-size:0.8rem;">PlayStation-style (even sticks)</button>
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Button names</div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+                <button id="gpw-style-xbox" class="nav-btn" data-modal-row="0" onclick="gpwSetStyle('xbox')" style="font-size:0.8rem;">Xbox</button>
+                <button id="gpw-style-ps" class="nav-btn" data-modal-row="0" onclick="gpwSetStyle('ps')" style="font-size:0.8rem;">PlayStation</button>
+                <button id="gpw-style-nintendo" class="nav-btn" data-modal-row="0" onclick="gpwSetStyle('nintendo')" style="font-size:0.8rem;">Nintendo</button>
+                <button id="gpw-style-other" class="nav-btn" data-modal-row="0" onclick="gpwSetStyle('other')" style="font-size:0.8rem;">Other</button>
+            </div>
+        </div>
+
+        <div id="gpw-steps" style="display:none;">
+            <div id="gpw-diagram" style="margin-bottom:10px;"></div>
+            <div id="gpw-progress" style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; text-align:center;"></div>
+            <div id="gpw-caption" style="font-size:1.05rem; color:var(--text-primary); text-align:center; margin:4px 0;"></div>
+            <div id="gpw-hint" style="font-size:0.8rem; color:#8f98a0; text-align:center; min-height:1.2em;"></div>
+            <div id="gpw-current" style="font-size:0.78rem; color:#8f98a0; text-align:center; min-height:1.2em;"></div>
+            <div id="gpw-notice" style="font-size:0.82rem; color:var(--accent); text-align:center; min-height:1.3em; margin-top:2px;"></div>
+        </div>
+
+        <div style="display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; margin-top:12px;">
+            <button id="gpw-back" class="nav-btn" data-modal-row="0" onclick="gpwBack()" style="font-size:0.82rem; display:none;">Back</button>
+            <button id="gpw-skip" class="nav-btn" data-modal-row="0" onclick="gpwSkip()" style="font-size:0.82rem; display:none;">Skip</button>
+            <button id="gpw-save" class="nav-btn" data-modal-row="0" onclick="gpwSave()" style="font-size:0.82rem; display:none;">Save</button>
+            <button id="gpw-start" class="nav-btn" data-modal-row="0" onclick="gpwStart()" style="font-size:0.82rem;">Start</button>
+            <button class="nav-btn" data-modal-row="0" onclick="closeGamepadWizard()" style="font-size:0.82rem;">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── GAMEPAD DIAGNOSTICS MODAL ── -->
 <div id="gamepad-diag-modal" class="modal-overlay sub-sub-modal" style="display:none;" onclick="if(event.target===this)closeGamepadDiag();">
     <div class="modal-content" style="width:440px;">
@@ -1200,7 +1255,9 @@ window._TUNE_INIT = {{ {
             <div style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.05em;">Controller layout</div>
             <div id="gpd-layout-status" style="font-size:0.82rem; color:var(--text-primary); margin-bottom:6px;"></div>
             <div id="gpd-layout-choices" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
-            <div style="font-size:0.75rem; color:#8f98a0; margin-top:6px;">Use this if buttons or sticks are wrong or in the wrong place. Press buttons and move sticks below to see what the app receives. Your choice is remembered for this controller.</div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); margin:8px 0 4px;">Button names (how buttons are labelled here and in Gamepad Controls)</div>
+            <div id="gpd-style-choices" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+            <div id="gpd-layout-help" style="font-size:0.75rem; color:#8f98a0; margin-top:6px;">Use this if buttons or sticks are wrong or in the wrong place. Press buttons and move sticks below to see what the app receives. Your choice is remembered for this controller.</div>
         </div>
 
         <!-- Suppression state -->
@@ -2263,6 +2320,7 @@ window._cfgAccounts = {{ accounts_list | tojson }};
 window._cfgActiveId = '{{ active_steam_id }}';
 window._platPriority = {{ platform_priority | tojson }};
 </script>
+<script src="{{ url_for('static', filename='js/gamepad_wizard.js') }}?v={{ app_version }}"></script>
 <script src="{{ url_for('static', filename='js/modal_tools.js') }}?v={{ app_version }}"></script>
 <script>
 {{ plugin_fragment_js('tools_scripts') | safe }}
