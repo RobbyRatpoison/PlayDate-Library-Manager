@@ -212,7 +212,9 @@
 
     // Entry point: the pad as the app should read it (the pad itself when no layout applies).
     window.pdStandardizeGamepad = function (gp) {
-        if (!gp || gp.mapping === 'standard' || gp === window._pdPad) return gp;
+        if (!gp || gp === window._pdPad) return gp;
+        // A pad the browser already maps is left alone unless the user recorded a layout for it.
+        if (gp.mapping === 'standard' && ((window._GAMEPAD_LAYOUTS || {})[gp.id] || {}).kind !== 'map') return gp;
         const r = resolve(gp);
         return r.layout ? apply(gp, r.layout, { source: r.source, map: r.map, name: r.name }) : gp;
     };
@@ -248,6 +250,8 @@
     // For the Diagnostics screen: what is in use and what could be chosen instead.
     window.PDLayout = {
         XBOX_RAW, parse, fits,
+        // The identity layout of a browser-mapped (standard) pad, the starting point for recording one.
+        STANDARD_MAP: [...Object.entries(STD_BUTTONS).map(([k, i]) => `${k}:b${i}`), ...Object.entries(STD_AXES).map(([k, i]) => `${k}:a${i}`)].join(','),
         // Two mapping strings that feed every standard control from the same source (field order and spelling aside).
         sameMap(a, b) {
             const la = a && parse(a), lb = b && parse(b);

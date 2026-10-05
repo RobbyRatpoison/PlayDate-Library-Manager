@@ -6197,18 +6197,20 @@ const _GPD_LAYOUT_STATUS = {
     standard: () => 'Using the pad as the browser reports it (your choice)',
     mismatch: () => "Your saved layout doesn't fit this pad, so the browser's own order is used",
     none: () => 'No layout change needed: using the pad as the browser reports it',
+    browser: () => 'The browser already maps this controller, so no layout change is needed',
 };
 
 function _gpdRenderLayout(rawGp) {
     const section = document.getElementById('gpd-layout-section');
     if (!section) return;
     if (!rawGp || !window.PDLayout) { section.style.display = 'none'; _gpdLayoutSig = ''; return; }
-    // A pad the browser already maps needs no layout choice, only button names.
-    const isStd = rawGp.mapping === 'standard';
-    // (the choices row is a flex container: clearing its display would drop the flex and its gap)
-    for (const id of ['gpd-layout-status', 'gpd-layout-choices', 'gpd-layout-help']) document.getElementById(id).style.display = isStd ? 'none' : (id === 'gpd-layout-choices' ? 'flex' : '');
-    const info = isStd ? { source: 'none', map: null, candidates: [], xboxFits: false } : PDLayout.info(rawGp);
+    // A pad the browser already maps needs no automatic layout (no database or Xbox-style guess), but a
+    // custom one can still be recorded for it, and is honoured once saved.
     const saved = (window._GAMEPAD_LAYOUTS || {})[rawGp.id] || null;
+    const isStd = rawGp.mapping === 'standard';
+    const info = isStd && !(saved && saved.kind === 'map') ? { source: 'browser', map: null, candidates: [], xboxFits: false } : PDLayout.info(rawGp);
+    // (the choices row is a flex container: clearing its display would drop the flex and its gap)
+    for (const id of ['gpd-layout-status', 'gpd-layout-choices', 'gpd-layout-help']) document.getElementById(id).style.display = id === 'gpd-layout-choices' ? 'flex' : '';
     const sig = [rawGp.id, info.source, info.map, info.candidates.length, info.autoMap, info.xboxFits, saved && saved.kind, saved && saved.map, saved && saved.style].join('|');
     if (sig === _gpdLayoutSig) return;
     _gpdLayoutSig = sig;

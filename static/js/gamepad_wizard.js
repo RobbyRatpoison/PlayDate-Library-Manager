@@ -536,7 +536,9 @@
     window.gpwOpen = function () {
         const pad = rawPad();
         if (!pad) { toast('No controller detected. Press a button on the controller, then try again.'); return; }
-        const info = PDLayout.info(pad);
+        const savedLayout = (window._GAMEPAD_LAYOUTS || {})[pad.id] || {};
+        // A browser-mapped pad starts from the identity layout, not a database guess made for raw order.
+        const info = pad.mapping === 'standard' && savedLayout.kind !== 'map' ? { map: PDLayout.STANDARD_MAP } : PDLayout.info(pad);
         W.padId = pad.id;
         W.style = styleFor(pad.id);
         const saved = (window._GAMEPAD_LAYOUTS || {})[pad.id] || {};
