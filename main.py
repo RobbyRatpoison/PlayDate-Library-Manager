@@ -121,8 +121,13 @@ if sys.platform == "linux" and not _USE_QT:
         _EVDEV_PAD = bool(_load_state_ev().get('evdev_gamepad')) and not _is_deck_ev()
     except Exception:
         _EVDEV_PAD = False
+# Read by config.inject_config_status() for the page. Always set or cleared here: a restart (renderer
+# switch, update) launches the new process with this one's environment, and a stale flag left Qt waiting
+# for an evdev pad that never arrives.
 if _EVDEV_PAD:
-    os.environ['PLAYDATE_EVDEV_PAD'] = '1'   # read by config.inject_config_status() for the page
+    os.environ['PLAYDATE_EVDEV_PAD'] = '1'
+else:
+    os.environ.pop('PLAYDATE_EVDEV_PAD', None)
 
 # ── Linux WebKit detection — must run before importing webview ────────────────
 # Set PLAYDATE_GTK4=1 to force the GTK4/WebKit6 renderer (useful for testing
