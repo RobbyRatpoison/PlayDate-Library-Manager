@@ -6329,25 +6329,18 @@ function gpdHideLive() { _gpdSetLive(false); }
 
 // ── Live drawing of the controller (Gamepad Setup) ──────────────────────────
 // The same drawing the layout wizard uses, with pressed controls lit and the sticks moving.
-// Shape: the one saved by the wizard, else PlayStation-style for a PlayStation pad, retro for a pad
-// whose layout has no sticks, else Xbox-style.
+// The saved drawing, else a starter for a shape picked by rule (see PDWizard.drawingFor), with the
+// controls the layout in use doesn't have left out.
 let _gpdDrawingKey = '';
-
-function _gpdShapeFor(rawGp, gp) {
-    const saved = (window._GAMEPAD_LAYOUTS || {})[rawGp.id] || {};
-    if (saved.shape) return saved.shape;
-    if (_labelStyleFor(rawGp.id) === 'ps') return 'ps';
-    const map = gp._pdLayout && gp._pdLayout.map;
-    return map && !/(^|,)leftx:/.test(map) ? 'retro' : 'xbox';
-}
 
 function _gpdUpdateDrawing(rawGp, gp) {
     const host = document.getElementById('gpd-drawing');
     if (!host || typeof PDWizard === 'undefined') return;
     if (!gp) { host.innerHTML = ''; _gpdDrawingKey = ''; return; }
-    const shape = _gpdShapeFor(rawGp, gp), style = _labelStyleFor(rawGp.id);
-    const key = shape + '|' + style;
-    if (key !== _gpdDrawingKey) { host.innerHTML = PDWizard.diagram(shape, style, []); _gpdDrawingKey = key; }
+    const style = _labelStyleFor(rawGp.id);
+    const drawing = PDWizard.drawingFor(rawGp.id, style, gp._pdLayout && gp._pdLayout.map);
+    const key = JSON.stringify(drawing) + '|' + style;
+    if (key !== _gpdDrawingKey) { host.innerHTML = PDWizard.diagram(drawing, style, []); _gpdDrawingKey = key; }
     PDWizard.liveUpdate(host.firstElementChild, gp);
 }
 
@@ -6414,9 +6407,9 @@ function _gpdStopPoll() {
 
 // ── Gamepad Remap ─────────────────────────────────────────────────────────────
 const _REMAP_ACTIONS = [
-    // Confirm and Back keep a button: without them a gamepad-only user could not get back in here to fix it.
+    // Confirm keeps a button: without it a gamepad-only user could not get back in here to fix it.
     { action: 'a',     defaultBtn: 0,  label: 'Confirm / Select', required: true },
-    { action: 'b',     defaultBtn: 1,  label: 'Back / Cancel',    required: true },
+    { action: 'b',     defaultBtn: 1,  label: 'Back / Cancel' },   // optional: a pad with no spare button (NES) can go without; the live view then closes on Confirm
     // x/y defaults are getters: which raw index is X depends on the input path
     // (pdGamepadXYSwapped), decided at call time rather than script load.
     { action: 'x',     get defaultBtn() { return _stdFaceIdx(2); }, label: 'Context Menu' },
@@ -6545,7 +6538,7 @@ function grmStartCapture(action) {
 
 // Give the captured physical button to an action. When another action already has it, ask:
 // the other action can be cleared (it ends up unset), and the two can swap buttons when the
-// action being changed has one to give. Confirm and Back (`required`) are never cleared, only
+// action being changed has one to give. Confirm (`required`) is never cleared, only
 // swapped, so one that has no button to swap is refused with a toast instead.
 async function _grmAssign(target, newPhys) {
     const oldPhys = _remapState.get(target);

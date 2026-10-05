@@ -1192,6 +1192,8 @@ window._TUNE_INIT = {{ {
     .gpw-ctl circle[data-stick] { fill:#3a4a63; }
     .gpw-live circle[data-stick] { fill:#0e1621; }
     .gpw-hl rect, .gpw-hl circle { fill:var(--accent); stroke:var(--accent); }
+    #gamepad-wizard-modal .gpw-part { cursor:grab; }
+    .gpw-sel .gpw-ctl rect, .gpw-sel .gpw-ctl circle { stroke:#fff; stroke-width:2.5; stroke-dasharray:4 2; }
     .gpw-hl .gpw-lbl { fill:#0e1621 !important; }
     @keyframes gpwPulse { from { opacity:0.55; } to { opacity:1; } }
     #gamepad-wizard-modal button.gpw-on { border-color:var(--accent); }
@@ -1205,13 +1207,28 @@ window._TUNE_INIT = {{ {
         </div>
 
         <div id="gpw-setup">
-            <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:10px; line-height:1.5;">Pick the shape and button names that match your controller, so the drawing looks like it. You will then be asked to press each control in turn. Anything you skip keeps its current setting.</div>
-            <div id="gpw-setup-diagram" style="margin-bottom:10px;"></div>
-            <div style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Shape</div>
+            <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:10px; line-height:1.5;">Pick a body that looks like your controller, then add, remove and drag controls (with the mouse) until the drawing matches it. You will then be asked to press each control in turn. Anything you skip keeps its current setting.</div>
+            <div id="gpw-setup-diagram" style="margin-bottom:6px; touch-action:none;"></div>
+            <div id="gpw-inspector" style="min-height:2.2em; margin-bottom:10px;"></div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Body</div>
             <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:10px;">
-                <button id="gpw-shape-xbox" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('xbox')" style="font-size:0.8rem;">Xbox-style (offset sticks)</button>
-                <button id="gpw-shape-ps" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('ps')" style="font-size:0.8rem;">PlayStation-style (even sticks)</button>
-                <button id="gpw-shape-retro" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('retro')" style="font-size:0.8rem;">Retro pad (d-pad, no sticks)</button>
+                <button id="gpw-shape-xbox" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('xbox')" style="font-size:0.8rem;">Gamepad (Xbox-style)</button>
+                <button id="gpw-shape-ps" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('ps')" style="font-size:0.8rem;">Gamepad (PlayStation-style)</button>
+                <button id="gpw-shape-retro" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('retro')" style="font-size:0.8rem;">Rounded retro pad</button>
+                <button id="gpw-shape-wide" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('wide')" style="font-size:0.8rem;">Wide pad (6 buttons, arcade)</button>
+                <button id="gpw-shape-box" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('box')" style="font-size:0.8rem;">Square box (joystick)</button>
+                <button id="gpw-shape-n64" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('n64')" style="font-size:0.8rem;">Three-prong (N64)</button>
+                <button id="gpw-shape-blank" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('blank')" style="font-size:0.8rem;">Blank</button>
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Add a control</div>
+            <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:10px;">
+                <button class="nav-btn" data-modal-row="0" onclick="gpwAdd('dpad')" style="font-size:0.8rem;">D-pad</button>
+                <button class="nav-btn" data-modal-row="0" onclick="gpwAdd('stick')" style="font-size:0.8rem;">Stick</button>
+                <button class="nav-btn" data-modal-row="0" onclick="gpwAdd('face')" style="font-size:0.8rem;">Face button</button>
+                <button class="nav-btn" data-modal-row="0" onclick="gpwAdd('shoulder')" style="font-size:0.8rem;">Bumper</button>
+                <button class="nav-btn" data-modal-row="0" onclick="gpwAdd('trigger')" style="font-size:0.8rem;">Trigger</button>
+                <button class="nav-btn" data-modal-row="0" onclick="gpwAdd('center')" style="font-size:0.8rem;">Center button</button>
+                <button class="nav-btn" data-modal-row="0" onclick="gpwAdd('other')" style="font-size:0.8rem;">Other button</button>
             </div>
             <div style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Button names</div>
             <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:6px;">
@@ -1224,6 +1241,7 @@ window._TUNE_INIT = {{ {
 
         <div id="gpw-steps" style="display:none;">
             <div id="gpw-diagram" style="margin-bottom:10px;"></div>
+            <div id="gpw-inspector-done" style="margin-bottom:6px;"></div>
             <div id="gpw-progress" style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; text-align:center;"></div>
             <div id="gpw-caption" style="font-size:1.05rem; color:var(--text-primary); text-align:center; margin:4px 0;"></div>
             <div id="gpw-hint" style="font-size:0.8rem; color:#8f98a0; text-align:center; min-height:1.2em;"></div>
@@ -1234,6 +1252,7 @@ window._TUNE_INIT = {{ {
         <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-end; margin-top:12px;">
             <button id="gpw-back" class="nav-btn" data-modal-row="0" onclick="gpwBack()" style="font-size:0.82rem; display:none;">Back</button>
             <button id="gpw-skip" class="nav-btn" data-modal-row="0" onclick="gpwSkip()" style="font-size:0.82rem; display:none;">Skip</button>
+            <button id="gpw-edit-again" class="nav-btn" data-modal-row="0" onclick="gpwEditAgain()" style="font-size:0.82rem; display:none;">Edit drawing</button>
             <button id="gpw-save" class="nav-btn" data-modal-row="0" onclick="gpwSave()" style="font-size:0.82rem; display:none;">Save</button>
             <button id="gpw-start" class="nav-btn" data-modal-row="0" onclick="gpwStart()" style="font-size:0.82rem;">Start</button>
             <button class="nav-btn" data-modal-row="0" onclick="closeGamepadWizard()" style="font-size:0.82rem;">Cancel</button>
@@ -1304,7 +1323,7 @@ window._TUNE_INIT = {{ {
 
         <!-- Live input: hidden until asked for. While it is showing, gamepad buttons only report here. -->
         <div id="gpd-live-section" style="display:none; margin-bottom:6px;">
-            <div style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.05em;">Live Input — press any button. Hold B to hide this view.</div>
+            <div style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.05em;">Live Input — press any button. Hold Back (or Confirm, if no Back button is set) to hide this view.</div>
             <div id="gpd-drawing" style="max-width:320px; margin:0 auto 8px;"></div>
             <div style="margin-top:8px;">
                 <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:3px;">All axes (raw)</div>
@@ -1319,7 +1338,7 @@ window._TUNE_INIT = {{ {
         <div style="margin-top:14px; font-size:0.78rem; color:var(--text-secondary); line-height:1.5;">
             If no controller appears: press any button on the controller to activate the Gamepad API. On Steam Deck desktop mode, add PlayDate as a non-Steam game in Steam — this applies a gamepad layout instead of the default keyboard/mouse desktop layout.
             <br><br>
-            While the live view is showing, gamepad buttons only report here — they don't navigate or activate anything. Hold B for a moment to hide it.
+            While the live view is showing, gamepad buttons only report here — they don't navigate or activate anything. Hold Back for a moment to hide it (Confirm, if you have no Back button).
         </div>
     </div>
 </div>
