@@ -6413,8 +6413,9 @@ function _gpdStopPoll() {
 
 // ── Gamepad Remap ─────────────────────────────────────────────────────────────
 const _REMAP_ACTIONS = [
-    { action: 'a',     defaultBtn: 0,  label: 'Confirm / Select' },
-    { action: 'b',     defaultBtn: 1,  label: 'Back / Cancel' },
+    // Confirm and Back keep a button: without them a gamepad-only user could not get back in here to fix it.
+    { action: 'a',     defaultBtn: 0,  label: 'Confirm / Select', required: true },
+    { action: 'b',     defaultBtn: 1,  label: 'Back / Cancel',    required: true },
     // x/y defaults are getters: which raw index is X depends on the input path
     // (pdGamepadXYSwapped), decided at call time rather than script load.
     { action: 'x',     get defaultBtn() { return _stdFaceIdx(2); }, label: 'Context Menu' },
@@ -6435,6 +6436,7 @@ const _REMAP_ACTIONS = [
 ];
 const _grmLabel = a => _REMAP_ACTIONS.find(x => x.action === a).label;
 const _grmIsShortcut = a => !!_REMAP_ACTIONS.find(x => x.action === a).shortcut;
+const _grmIsRequired = a => !!_REMAP_ACTIONS.find(x => x.action === a).required;
 
 // Map<action, physicalBtnIdx> — UI working state
 let _remapState = new Map();
@@ -6455,7 +6457,10 @@ function _grmBuildState() {
     const inverted = {};
     for (const [k, v] of Object.entries(saved)) inverted[v] = parseInt(k, 10);
     for (const { action, defaultBtn } of _REMAP_ACTIONS) {
-        _remapState.set(action, inverted[action] !== undefined ? inverted[action] : defaultBtn);
+        // No saved button for it: still on its default, unless something is saved against that default
+        // button, which means it was cleared (an inert marker) or another action took the button.
+        const displaced = defaultBtn != null && saved[String(defaultBtn)] !== undefined;
+        _remapState.set(action, inverted[action] !== undefined ? inverted[action] : displaced ? null : defaultBtn);
     }
 }
 
@@ -6481,7 +6486,7 @@ function _grmRenderRows() {
     let html = '';
     const gpId = _firstConnectedGamepadId();
     let shortcutHeader = false;
-    for (const { action, label, shortcut } of _REMAP_ACTIONS) {
+    for (const { action, label, shortcut, required } of _REMAP_ACTIONS) {
         if (shortcut && !shortcutHeader) {
             shortcutHeader = true;
             html += `<div style="margin-top:10px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">Shortcuts: act on the game under the focus ring. Not set until you choose a button.</div>`;
@@ -6498,7 +6503,7 @@ function _grmRenderRows() {
                    <button class="nav-btn" data-modal-row="${_REMAP_ACTIONS.findIndex(a=>a.action===action)}" onclick="grmCancelCapture()" style="font-size:0.78rem; padding:3px 10px;">Cancel</button>`
                 : `<span style="box-sizing:border-box; display:inline-block; min-width:38px; text-align:center; padding:1px 7px; border-radius:4px; background:rgba(255,255,255,0.1); font-size:0.8rem; color:var(--text-primary); border:${badgeBorder};">${escHtml(btnLabel)}</span>
                    <button class="nav-btn" data-modal-row="${_REMAP_ACTIONS.findIndex(a=>a.action===action)}" onclick="grmStartCapture('${action}')" style="font-size:0.78rem; padding:3px 10px;">${physIdx == null ? 'Set' : 'Change'}</button>
-                   ${shortcut && physIdx != null ? `<button class="nav-btn" data-modal-row="${_REMAP_ACTIONS.findIndex(a=>a.action===action)}" onclick="grmClear('${action}')" style="font-size:0.78rem; padding:3px 10px;">Clear</button>` : ''}`
+                   ${!required && physIdx != null ? `<button class="nav-btn" data-modal-row="${_REMAP_ACTIONS.findIndex(a=>a.action===action)}" onclick="grmClear('${action}')" style="font-size:0.78rem; padding:3px 10px;">Clear</button>` : ''}`
             }
         </div>`;
     }
@@ -6538,30 +6543,30 @@ function grmStartCapture(action) {
 }
 
 // Give the captured physical button to an action. When another action already has it, ask:
-// a shortcut can be cleared (it just ends up unset), and the two can swap buttons when the
-// action being changed has one to give. An action that must keep a button (everything
-// above the shortcuts) is never cleared, only swapped.
+// the other action can be cleared (it ends up unset), and the two can swap buttons when the
+// action being changed has one to give. Confirm and Back (`required`) are never cleared, only
+// swapped, so one that has no button to swap is refused with a toast instead.
 async function _grmAssign(target, newPhys) {
     const oldPhys = _remapState.get(target);
     if (oldPhys === newPhys) { _grmRenderRows(); return; }
     let owner = null;
     for (const [act, phys] of _remapState) if (phys === newPhys && act !== target) { owner = act; break; }
     if (owner) {
-        const ownerIsShortcut = _grmIsShortcut(owner);
+        const clearable = !_grmIsRequired(owner);
         const canSwap = oldPhys != null;
         const what = `${_grmBtnLabel(newPhys)} is already used for "${_grmLabel(owner)}".`;
         const swapTxt = canSwap ? `swap so "${_grmLabel(owner)}" takes ${_grmBtnLabel(oldPhys)}` : '';
         let choice;
-        if (!ownerIsShortcut && !canSwap) {
-            await alert(`${what}\n\nThat action needs a button. Move it to another button first, or pick a different button for "${_grmLabel(target)}".`);
+        if (!clearable && !canSwap) {
+            showLaunchToast(`${_grmBtnLabel(newPhys)} is already used for "${_grmLabel(owner)}", which needs a button. Move that to another button first, or pick a different button for "${_grmLabel(target)}".`);
             _grmRenderRows();
             return;
         }
-        if (ownerIsShortcut && canSwap) choice = await confirmThree(`${what}\n\nClear it, or ${swapTxt}?`, 'Clear it', 'Swap', 'Cancel');
-        else if (ownerIsShortcut) choice = await confirmCustom(`${what}\n\nClear it?`, 'Clear it', 'Cancel');
+        if (clearable && canSwap) choice = await confirmThree(`${what}\n\nClear it, or ${swapTxt}?`, 'Clear it', 'Swap', 'Cancel');
+        else if (clearable) choice = await confirmCustom(`${what}\n\nClear it?`, 'Clear it', 'Cancel');
         else choice = await confirmCustom(`${what}\n\nSwap so "${_grmLabel(owner)}" takes ${_grmBtnLabel(oldPhys)}?`, 'Swap', 'Cancel');
         if (!choice) { _grmRenderRows(); return; }
-        const swap = choice === 'alt' || !ownerIsShortcut;
+        const swap = choice === 'alt' || !clearable;
         _remapState.set(owner, swap ? oldPhys : null);
     }
     _remapState.set(target, newPhys);
@@ -6570,7 +6575,7 @@ async function _grmAssign(target, newPhys) {
 }
 
 function grmClear(action) {
-    if (!_grmIsShortcut(action)) return;
+    if (_grmIsRequired(action)) return;
     _remapState.set(action, null);
     _grmSave();
     _grmRenderRows();
