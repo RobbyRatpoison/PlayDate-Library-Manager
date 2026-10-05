@@ -451,7 +451,7 @@ const TUTORIAL_SECTIONS = [
                 title: 'Advanced settings',
                 body: `<p>${tutOpen('advanced', 'Settings → Advanced')} holds a few settings most people rarely change:</p>
                        <ul>
-                         <li><strong>Auto-check updates</strong> - whether PlayDate looks for a new version on its own. You can always check by hand from the hamburger menu.</li>
+                         <li><strong>Auto-check updates</strong> - whether PlayDate looks for a new version on its own, at most once a day. You can always check by hand from the hamburger menu.</li>
                          <li><strong>Beta updates</strong> - opt in to test builds before they're released to everyone. They can be rough, so it's off by default.</li>
                          <li><strong>Renderer</strong> (Linux only) - switch to an alternate renderer that smooths choppy scrolling on some NVIDIA setups. See ${tutGo('linux-deck', 'Smoother scrolling on NVIDIA', 'Smoother scrolling on NVIDIA')}.</li>
                          <li><strong>Send Log to Developer</strong> - sends PlayDate's log and diagnostic details about your setup when something breaks. Your API keys are never included.</li>

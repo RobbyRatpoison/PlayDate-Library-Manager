@@ -18,7 +18,9 @@
 - Gamepad Controls and Gamepad Setup are greyed out while gamepad input is off.
 - Gamepad input is no longer labelled experimental.
 - Mouse actions replace "Require double-click to launch/install". Your setting carries over.
+- Automatic update checks now run at most once a day.
 
 ### Fixes
 
 - Fixed "Reset to Defaults" in Gamepad Controls not updating the list until reopened.
+- Fixed the update notification dot reappearing on every page load, and the Plugins dot staying lit after updating.
