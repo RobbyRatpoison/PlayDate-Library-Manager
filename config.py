@@ -1228,8 +1228,41 @@ DEFAULT_CARD_CLICK_RULES = [
 # it, 'map' is an SDL mapping string (a database entry, or one a user built in the wizard).
 GAMEPAD_LAYOUT_KINDS = ('standard', 'map')
 GAMEPAD_LABEL_STYLES = ('xbox', 'ps', 'nintendo', 'other')
-GAMEPAD_SHAPES = ('xbox', 'ps', 'retro')   # which controller drawing the wizard and Diagnostics show
+# The body outline of the controller drawing (gamepad_wizard.js BODIES) and the kinds of part placed on it.
+GAMEPAD_SHAPES = ('xbox', 'ps', 'retro', 'wide', 'box', 'n64', 'blank')
+GAMEPAD_PART_TYPES = ('dpad', 'stick', 'face', 'shoulder', 'trigger', 'center', 'other')
+GAMEPAD_MAX_PARTS = 40
 _GAMEPAD_MAP_RE = re.compile(r'^[a-z0-9:,.+~_-]{1,1000}$')
+
+
+def normalize_gamepad_parts(parts):
+    """The controls placed on a controller drawing, in the 400x244 viewBox: [{type, x, y, role?, label?, raw?}].
+    Valid parts only, at most GAMEPAD_MAX_PARTS, one d-pad and two sticks."""
+    out, count = [], {}
+    for p in parts if isinstance(parts, list) else []:
+        if len(out) >= GAMEPAD_MAX_PARTS:
+            break
+        if not (isinstance(p, dict) and p.get('type') in GAMEPAD_PART_TYPES):
+            continue
+        x, y = p.get('x'), p.get('y')
+        if not all(isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 400 for v in (x,)) \
+                or not (isinstance(y, (int, float)) and not isinstance(y, bool) and 0 <= y <= 244):
+            continue
+        t = p['type']
+        if count.get(t, 0) >= {'dpad': 1, 'stick': 2}.get(t, GAMEPAD_MAX_PARTS):
+            continue
+        count[t] = count.get(t, 0) + 1
+        clean = {'type': t, 'x': round(x), 'y': round(y)}
+        if p.get('role') in ('a', 'b', 'x', 'y') and t == 'face':
+            clean['role'] = p['role']
+        label = p.get('label')
+        if isinstance(label, str) and label.strip() and len(label.strip()) <= 12 and label.isprintable():
+            clean['label'] = label.strip()
+        raw = p.get('raw')
+        if isinstance(raw, int) and not isinstance(raw, bool) and 0 <= raw <= 255:
+            clean['raw'] = raw
+        out.append(clean)
+    return out
 
 
 def normalize_gamepad_layouts(layouts):
@@ -1249,6 +1282,9 @@ def normalize_gamepad_layouts(layouts):
             clean['style'] = rec['style']
         if rec.get('shape') in GAMEPAD_SHAPES:
             clean['shape'] = rec['shape']
+        parts = normalize_gamepad_parts(rec.get('parts'))
+        if parts:
+            clean['parts'] = parts
         # Button names, keyed by raw button number: {'17': 'Z'}
         names = {}
         for k, v in (rec['names'].items() if isinstance(rec.get('names'), dict) else []):

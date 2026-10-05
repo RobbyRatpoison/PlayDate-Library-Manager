@@ -110,3 +110,22 @@ def test_controller_drawing_shape_is_validated():
     assert config.normalize_gamepad_layouts({PAD: {'shape': 'retro'}}) == {PAD: {'shape': 'retro'}}
     assert config.normalize_gamepad_layouts({PAD: {'kind': 'standard', 'shape': 'ps'}}) == {PAD: {'kind': 'standard', 'shape': 'ps'}}
     assert config.normalize_gamepad_layouts({PAD: {'shape': 'sega'}}) == {}
+
+
+def test_drawing_parts_are_validated():
+    good = {'type': 'face', 'x': 100.4, 'y': 50, 'role': 'a', 'label': 'C', 'raw': 3}
+    got = config.normalize_gamepad_layouts({PAD: {'shape': 'n64', 'parts': [good, {'type': 'bogus', 'x': 1, 'y': 1},
+                                                                          {'type': 'face', 'x': 999, 'y': 1}, 'x']}})
+    assert got == {PAD: {'shape': 'n64', 'parts': [{'type': 'face', 'x': 100, 'y': 50, 'role': 'a', 'label': 'C', 'raw': 3}]}}
+
+
+def test_drawing_parts_limits():
+    parts = [{'type': 'dpad', 'x': 1, 'y': 1}] * 3 + [{'type': 'stick', 'x': 1, 'y': 1}] * 4 + [{'type': 'other', 'x': 5, 'y': 5}] * 60
+    got = config.normalize_gamepad_layouts({PAD: {'parts': parts}})[PAD]['parts']
+    assert [p['type'] for p in got].count('dpad') == 1 and [p['type'] for p in got].count('stick') == 2
+    assert len(got) == config.GAMEPAD_MAX_PARTS
+
+
+def test_drawing_part_role_only_on_face_and_label_length():
+    got = config.normalize_gamepad_layouts({PAD: {'parts': [{'type': 'other', 'x': 1, 'y': 1, 'role': 'a', 'label': 'x' * 13}]}})
+    assert got == {PAD: {'parts': [{'type': 'other', 'x': 1, 'y': 1}]}}
