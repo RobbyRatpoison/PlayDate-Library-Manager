@@ -1007,10 +1007,10 @@
         <!-- Scrollable body -->
         <div style="overflow-y:auto; flex:1; min-height:0; padding:8px 1.875rem 1.875rem; margin-top:-8px;">
         <div class="hub-section">
-            <button id="gamepad-enabled-btn" class="settings-item" data-modal-row="0" onclick="toggleGamepadEnabled()">Gamepad input (experimental): OFF</button>
+            <button id="gamepad-enabled-btn" class="settings-item" data-modal-row="0" onclick="toggleGamepadEnabled()">Gamepad input: OFF</button>
             <button id="gamepad-suppress-btn" class="settings-item" data-modal-row="1" onclick="toggleGamepadSuppress()">Pause gamepad on launch: ON</button>
-            <button class="settings-item" data-modal-row="2" onclick="openGamepadRemap()">Gamepad Controls</button>
-            <button class="settings-item" data-modal-row="3" onclick="openGamepadDiag()">Gamepad Diagnostics</button>
+            <button id="gamepad-controls-btn" class="settings-item" data-modal-row="2" onclick="openGamepadDependent(openGamepadRemap)">Gamepad Controls</button>
+            <button id="gamepad-setup-btn" class="settings-item" data-modal-row="3" onclick="openGamepadDependent(openGamepadDiag)">Gamepad Setup</button>
         </div>
         <div class="hub-section">
             <div class="hub-section-label">Stick Feel</div>

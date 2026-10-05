@@ -1177,8 +1177,23 @@
 
         function _updateGamepadEnabledLabel() {
             const btn = document.getElementById('gamepad-enabled-btn');
-            if (btn) btn.textContent = 'Gamepad input (experimental): ' + (window._GAMEPAD_ENABLED ? 'ON' : 'OFF');
+            if (btn) btn.textContent = 'Gamepad input: ' + (window._GAMEPAD_ENABLED ? 'ON' : 'OFF');
             _updateGamepadSuppressLabel();
+            _updateGamepadDependents();
+        }
+        // Gamepad Controls and Gamepad Setup mean nothing while gamepad input is off: dim them (not the
+        // disabled attribute, which would take them out of gamepad navigation) and ignore the click.
+        function _updateGamepadDependents() {
+            for (const id of ['gamepad-controls-btn', 'gamepad-setup-btn']) {
+                const btn = document.getElementById(id);
+                if (!btn) continue;
+                btn.style.opacity = window._GAMEPAD_ENABLED ? '' : '0.4';
+                btn.style.cursor  = window._GAMEPAD_ENABLED ? '' : 'default';
+            }
+        }
+        function openGamepadDependent(open) {
+            if (!window._GAMEPAD_ENABLED) { showLaunchToast('Turn on gamepad input first.'); return; }
+            open();
         }
         function toggleGamepadEnabled() {
             window._GAMEPAD_ENABLED = !window._GAMEPAD_ENABLED;
