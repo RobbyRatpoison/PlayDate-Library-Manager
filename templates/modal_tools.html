@@ -1195,6 +1195,7 @@ window._TUNE_INIT = {{ {
     .gpw-hl .gpw-lbl { fill:#0e1621 !important; }
     @keyframes gpwPulse { from { opacity:0.55; } to { opacity:1; } }
     #gamepad-wizard-modal button.gpw-on { border-color:var(--accent); }
+    #gamepad-diag-modal .gamepad-focus, #gamepad-wizard-modal .gamepad-focus, #gamepad-names-modal .gamepad-focus { position:relative; z-index:2; }
 </style>
 <div id="gamepad-wizard-modal" class="modal-overlay sub-sub-modal" style="display:none; z-index:1003;">
     <div class="modal-content" style="width:520px; max-width:94vw; max-height:92vh; overflow-y:auto;">
@@ -1207,13 +1208,13 @@ window._TUNE_INIT = {{ {
             <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:10px; line-height:1.5;">Pick the shape and button names that match your controller, so the drawing looks like it. You will then be asked to press each control in turn. Anything you skip keeps its current setting.</div>
             <div id="gpw-setup-diagram" style="margin-bottom:10px;"></div>
             <div style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Shape</div>
-            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+            <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:10px;">
                 <button id="gpw-shape-xbox" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('xbox')" style="font-size:0.8rem;">Xbox-style (offset sticks)</button>
                 <button id="gpw-shape-ps" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('ps')" style="font-size:0.8rem;">PlayStation-style (even sticks)</button>
                 <button id="gpw-shape-retro" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('retro')" style="font-size:0.8rem;">Retro pad (d-pad, no sticks)</button>
             </div>
             <div style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Button names</div>
-            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+            <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:6px;">
                 <button id="gpw-style-xbox" class="nav-btn" data-modal-row="0" onclick="gpwSetStyle('xbox')" style="font-size:0.8rem;">Xbox</button>
                 <button id="gpw-style-ps" class="nav-btn" data-modal-row="0" onclick="gpwSetStyle('ps')" style="font-size:0.8rem;">PlayStation</button>
                 <button id="gpw-style-nintendo" class="nav-btn" data-modal-row="0" onclick="gpwSetStyle('nintendo')" style="font-size:0.8rem;">Nintendo</button>
@@ -1230,7 +1231,7 @@ window._TUNE_INIT = {{ {
             <div id="gpw-notice" style="font-size:0.82rem; color:var(--accent); text-align:center; min-height:1.3em; margin-top:2px;"></div>
         </div>
 
-        <div style="display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; margin-top:12px;">
+        <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-end; margin-top:12px;">
             <button id="gpw-back" class="nav-btn" data-modal-row="0" onclick="gpwBack()" style="font-size:0.82rem; display:none;">Back</button>
             <button id="gpw-skip" class="nav-btn" data-modal-row="0" onclick="gpwSkip()" style="font-size:0.82rem; display:none;">Skip</button>
             <button id="gpw-save" class="nav-btn" data-modal-row="0" onclick="gpwSave()" style="font-size:0.82rem; display:none;">Save</button>
@@ -1249,7 +1250,7 @@ window._TUNE_INIT = {{ {
         </div>
         <div style="font-size:0.82rem; color:var(--text-secondary); line-height:1.5; margin-bottom:8px; flex-shrink:0;">Give buttons the names printed on your controller, such as C or Z. Press a button on the controller to find its row. A blank name keeps the default.</div>
         <div id="gpn-rows" style="overflow-y:auto; flex:1; min-height:0; display:flex; flex-direction:column; gap:3px;"></div>
-        <div style="display:flex; gap:6px; justify-content:flex-end; margin-top:10px; flex-shrink:0;">
+        <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:10px; flex-shrink:0;">
             <button class="nav-btn" data-modal-row="0" onclick="gpnClear()" style="font-size:0.82rem;">Clear all</button>
             <button class="nav-btn" data-modal-row="0" onclick="gpnSave()" style="font-size:0.82rem;">Save</button>
             <button class="nav-btn" data-modal-row="0" onclick="closeGamepadNames()" style="font-size:0.82rem;">Cancel</button>
@@ -1276,9 +1277,9 @@ window._TUNE_INIT = {{ {
         <div id="gpd-layout-section" style="margin-bottom:14px; display:none;">
             <div style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.05em;">Controller layout</div>
             <div id="gpd-layout-status" style="font-size:0.82rem; color:var(--text-primary); margin-bottom:6px;"></div>
-            <div id="gpd-layout-choices" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+            <div id="gpd-layout-choices" style="display:flex; flex-wrap:wrap; gap:12px;"></div>
             <div style="font-size:0.75rem; color:var(--text-secondary); margin:8px 0 4px;">Button names (how buttons are labelled here and in Gamepad Controls)</div>
-            <div id="gpd-style-choices" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+            <div id="gpd-style-choices" style="display:flex; flex-wrap:wrap; gap:12px;"></div>
             <div id="gpd-layout-help" style="font-size:0.75rem; color:#8f98a0; margin-top:6px;">Use this if buttons or sticks are wrong or in the wrong place. Use Test controller below to see what the app receives. Your choice is remembered for this controller.</div>
         </div>
 

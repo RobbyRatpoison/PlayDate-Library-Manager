@@ -6204,7 +6204,8 @@ function _gpdRenderLayout(rawGp) {
     if (!rawGp || !window.PDLayout) { section.style.display = 'none'; _gpdLayoutSig = ''; return; }
     // A pad the browser already maps needs no layout choice, only button names.
     const isStd = rawGp.mapping === 'standard';
-    for (const id of ['gpd-layout-status', 'gpd-layout-choices', 'gpd-layout-help']) document.getElementById(id).style.display = isStd ? 'none' : '';
+    // (the choices row is a flex container: clearing its display would drop the flex and its gap)
+    for (const id of ['gpd-layout-status', 'gpd-layout-choices', 'gpd-layout-help']) document.getElementById(id).style.display = isStd ? 'none' : (id === 'gpd-layout-choices' ? 'flex' : '');
     const info = isStd ? { source: 'none', map: null, candidates: [], xboxFits: false } : PDLayout.info(rawGp);
     const saved = (window._GAMEPAD_LAYOUTS || {})[rawGp.id] || null;
     const sig = [rawGp.id, info.source, info.map, info.candidates.length, info.xboxFits, saved && saved.kind, saved && saved.map, saved && saved.style].join('|');
