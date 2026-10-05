@@ -104,3 +104,9 @@ def test_names_alone_make_a_valid_entry_and_empty_names_do_not():
 def test_names_are_capped_at_64():
     many = {str(i): f'b{i}' for i in range(100)}
     assert len(config.normalize_gamepad_layouts({PAD: {'names': many}})[PAD]['names']) == 64
+
+
+def test_controller_drawing_shape_is_validated():
+    assert config.normalize_gamepad_layouts({PAD: {'shape': 'retro'}}) == {PAD: {'shape': 'retro'}}
+    assert config.normalize_gamepad_layouts({PAD: {'kind': 'standard', 'shape': 'ps'}}) == {PAD: {'kind': 'standard', 'shape': 'ps'}}
+    assert config.normalize_gamepad_layouts({PAD: {'shape': 'sega'}}) == {}

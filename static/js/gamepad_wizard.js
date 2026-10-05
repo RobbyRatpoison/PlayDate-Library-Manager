@@ -1,4 +1,4 @@
-// Gamepad layout wizard (Gamepad Diagnostics > Controller layout > Set up custom layout).
+// Gamepad layout wizard (Gamepad Setup > Controller layout > Set up custom layout).
 //
 // Walks through the controls of a pad one at a time, shown by highlighting them on a pad
 // drawing (Xbox-style or PlayStation-style shape) instead of by letter, since A, cross and B
@@ -71,7 +71,7 @@
 
     // Retro pad: d-pad on the left, two rows of three face buttons, two shoulder buttons.
     function retroDiagram(hl) {
-        const g = (key, inner) => `<g class="gpw-ctl${hl.has(key) ? ' gpw-hl' : ''}">${inner}</g>`;
+        const g = (key, inner) => `<g data-ctl="${key}" class="gpw-ctl${hl.has(key) ? ' gpw-hl' : ''}">${inner}</g>`;
         const circle = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}"/>`;
         const rect = (x, y, w, h, r = 4) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}"/>`;
         const faces = [[236, 100], [276, 100], [316, 100], [236, 140], [276, 140], [316, 140]]
@@ -88,7 +88,7 @@
     function diagram(shape, style, highlight) {
         if (shape === 'retro') return retroDiagram(new Set(highlight || []));
         const s = SHAPES[shape] || SHAPES.xbox, hl = new Set(highlight || []);
-        const g = (key, inner) => `<g class="gpw-ctl${hl.has(key) ? ' gpw-hl' : ''}">${inner}</g>`;
+        const g = (key, inner) => `<g data-ctl="${key}" class="gpw-ctl${hl.has(key) ? ' gpw-hl' : ''}">${inner}</g>`;
         const circle = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}"/>`;
         const rect = (x, y, w, h, r = 4) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}"/>`;
         const [fx, fy] = FACE_CENTER, [dx, dy] = s.dpad;
@@ -102,8 +102,8 @@
             `<path class="gpw-body" d="${BODY}"/>` +
             g('lt', rect(78, 4, 54, 14, 6)) + g('rt', rect(268, 4, 54, 14, 6)) +
             g('lb', rect(66, 22, 78, 13)) + g('rb', rect(256, 22, 78, 13)) +
-            g('ls', circle(s.ls[0], s.ls[1], 22) + circle(s.ls[0], s.ls[1], 11)) +
-            g('rs', circle(s.rs[0], s.rs[1], 22) + circle(s.rs[0], s.rs[1], 11)) +
+            g('ls', circle(s.ls[0], s.ls[1], 22) + `<circle data-stick="ls" cx="${s.ls[0]}" cy="${s.ls[1]}" r="11"/>`) +
+            g('rs', circle(s.rs[0], s.rs[1], 22) + `<circle data-stick="rs" cx="${s.rs[0]}" cy="${s.rs[1]}" r="11"/>`) +
             g('dpup', rect(dx - 6, dy - 22, 12, 16, 3)) + g('dpdown', rect(dx - 6, dy + 6, 12, 16, 3)) +
             g('dpleft', rect(dx - 22, dy - 6, 16, 12, 3)) + g('dpright', rect(dx + 6, dy - 6, 16, 12, 3)) +
             face('a', 0, 20) + face('b', 20, 0) + face('x', -20, 0) + face('y', 0, -20) +
@@ -326,7 +326,7 @@
     // ── Public actions ────────────────────────────────────────────────────────
     window.gpwOpen = function () {
         const pad = rawPad();
-        if (!pad) { alert('No controller detected. Press a button on it with Gamepad Diagnostics open, then try again.'); return; }
+        if (!pad) { if (typeof showLaunchToast === 'function') showLaunchToast('No controller detected. Press a button on the controller, then try again.'); return; }
         const info = PDLayout.info(pad);
         W.padId = pad.id;
         W.rec = recFromMap(info.map || '');
@@ -369,7 +369,7 @@
         }
         const map = mapFromRec(W.rec), layout = PDLayout.parse(map);
         if (!layout || (pad && !PDLayout.fits(layout, pad))) { notice("That layout doesn't match this controller. Try again."); return; }
-        PDLayout.save(W.padId, { kind: 'map', map, style: W.style });
+        PDLayout.save(W.padId, { kind: 'map', map, style: W.style, shape: W.shape });
         window.closeGamepadWizard();
         if (typeof _gpdLayoutSig !== 'undefined') _gpdLayoutSig = '';   // redraw the chooser
     };
@@ -377,5 +377,24 @@
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && W.open) { e.stopPropagation(); window.closeGamepadWizard(); } }, true);
 
     // Exposed for tests.
-    window.PDWizard = { stepsFor, diagram, recFromMap, mapFromRec, state: W };
+    // ── Live view (Gamepad Setup) ───────────────────────────────────────
+    // Lights the controls that are pressed on a drawing made by diagram(), and moves the stick
+    // thumbs. `pad` is the converted (standard-shaped) pad. The retro drawing has six face circles
+    // with no way to know which is which, so it lights them in order: A, B, X, Y, then extras.
+    const LIVE_BUTTONS = { a: 0, b: 1, x: 2, y: 3, lb: 4, rb: 5, lt: 6, rt: 7, back: 8, start: 9, ls: 10, rs: 11,
+                           dpup: 12, dpdown: 13, dpleft: 14, dpright: 15, guide: 16, f1: 0, f2: 1, f3: 2, f4: 3, f5: 17, f6: 18 };
+    function liveUpdate(svg, pad) {
+        if (!svg || !pad) return;
+        const value = i => { const b = pad.buttons[i]; return b ? (typeof b.value === 'number' ? b.value : (b.pressed ? 1 : 0)) : 0; };
+        svg.querySelectorAll('[data-ctl]').forEach(el => {
+            const i = LIVE_BUTTONS[el.dataset.ctl], v = i === undefined ? 0 : value(i);
+            el.classList.toggle('gpw-live', v > (i === 6 || i === 7 ? 0.15 : 0.5));
+        });
+        svg.querySelectorAll('[data-stick]').forEach(c => {
+            const [ax, ay] = c.dataset.stick === 'ls' ? [0, 1] : [2, 3];
+            c.setAttribute('transform', `translate(${(pad.axes[ax] || 0) * 9} ${(pad.axes[ay] || 0) * 9})`);
+        });
+    }
+
+    window.PDWizard = { stepsFor, diagram, liveUpdate, recFromMap, mapFromRec, state: W };
 })();

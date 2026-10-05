@@ -1223,11 +1223,12 @@ DEFAULT_CARD_CLICK_RULES = [
 ]
 
 
-# A controller's saved gamepad layout (gamepad_layout.js): {controller id: {kind, map?, style?, names?}}.
+# A controller's saved gamepad layout (gamepad_layout.js): {controller id: {kind, map?, style?, shape?, names?}}.
 # kind 'auto' is the default and is never stored, 'standard' leaves the pad as the browser reports
 # it, 'map' is an SDL mapping string (a database entry, or one a user built in the wizard).
 GAMEPAD_LAYOUT_KINDS = ('standard', 'map')
 GAMEPAD_LABEL_STYLES = ('xbox', 'ps', 'nintendo', 'other')
+GAMEPAD_SHAPES = ('xbox', 'ps', 'retro')   # which controller drawing the wizard and Diagnostics show
 _GAMEPAD_MAP_RE = re.compile(r'^[a-z0-9:,.+~_-]{1,1000}$')
 
 
@@ -1246,6 +1247,8 @@ def normalize_gamepad_layouts(layouts):
                 clean['map'] = rec['map']
         if rec.get('style') in GAMEPAD_LABEL_STYLES:
             clean['style'] = rec['style']
+        if rec.get('shape') in GAMEPAD_SHAPES:
+            clean['shape'] = rec['shape']
         # Button names, keyed by raw button number: {'17': 'Z'}
         names = {}
         for k, v in (rec['names'].items() if isinstance(rec.get('names'), dict) else []):

@@ -260,7 +260,7 @@
             const clean = {};
             for (const [k, v] of Object.entries(names || {})) if (String(v).trim()) clean[k] = String(v).trim().slice(0, 12);
             if (Object.keys(clean).length) rec.names = clean; else delete rec.names;
-            if (rec.kind || rec.style || rec.names) all[id] = rec; else delete all[id];
+            if (rec.kind || rec.style || rec.names || rec.shape) all[id] = rec; else delete all[id];
             window._GAMEPAD_LAYOUTS = all;
             invalidate();
             if (typeof savePreference === 'function') savePreference({ gamepad_layouts: all });
@@ -271,7 +271,7 @@
             const all = Object.assign({}, window._GAMEPAD_LAYOUTS || {});
             const rec = Object.assign({}, all[id] || {});
             if (style && style !== 'auto') rec.style = style; else delete rec.style;
-            if (rec.kind || rec.style || rec.names) all[id] = rec; else delete all[id];
+            if (rec.kind || rec.style || rec.names || rec.shape) all[id] = rec; else delete all[id];
             window._GAMEPAD_LAYOUTS = all;
             invalidate();
             if (typeof savePreference === 'function') savePreference({ gamepad_layouts: all });
@@ -287,7 +287,8 @@
             const prev = all[id] || {};
             if (rec.style === undefined && prev.style) rec.style = prev.style;
             if (rec.names === undefined && prev.names) rec.names = prev.names;
-            if (!rec.kind && !rec.style && !rec.names) delete all[id]; else all[id] = rec;
+            if (rec.shape === undefined && prev.shape) rec.shape = prev.shape;
+            if (!rec.kind && !rec.style && !rec.names && !rec.shape) delete all[id]; else all[id] = rec;
             window._GAMEPAD_LAYOUTS = all;
             invalidate();
             if (pad) keepExtraBindings(before, rawNumbers(pad));

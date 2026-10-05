@@ -55,14 +55,14 @@
 
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
-            // Gamepad Diagnostics suppresses every button, including B, down to
-            // a deliberate hold (see _pollLoop's gpDiagModal branch) so buttons
-            // can be tested without instantly closing it. Steam Input's default
+            // While Gamepad Setup's live view is showing it suppresses every button, including B,
+            // down to a deliberate hold (see _pollLoop) so buttons can be tested without instantly
+            // closing it. Steam Input's default
             // Desktop Mode layout synthesizes a real Escape keydown for some
             // buttons (e.g. Start) independent of the Gamepad API polling that
             // capture mode guards, so it needs its own check here too.
-            const gpDiagModal = document.getElementById('gamepad-diag-modal');
-            if (gpDiagModal && gpDiagModal.style.display !== 'none' && gpDiagModal.style.display !== '') return;
+            const gpOpen = id => { const m = document.getElementById(id); return !!m && m.style.display !== 'none' && m.style.display !== ''; };
+            if ((window._gpdLive === true && gpOpen('gamepad-diag-modal')) || gpOpen('gamepad-wizard-modal') || gpOpen('gamepad-names-modal')) return;
             // A focused text field takes priority over closing the modal
             // underneath it — see the identical check in _handleB() for why:
             // gamescope's on-screen keyboard (Steam Deck) dismisses itself on
@@ -343,12 +343,11 @@
     let REPEAT_INITIAL  = window._GAMEPAD_REPEAT_INITIAL_MS ?? 400;
     let REPEAT_RATE     = window._GAMEPAD_REPEAT_RATE_MS ?? 150;
     let STICK_DEAD       = (window._GAMEPAD_DEADZONE ?? 35) / 100;
-    // Gamepad Diagnostics exists to show raw button/axis state, so normal
+    // Gamepad Setup's live view exists to show raw button/axis state, so normal
     // app-level dispatch (A clicking the focused element, B closing modals)
-    // is suppressed entirely while it's open — otherwise neither button
-    // could ever be observed pressed for more than a single frame before
-    // closing the modal out from under the test. B still closes it, but
-    // only via a hold past this threshold, so a tap is safely just a tap.
+    // is suppressed entirely while it's showing — otherwise neither button
+    // could ever be observed pressed for more than a single frame. B hides the
+    // live view, but only via a hold past this threshold, so a tap is safely just a tap.
     const GP_DIAG_CLOSE_HOLD_MS = 1500;
     // Hat-switch axes (evdev ABS_HAT0X/Y) report discrete -1/0/1, not a
     // continuous range, so a coarser threshold than STICK_DEAD is fine and
@@ -847,10 +846,8 @@
                 return [...el.querySelectorAll(
                     'button:not(:disabled), a.nav-btn, a.btn-save, a[data-modal-row], input[data-modal-row], textarea[data-modal-row], select[data-modal-row], .custom-select[data-modal-row], div[data-modal-row], li[data-modal-row], span[data-modal-row], label[data-modal-row]'
                 )].filter(e => e.offsetParent !== null && !e.disabled && !e.closest('.pill'))
-                  // Gamepad Diagnostics suppresses all button dispatch while open (see
-                  // _pollLoop's gpDiagModal branch), so its own close button is excluded
-                  // here too — otherwise the focus ring would land on a button that A no
-                  // longer does anything to, implying an action that can't happen.
+                  // Gamepad Setup's close button is left out of gamepad navigation: B closes
+                  // the screen, so a focus stop on the X would only duplicate it.
                   .filter(e => id !== 'gamepad-diag-modal' || !e.hasAttribute('data-gp-diag-close'))
                   .sort((a, b) => {
                       const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect();
@@ -2900,8 +2897,13 @@
             }
         }
 
-        const gpDiagModal = document.getElementById('gamepad-diag-modal');
-        if (gpDiagModal && gpDiagModal.style.display !== 'none' && gpDiagModal.style.display !== '') {
+        // Gamepad Setup: while its live view is showing, or the layout wizard or button-name editor
+        // is open, buttons are only reported (they don't navigate), so each one can be watched or
+        // recorded. With the live view hidden the pad navigates that screen like any other.
+        const isOpen = id => { const m = document.getElementById(id); return !!m && m.style.display !== 'none' && m.style.display !== ''; };
+        const recording = isOpen('gamepad-wizard-modal') || isOpen('gamepad-names-modal');
+        const liveOn = window._gpdLive === true && isOpen('gamepad-diag-modal');
+        if (recording || liveOn) {
             gp.buttons.forEach((btn, i) => {
                 const pressed    = btn.pressed || btn.value > 0.5;
                 const wasPressed = !!_gp.prev[i];
@@ -2910,14 +2912,10 @@
                 _gp.prev[i] = pressed;
             });
             const bHeld = _gp.heldSince[BTN_IDX.b];
-            // Not while the layout wizard or the button-name editor is open: they are about which button B is.
-            const wizardOpen = ['gamepad-wizard-modal', 'gamepad-names-modal'].some(id => {
-                const m = document.getElementById(id);
-                return !!m && m.style.display !== 'none' && m.style.display !== '';
-            });
-            if (bHeld && !wizardOpen && now - bHeld > GP_DIAG_CLOSE_HOLD_MS) {
+            // Holding B hides the live view, not the modal. Not while recording: B may be what is being recorded.
+            if (bHeld && !recording && now - bHeld > GP_DIAG_CLOSE_HOLD_MS) {
                 delete _gp.heldSince[BTN_IDX.b];
-                if (typeof closeGamepadDiag === 'function') closeGamepadDiag();
+                if (typeof gpdHideLive === 'function') gpdHideLive();
             }
             return;
         }

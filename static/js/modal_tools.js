@@ -6022,7 +6022,7 @@ function resizeToSteamDeck() {
     }
 }
 
-// ── Gamepad Diagnostics ────────────────────────────────────────────────────
+// ── Gamepad Setup ────────────────────────────────────────────────────
 
 // Standard Gamepad layout: buttons[2] is X, buttons[3] is Y. _activeBtnLabels()
 // trades 2 and 3 on input paths that report them backwards (WebKitGTK; see
@@ -6083,7 +6083,7 @@ const BTN_LABELS_OTHER = {
 
 const _BTN_LABEL_SETS = { xbox: BTN_LABELS, ps: BTN_LABELS_PS, nintendo: BTN_LABELS_NINTENDO, other: BTN_LABELS_OTHER };
 
-// Which naming a pad gets: the user's saved choice (Gamepad Diagnostics, or the layout wizard),
+// Which naming a pad gets: the user's saved choice (Gamepad Setup, or the layout wizard),
 // else a guess from the vendor id or name.
 function _labelStyleFor(id) {
     const saved = (window._GAMEPAD_LAYOUTS || {})[id];
@@ -6148,27 +6148,6 @@ function _firstConnectedGamepadId() {
 
 let _gpdRafId = null;
 
-// Stick position as a dot inside the stick's range, with the configured dead
-// zone drawn as a square: input.js applies it per axis (|x| > dead or |y| > dead
-// counts as a direction), so a circle would misrepresent where it kicks in.
-// The dot lights up once it's outside that square, i.e. when the app would
-// actually register a direction.
-function _gpdStickSvg(x, y) {
-    const R = 44, C = 50;
-    const dz = Math.max(0, Math.min(1, (window._GAMEPAD_DEADZONE ?? 35) / 100));
-    const mag = Math.hypot(x, y);
-    const k = mag > 1 ? 1 / mag : 1;   // some pads report corners past 1.0
-    const px = C + x * k * R, py = C + y * k * R;
-    const active = Math.abs(x) > dz || Math.abs(y) > dz;
-    return `<svg viewBox="0 0 100 100" width="96" height="96" role="img" aria-label="stick position">
-        <circle cx="${C}" cy="${C}" r="${R}" fill="rgba(255,255,255,0.04)" stroke="var(--border)" stroke-width="1.5"/>
-        <line x1="${C - R}" y1="${C}" x2="${C + R}" y2="${C}" stroke="var(--border)" stroke-width="1"/>
-        <line x1="${C}" y1="${C - R}" x2="${C}" y2="${C + R}" stroke="var(--border)" stroke-width="1"/>
-        <rect x="${C - dz * R}" y="${C - dz * R}" width="${dz * R * 2}" height="${dz * R * 2}" fill="none" stroke="var(--text-secondary)" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>
-        <circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="${active ? 'var(--accent)' : 'var(--text-secondary)'}"/>
-    </svg>`;
-}
-
 function openGamepadDiag() {
     document.getElementById('gamepad-diag-modal').style.display = 'flex';
     _gpdRefreshStatic();
@@ -6176,6 +6155,7 @@ function openGamepadDiag() {
 }
 
 function closeGamepadDiag() {
+    _gpdSetLive(false);
     document.getElementById('gamepad-diag-modal').style.display = 'none';
     _gpdStopPoll();
 }
@@ -6275,7 +6255,7 @@ let _gpnRaf = null;
 
 function gpdOpenNames() {
     const pad = _firstGamepad(true);
-    if (!pad) { alert('No controller detected. Press a button on it with Gamepad Diagnostics open, then try again.'); return; }
+    if (!pad) { showLaunchToast('No controller detected. Press a button on the controller, then try again.'); return; }
     const saved = ((window._GAMEPAD_LAYOUTS || {})[pad.id] || {}).names || {};
     const defaults = _activeBtnLabels(pad.id, true);
     const rawOf = pdStandardizeGamepad(pad)._pdRaw;
@@ -6330,6 +6310,46 @@ function gpdPickStyle(style) {
     _gpdLayoutSig = '';
 }
 
+// ── Live view toggle (Gamepad Setup) ───────────────────────────────────────
+// The live drawing and raw readouts are hidden until asked for. While they show, input.js stops
+// the pad from navigating (so every button can be watched); holding B hides them again. With
+// them hidden the pad navigates this screen like any other, and B closes it.
+window._gpdLive = false;
+
+function _gpdSetLive(on) {
+    window._gpdLive = on;
+    document.getElementById('gpd-live-section').style.display = on ? '' : 'none';
+    document.getElementById('gpd-live-btn').textContent = on ? 'Hide live input' : 'Test controller (live input)';
+    _gpdDrawingKey = '';
+}
+
+function gpdToggleLive() { _gpdSetLive(!window._gpdLive); }
+function gpdHideLive() { _gpdSetLive(false); }
+
+// ── Live drawing of the controller (Gamepad Setup) ──────────────────────────
+// The same drawing the layout wizard uses, with pressed controls lit and the sticks moving.
+// Shape: the one saved by the wizard, else PlayStation-style for a PlayStation pad, retro for a pad
+// whose layout has no sticks, else Xbox-style.
+let _gpdDrawingKey = '';
+
+function _gpdShapeFor(rawGp, gp) {
+    const saved = (window._GAMEPAD_LAYOUTS || {})[rawGp.id] || {};
+    if (saved.shape) return saved.shape;
+    if (_labelStyleFor(rawGp.id) === 'ps') return 'ps';
+    const map = gp._pdLayout && gp._pdLayout.map;
+    return map && !/(^|,)leftx:/.test(map) ? 'retro' : 'xbox';
+}
+
+function _gpdUpdateDrawing(rawGp, gp) {
+    const host = document.getElementById('gpd-drawing');
+    if (!host || typeof PDWizard === 'undefined') return;
+    if (!gp) { host.innerHTML = ''; _gpdDrawingKey = ''; return; }
+    const shape = _gpdShapeFor(rawGp, gp), style = _labelStyleFor(rawGp.id);
+    const key = shape + '|' + style;
+    if (key !== _gpdDrawingKey) { host.innerHTML = PDWizard.diagram(shape, style, []); _gpdDrawingKey = key; }
+    PDWizard.liveUpdate(host.firstElementChild, gp);
+}
+
 function _gpdStartPoll() {
     if (_gpdRafId) return;
     function poll() {
@@ -6362,69 +6382,17 @@ function _gpdStartPoll() {
             mapEl.textContent = '';
         }
         _gpdRenderLayout(rawGp);
+        if (!window._gpdLive) return;   // the live drawing and raw readouts only run while shown
+
+        _gpdUpdateDrawing(rawGp, gp);
 
         if (!gp) {
-            document.getElementById('gpd-buttons').innerHTML = '';
-            document.getElementById('gpd-triggers').innerHTML = '';
-            document.getElementById('gpd-lstick-viz').innerHTML = '';
-            document.getElementById('gpd-rstick-viz').innerHTML = '';
-            document.getElementById('gpd-lstick').textContent = 'x: --  y: --';
-            document.getElementById('gpd-rstick').textContent = 'x: --  y: --';
             document.getElementById('gpd-axes-raw').textContent = '--';
             document.getElementById('gpd-buttons-raw').textContent = '--';
             return;
         }
 
-        // Face buttons render in reading order (A B X Y) regardless of which raw
-        // index carries X (2 on most paths, 3 on WebKitGTK -- see _stdFaceIdx);
-        // everything else follows in ascending raw order, so nothing is hidden.
-        // Triggers (6/7) are analogue, so they get their own bars below instead
-        // of an on/off chip here.
-        const btnEl = document.getElementById('gpd-buttons');
-        const labels = _activeBtnLabels(gp.id);
-        const displayOrder = [0, 1, _stdFaceIdx(2), _stdFaceIdx(3),
-            ...gp.buttons.map((_, i) => i).filter(i => i > 3 && i !== 6 && i !== 7)];
-        let btnHtml = '';
-        displayOrder.forEach(i => {
-            const btn = gp.buttons[i];
-            if (!btn) return;
-            const pressed = btn.pressed || btn.value > 0.5;
-            const label = labels[i] || i;
-            const bg = pressed ? 'var(--accent)' : 'rgba(255,255,255,0.07)';
-            const color = pressed ? 'var(--on-accent)' : 'var(--text-secondary)';
-            const faceColor = _faceButtonColor(i, gp.id);
-            const border = faceColor ? `2px solid ${faceColor}` : '2px solid transparent';
-            btnHtml += `<span style="box-sizing:border-box;padding:1px 7px;border-radius:4px;font-size:0.78rem;background:${bg};color:${color};border:${border};transition:background 0.08s;">${label}</span>`;
-        });
-        btnEl.innerHTML = btnHtml;
-
-        // Triggers: analogue 0..1 value as a bar plus a number, since a pad can
-        // report anything in between (and a worn or miscalibrated trigger that
-        // never reaches 1.0 or rests above 0 is exactly what this should show).
-        let trigHtml = '';
-        [6, 7].forEach(i => {
-            const btn = gp.buttons[i];
-            if (!btn) return;
-            const v = Math.max(0, Math.min(1, typeof btn.value === 'number' ? btn.value : (btn.pressed ? 1 : 0)));
-            trigHtml += `<div>
-                <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-secondary); margin-bottom:3px;">
-                    <span>${labels[i] || i}</span><span style="font-family:monospace; color:var(--text-primary);">${v.toFixed(2)}</span>
-                </div>
-                <div style="height:8px; border-radius:4px; background:rgba(255,255,255,0.07); overflow:hidden;">
-                    <div style="height:100%; width:${(v * 100).toFixed(1)}%; background:var(--accent);"></div>
-                </div>
-            </div>`;
-        });
-        document.getElementById('gpd-triggers').innerHTML = trigHtml;
-
-        // Sticks
-        document.getElementById('gpd-lstick-viz').innerHTML = _gpdStickSvg(gp.axes[0] || 0, gp.axes[1] || 0);
-        document.getElementById('gpd-rstick-viz').innerHTML = _gpdStickSvg(gp.axes[2] || 0, gp.axes[3] || 0);
         const fmt = v => (v >= 0 ? ' ' : '') + v.toFixed(2);
-        document.getElementById('gpd-lstick').textContent =
-            `x: ${fmt(gp.axes[0] || 0)}  y: ${fmt(gp.axes[1] || 0)}`;
-        document.getElementById('gpd-rstick').textContent =
-            `x: ${fmt(gp.axes[2] || 0)}  y: ${fmt(gp.axes[3] || 0)}`;
 
         // Full raw axes array — a leaked hat switch (unmapped D-pad) shows up here
         // as extra axes beyond the two known sticks (indices 0-3).
@@ -6459,8 +6427,7 @@ const _REMAP_ACTIONS = [
     { action: 'down',  defaultBtn: 13, label: 'Navigate Down' },
     { action: 'left',  defaultBtn: 14, label: 'Navigate Left' },
     { action: 'right', defaultBtn: 15, label: 'Navigate Right' },
-    // Shortcuts act on the game under the focus ring. Unset by default (defaultBtn null), and
-    // unlike the actions above they may be left without a button.
+    // Shortcuts act on the game under the focus ring. Unset by default (defaultBtn null).
     { action: 'sc_store',         defaultBtn: null, label: 'Open Store Page',           shortcut: true },
     { action: 'sc_folder',        defaultBtn: null, label: 'Open Install Folder',       shortcut: true },
     { action: 'sc_achievements',  defaultBtn: null, label: 'Open Steam Achievements',   shortcut: true },

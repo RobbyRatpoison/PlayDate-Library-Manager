@@ -415,7 +415,7 @@ function describeCustomExprSql(sql) {
 // evdev reader (gamepad_reader.py) deliver. WebKitGTK on Linux goes through
 // libmanette instead, which reports them backwards -- confirmed on a wired Xbox
 // Elite 2 and the Deck's built-in pad. Used by input.js (BTN_IDX) and the
-// Gamepad Diagnostics/Remap screens (modal_tools.js) so all three agree.
+// Gamepad Setup/Remap screens (modal_tools.js) so all three agree.
 function pdGamepadXYSwapped() {
     if (window._STEAM_DECK_SESSION === true) return false;   // evdev path, standard indices
     const ua = navigator.userAgent || '';
