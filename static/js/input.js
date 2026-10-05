@@ -2771,6 +2771,15 @@
         window.pdRunCardAction(_SHORTCUT_ACTIONS[name], appid, area);
     }
 
+    // The raw button an action is on now: the user's own pick, else its default unless that button was
+    // given another job (or cleared). null when the action has no button.
+    // defaultExists false: the pad's layout has no such button (a converted pad then reads it as never pressed).
+    function _rawFor(action, defaultExists = true) {
+        for (const [k, v] of Object.entries(_userRemap)) if (v === action) return +k;
+        const d = BTN_IDX[action];
+        return defaultExists && _userRemap[d] === undefined ? d : null;
+    }
+
     function _onButton(rawIdx, isRepeat) {
         const userAction     = _userRemap[rawIdx];
         if (_SHORTCUT_ACTIONS[userAction]) {
@@ -2911,10 +2920,13 @@
                 else if (!pressed && wasPressed) delete _gp.heldSince[i];
                 _gp.prev[i] = pressed;
             });
-            const bHeld = _gp.heldSince[BTN_IDX.b];
-            // Holding B hides the live view, not the modal. Not while recording: B may be what is being recorded.
-            if (bHeld && !recording && now - bHeld > GP_DIAG_CLOSE_HOLD_MS) {
-                delete _gp.heldSince[BTN_IDX.b];
+            // Holding Back hides the live view, not the modal; a pad with no Back button uses Confirm instead,
+            // so the view can always be left. Not while recording: that button may be what is being recorded.
+            const layoutMap = gp._pdLayout && gp._pdLayout.map;
+            const holdIdx = _rawFor('b', !layoutMap || /(^|,)b:/.test(layoutMap)) ?? _rawFor('a');
+            const held = holdIdx != null ? _gp.heldSince[holdIdx] : null;
+            if (held && !recording && now - held > GP_DIAG_CLOSE_HOLD_MS) {
+                delete _gp.heldSince[holdIdx];
                 if (typeof gpdHideLive === 'function') gpdHideLive();
             }
             return;
