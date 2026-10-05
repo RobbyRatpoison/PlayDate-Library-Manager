@@ -793,6 +793,7 @@ def install_plugin():
         return jsonify({'status': 'error', 'message': 'File must be a .zip archive.'}), 400
     try:
         plugin_id, name = _install_plugin_zip(f.read())
+        _plugin_update_cache.pop(plugin_id, None)
         return jsonify({'status': 'success', 'plugin_id': plugin_id, 'name': name})
     except ValueError as e:
         return api_error('Something went wrong on the server. Check playdate.log for details.', 400, exc=e)

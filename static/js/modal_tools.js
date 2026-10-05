@@ -5434,9 +5434,8 @@ async function _checkPluginUpdates() {
                 el.innerHTML = `<button${mr} style="font:inherit;font-size:0.75rem;font-weight:400;background:none;border:none;padding:0;margin-left:7px;color:var(--accent);cursor:pointer;vertical-align:baseline;" onclick="_updatePlugin('${escHtml(u.id)}','${escHtml(u.source || '')}')">v${escHtml(u.latest_version)} available &#8595;</button>`;
             }
         }
-        if (anyStandalone || anyGated) {
-            document.getElementById('plugin-update-dot')?.style.setProperty('visibility', 'visible');
-        }
+        document.getElementById('plugin-update-dot')?.style.setProperty(
+            'visibility', (anyStandalone || anyGated) ? 'visible' : 'hidden');
         // "Update All" button: shown whenever >=1 plugin has a standalone
         // (non-core-gated) update available.
         const _uaBtn = document.getElementById('plugin-update-all-btn');
