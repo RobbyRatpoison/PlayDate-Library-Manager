@@ -801,6 +801,7 @@
         'filter-io-modal',     // from data-modal
         'gamepad-remap-modal', // from gamepad-modal
         'gamepad-wizard-modal', // from gamepad-diag-modal
+        'gamepad-names-modal',  // from gamepad-diag-modal
         'gamepad-diag-modal',  // from gamepad-modal
         'send-log-modal',      // from advanced-modal
         'steam-junk-modal',    // from blacklist-modal
@@ -2361,6 +2362,7 @@
             ['filter-io-modal',       'closeFilterIoModal'],
             ['gamepad-remap-modal',   'closeGamepadRemap'],
             ['gamepad-wizard-modal',  'closeGamepadWizard'],
+            ['gamepad-names-modal',   'closeGamepadNames'],
             ['gamepad-diag-modal',    'closeGamepadDiag'],
             ['send-log-modal',        'closeSendLogModal'],
             ['steam-junk-modal',      'closeSteamJunkModal'],
@@ -2908,9 +2910,11 @@
                 _gp.prev[i] = pressed;
             });
             const bHeld = _gp.heldSince[BTN_IDX.b];
-            // Not while the layout wizard is open: it is recording which button B is.
-            const wizard = document.getElementById('gamepad-wizard-modal');
-            const wizardOpen = !!wizard && wizard.style.display !== 'none' && wizard.style.display !== '';
+            // Not while the layout wizard or the button-name editor is open: they are about which button B is.
+            const wizardOpen = ['gamepad-wizard-modal', 'gamepad-names-modal'].some(id => {
+                const m = document.getElementById(id);
+                return !!m && m.style.display !== 'none' && m.style.display !== '';
+            });
             if (bHeld && !wizardOpen && now - bHeld > GP_DIAG_CLOSE_HOLD_MS) {
                 delete _gp.heldSince[BTN_IDX.b];
                 if (typeof closeGamepadDiag === 'function') closeGamepadDiag();
@@ -3268,6 +3272,7 @@
         // Sub-modals (also registered so _anyWatchedOpen works correctly for nesting)
         _watchModal('gamepad-remap-modal');
         _watchModal('gamepad-wizard-modal');
+        _watchModal('gamepad-names-modal');
         _watchModal('gamepad-diag-modal');
         _watchModal('hltb-modal');
         _watchModal('theme-picker-modal');

@@ -108,15 +108,18 @@
         const key = gp.id + '#' + gp.index;
         axesSeen = seenByPad.get(key) || seenByPad.set(key, new Set()).get(key);
         gp.axes.forEach((v, i) => { if (v !== 0) axesSeen.add(i); });
-        const buttons = [];
-        for (let i = 0; i < STD_BUTTON_COUNT; i++) buttons.push(button(layout.btn[i], gp));
-        for (let i = 0; i < gp.buttons.length; i++) if (!layout.usedButtons.has(i)) buttons.push(gp.buttons[i]);
+        const buttons = [], rawOf = [];   // rawOf[i]: the raw button behind converted button i (null for an axis or hat)
+        for (let i = 0; i < STD_BUTTON_COUNT; i++) {
+            buttons.push(button(layout.btn[i], gp));
+            rawOf.push(layout.btn[i] && layout.btn[i].t === 'b' ? layout.btn[i].i : null);
+        }
+        for (let i = 0; i < gp.buttons.length; i++) if (!layout.usedButtons.has(i)) { buttons.push(gp.buttons[i]); rawOf.push(i); }
         const axes = [0, 1, 2, 3].map(i => {
             const s = layout.ax[i];
             return s && s.t === 'a' ? clamp(axisValue(s, gp), -1, 1) : 0;
         });
         return { id: gp.id, index: gp.index, connected: gp.connected, timestamp: gp.timestamp,
-                 mapping: 'standard', _pdNormalized: true, _pdLayout: info, axes, buttons };
+                 mapping: 'standard', _pdNormalized: true, _pdLayout: info, _pdRaw: rawOf, axes, buttons };
     }
 
     // ── Finding the layout ────────────────────────────────────────────────────
@@ -204,6 +207,34 @@
         return r.layout ? apply(gp, r.layout, { source: r.source, map: r.map, name: r.name }) : gp;
     };
 
+    // ── Bindings on extra buttons survive a layout change ─────────────────────
+    // Gamepad Controls stores a binding under the converted button number, and extras are numbered
+    // after the standard 17 in raw order, so a different layout moves them. When a layout is saved,
+    // move each binding on an extra to the same physical button.
+    function connectedPad(id) {
+        const list = navigator.getGamepads ? navigator.getGamepads() : [];
+        for (const g of list) if (g && g.id === id) return g;
+        return null;
+    }
+    const rawNumbers = pad => window.pdStandardizeGamepad(pad)._pdRaw || null;   // null: used as reported, raw = converted
+
+    function keepExtraBindings(before, after) {
+        const out = {};
+        let changed = false;
+        for (const [k, action] of Object.entries(window._BUTTON_REMAPS || {})) {
+            const idx = +k;
+            if (idx < STD_BUTTON_COUNT) { out[k] = action; continue; }
+            const raw = before ? before[idx] : idx;                       // the physical button it was on
+            const now = raw == null ? -1 : (after ? after.indexOf(raw) : raw);
+            if (now >= STD_BUTTON_COUNT) { out[String(now)] = action; if (now !== idx) changed = true; }
+            else changed = true;   // that button is now a standard control; leaving the binding would hijack it
+        }
+        if (!changed) return;
+        window._BUTTON_REMAPS = out;
+        if (window._inputMgr && window._inputMgr.setButtonRemaps) window._inputMgr.setButtonRemaps(out);
+        if (typeof savePreference === 'function') savePreference({ button_remaps: out });
+    }
+
     // For the Diagnostics screen: what is in use and what could be chosen instead.
     window.PDLayout = {
         XBOX_RAW, parse, fits, apply, vendorProduct, invalidate, loadDb,
@@ -221,13 +252,26 @@
             if (s.t === 'h') return `h${s.i}.${s.mask}`;
             return (s.half > 0 ? '+' : s.half < 0 ? '-' : '') + 'a' + s.i + (s.inv ? '~' : '');
         },
+        // Names the user gave buttons, keyed by the pad's raw button number (a physical button's
+        // number never changes, whichever layout is in use): { '17': 'Z' }. Blank names are dropped.
+        setNames(id, names) {
+            const all = Object.assign({}, window._GAMEPAD_LAYOUTS || {});
+            const rec = Object.assign({}, all[id] || {});
+            const clean = {};
+            for (const [k, v] of Object.entries(names || {})) if (String(v).trim()) clean[k] = String(v).trim().slice(0, 12);
+            if (Object.keys(clean).length) rec.names = clean; else delete rec.names;
+            if (rec.kind || rec.style || rec.names) all[id] = rec; else delete all[id];
+            window._GAMEPAD_LAYOUTS = all;
+            invalidate();
+            if (typeof savePreference === 'function') savePreference({ gamepad_layouts: all });
+        },
         // Button-label style only ('xbox' | 'ps' | 'nintendo' | 'other', or 'auto' to go back to
         // guessing from the vendor); the saved layout is left as it is.
         setStyle(id, style) {
             const all = Object.assign({}, window._GAMEPAD_LAYOUTS || {});
             const rec = Object.assign({}, all[id] || {});
             if (style && style !== 'auto') rec.style = style; else delete rec.style;
-            if (rec.kind || rec.style) all[id] = rec; else delete all[id];
+            if (rec.kind || rec.style || rec.names) all[id] = rec; else delete all[id];
             window._GAMEPAD_LAYOUTS = all;
             invalidate();
             if (typeof savePreference === 'function') savePreference({ gamepad_layouts: all });
@@ -235,14 +279,18 @@
         // Remember a choice for this controller: { kind: 'auto' | 'standard' | 'map', map?, style? }.
         // The button-label style is kept when a later choice doesn't name one.
         save(id, choice) {
+            const pad = connectedPad(id);
+            const before = pad ? rawNumbers(pad) : null;
             const all = Object.assign({}, window._GAMEPAD_LAYOUTS || {});
             const rec = Object.assign({}, choice || {});
             if (!rec.kind || rec.kind === 'auto') delete rec.kind;
             const prev = all[id] || {};
             if (rec.style === undefined && prev.style) rec.style = prev.style;
-            if (!rec.kind && !rec.style) delete all[id]; else all[id] = rec;
+            if (rec.names === undefined && prev.names) rec.names = prev.names;
+            if (!rec.kind && !rec.style && !rec.names) delete all[id]; else all[id] = rec;
             window._GAMEPAD_LAYOUTS = all;
             invalidate();
+            if (pad) keepExtraBindings(before, rawNumbers(pad));
             if (typeof savePreference === 'function') savePreference({ gamepad_layouts: all });
         },
     };

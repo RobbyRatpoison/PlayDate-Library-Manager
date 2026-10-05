@@ -6093,10 +6093,22 @@ function _labelStyleFor(id) {
     return 'xbox';
 }
 
-function _activeBtnLabels(gpId) {
+// noCustom = true gives the style's own names (the rename editor shows them as the defaults).
+function _activeBtnLabels(gpId, noCustom) {
     const std = _BTN_LABEL_SETS[_labelStyleFor(gpId)];
-    if (!pdGamepadXYSwapped()) return std;
-    return { ...std, 2: std[3], 3: std[2] };
+    const labels = pdGamepadXYSwapped() ? { ...std, 2: std[3], 3: std[2] } : std;
+    const saved = (window._GAMEPAD_LAYOUTS || {})[gpId];
+    if (noCustom || !saved || !saved.names) return labels;
+    // Names are kept per raw button; find the converted button each one is behind right now.
+    const raw = _firstGamepad(true);
+    if (!raw || raw.id !== gpId) return labels;
+    const rawOf = pdStandardizeGamepad(raw)._pdRaw;   // undefined when the pad is used as reported
+    const out = { ...labels };
+    for (const [r, name] of Object.entries(saved.names)) {
+        const i = rawOf ? rawOf.indexOf(+r) : +r;
+        if (i >= 0) out[i] = name;
+    }
+    return out;
 }
 
 // Standard face-button brand colors, keyed by the same raw indices as
@@ -6245,7 +6257,7 @@ function _gpdRenderLayout(rawGp) {
     document.getElementById('gpd-style-choices').innerHTML = [['auto', `Auto (${guess})`], ['xbox', 'Xbox'], ['ps', 'PlayStation'], ['nintendo', 'Nintendo'], ['other', 'Other']].map(([key, label]) =>
         `<button class="nav-btn" data-modal-row="0" onclick="gpdPickStyle('${key}')" ` +
         `style="font-size:0.78rem; padding:3px 10px;${key === style ? ' border-color:var(--accent);' : ''}">${key === style ? '&#10003; ' : ''}${escHtml(label)}</button>`
-    ).join('');
+    ).join('') + `<button class="nav-btn" data-modal-row="0" onclick="gpdOpenNames()" style="font-size:0.78rem; padding:3px 10px;">Rename buttons...</button>`;
 }
 
 function gpdPickLayout(i) {
@@ -6255,6 +6267,62 @@ function gpdPickLayout(i) {
     PDLayout.save(_gpdLayoutPadId, c.rec);
     _gpdLayoutSig = '';   // redraw with the new pick on the next frame
 }
+
+// ── Rename buttons (Diagnostics) ──────────────────────────────────────────────
+// One row per raw button the pad reports, saved by raw number (see PDLayout.setNames). Pressing a
+// button on the pad highlights its row, so a button can be found without knowing its number.
+let _gpnRaf = null;
+
+function gpdOpenNames() {
+    const pad = _firstGamepad(true);
+    if (!pad) { alert('No controller detected. Press a button on it with Gamepad Diagnostics open, then try again.'); return; }
+    const saved = ((window._GAMEPAD_LAYOUTS || {})[pad.id] || {}).names || {};
+    const defaults = _activeBtnLabels(pad.id, true);
+    const rawOf = pdStandardizeGamepad(pad)._pdRaw;
+    document.getElementById('gpn-rows').innerHTML = Array.from({ length: pad.buttons.length }, (_, r) => {
+        const std = rawOf ? rawOf.indexOf(r) : r;
+        const def = std >= 0 && defaults[std] ? defaults[std] : '';
+        return `<div class="gpn-row" data-raw="${r}" style="display:flex; align-items:center; gap:10px; padding:3px 8px; border-radius:6px; background:rgba(255,255,255,0.04);">` +
+            `<span style="flex:1; font-size:0.85rem; color:var(--text-primary);">Button ${r}${std < 0 || std > 16 ? ' <span style="color:#8f98a0;">(extra)</span>' : ''}</span>` +
+            `<input type="text" maxlength="12" data-raw="${r}" data-modal-row="${70 + r}" value="${escHtml(saved[r] || '')}" placeholder="${escHtml(def || 'name')}" ` +
+            `style="width:130px; margin:0; font-size:0.85rem;"></div>`;
+    }).join('');
+    document.getElementById('gamepad-names-modal').dataset.padId = pad.id;
+    document.getElementById('gamepad-names-modal').style.display = 'flex';
+    if (!_gpnRaf) {
+        const tick = () => {
+            _gpnRaf = requestAnimationFrame(tick);
+            const p = _firstGamepad(true);
+            document.querySelectorAll('#gpn-rows .gpn-row').forEach(row => {
+                const b = p && p.buttons[+row.dataset.raw];
+                row.style.background = b && (b.pressed || b.value > 0.5) ? 'var(--accent)' : 'rgba(255,255,255,0.04)';
+            });
+        };
+        _gpnRaf = requestAnimationFrame(tick);
+    }
+}
+
+function closeGamepadNames() {
+    document.getElementById('gamepad-names-modal').style.display = 'none';
+    if (_gpnRaf) { cancelAnimationFrame(_gpnRaf); _gpnRaf = null; }
+}
+
+function gpnClear() {
+    document.querySelectorAll('#gpn-rows input').forEach(i => { i.value = ''; });
+}
+
+function gpnSave() {
+    const names = {};
+    document.querySelectorAll('#gpn-rows input').forEach(i => { if (i.value.trim()) names[i.dataset.raw] = i.value.trim(); });
+    PDLayout.setNames(document.getElementById('gamepad-names-modal').dataset.padId, names);
+    closeGamepadNames();
+    _gpdLayoutSig = '';
+}
+
+document.addEventListener('keydown', e => {
+    const m = document.getElementById('gamepad-names-modal');
+    if (e.key === 'Escape' && m && m.style.display !== 'none' && m.style.display !== '') { e.stopPropagation(); closeGamepadNames(); }
+}, true);
 
 function gpdPickStyle(style) {
     if (!window.PDLayout || !_gpdLayoutPadId) return;

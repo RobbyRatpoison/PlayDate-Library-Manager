@@ -1236,6 +1236,23 @@ window._TUNE_INIT = {{ {
     </div>
 </div>
 
+<!-- ── GAMEPAD BUTTON NAMES (opened from Gamepad Diagnostics) ── -->
+<div id="gamepad-names-modal" class="modal-overlay sub-sub-modal" style="display:none; z-index:1003;">
+    <div class="modal-content" style="width:520px; max-width:94vw; max-height:92vh; display:flex; flex-direction:column;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-shrink:0;">
+            <h2 style="margin:0; color:var(--text-primary);">Rename buttons</h2>
+            <button onclick="closeGamepadNames()" data-modal-row="0" style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1;">&#x2715;</button>
+        </div>
+        <div style="font-size:0.82rem; color:var(--text-secondary); line-height:1.5; margin-bottom:8px; flex-shrink:0;">Give buttons the names printed on your controller, such as C or Z. Press a button on the controller to find its row. A blank name keeps the default.</div>
+        <div id="gpn-rows" style="overflow-y:auto; flex:1; min-height:0; display:flex; flex-direction:column; gap:3px;"></div>
+        <div style="display:flex; gap:6px; justify-content:flex-end; margin-top:10px; flex-shrink:0;">
+            <button class="nav-btn" data-modal-row="0" onclick="gpnClear()" style="font-size:0.82rem;">Clear all</button>
+            <button class="nav-btn" data-modal-row="0" onclick="gpnSave()" style="font-size:0.82rem;">Save</button>
+            <button class="nav-btn" data-modal-row="0" onclick="closeGamepadNames()" style="font-size:0.82rem;">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── GAMEPAD DIAGNOSTICS MODAL ── -->
 <div id="gamepad-diag-modal" class="modal-overlay sub-sub-modal" style="display:none;" onclick="if(event.target===this)closeGamepadDiag();">
     <div class="modal-content" style="width:440px;">

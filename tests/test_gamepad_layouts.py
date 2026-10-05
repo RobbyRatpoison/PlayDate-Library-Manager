@@ -82,3 +82,25 @@ def test_bundled_database_has_the_8bitdo_pad():
     layouts = json.load(open(path))['layouts']
     maps = layouts['2dc8:310b']['maps']
     assert any('lefttrigger:a2' in m and 'righttrigger:a5' in m for m in maps)
+
+
+def test_button_names_are_kept_by_raw_button_number():
+    got = config.normalize_gamepad_layouts({PAD: {'names': {'17': ' Z ', '3': 'C'}}})
+    assert got == {PAD: {'names': {'17': 'Z', '3': 'C'}}}
+
+
+def test_bad_button_names_are_dropped():
+    got = config.normalize_gamepad_layouts({PAD: {'kind': 'standard', 'names': {
+        'x': 'no', '1234': 'no', '-1': 'no', '2': '', '3': '   ', '4': 'a' * 13, '5': 'new\nline', '6': 7, '7': 'ok'}}})
+    assert got == {PAD: {'kind': 'standard', 'names': {'7': 'ok'}}}
+
+
+def test_names_alone_make_a_valid_entry_and_empty_names_do_not():
+    assert config.normalize_gamepad_layouts({PAD: {'names': {'0': 'A'}}}) == {PAD: {'names': {'0': 'A'}}}
+    assert config.normalize_gamepad_layouts({PAD: {'names': {}}}) == {}
+    assert config.normalize_gamepad_layouts({PAD: {'names': ['A']}}) == {}
+
+
+def test_names_are_capped_at_64():
+    many = {str(i): f'b{i}' for i in range(100)}
+    assert len(config.normalize_gamepad_layouts({PAD: {'names': many}})[PAD]['names']) == 64

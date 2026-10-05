@@ -1223,7 +1223,7 @@ DEFAULT_CARD_CLICK_RULES = [
 ]
 
 
-# A controller's saved gamepad layout (gamepad_layout.js): {controller id: {kind, map?, style?}}.
+# A controller's saved gamepad layout (gamepad_layout.js): {controller id: {kind, map?, style?, names?}}.
 # kind 'auto' is the default and is never stored, 'standard' leaves the pad as the browser reports
 # it, 'map' is an SDL mapping string (a database entry, or one a user built in the wizard).
 GAMEPAD_LAYOUT_KINDS = ('standard', 'map')
@@ -1246,6 +1246,14 @@ def normalize_gamepad_layouts(layouts):
                 clean['map'] = rec['map']
         if rec.get('style') in GAMEPAD_LABEL_STYLES:
             clean['style'] = rec['style']
+        # Button names, keyed by raw button number: {'17': 'Z'}
+        names = {}
+        for k, v in (rec['names'].items() if isinstance(rec.get('names'), dict) else []):
+            if (isinstance(k, str) and k.isdigit() and len(k) <= 3 and isinstance(v, str)
+                    and v.strip() and len(v.strip()) <= 12 and v.isprintable() and len(names) < 64):
+                names[k] = v.strip()
+        if names:
+            clean['names'] = names
         if clean:
             out[pad_id] = clean
         if len(out) >= 64:
