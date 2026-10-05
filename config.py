@@ -1424,6 +1424,18 @@ def save_state(updates):
             state["gamepad_repeat_rate_ms"] = max(20, min(1000, int(updates["gamepad_repeat_rate_ms"])))
         if "last_backup_at" in updates:
             state["last_backup_at"] = float(updates["last_backup_at"])
+        # Update-notification bookkeeping (updater.py / plugins check-updates)
+        if "update_seen_version" in updates:
+            state["update_seen_version"] = str(updates["update_seen_version"] or "")[:64]
+        if "update_check_cache" in updates:
+            v = updates["update_check_cache"]
+            state["update_check_cache"] = v if isinstance(v, dict) else {}
+        if "plugin_updates_seen" in updates:
+            v = updates["plugin_updates_seen"]
+            state["plugin_updates_seen"] = {str(k)[:64]: str(x)[:64] for k, x in v.items()} if isinstance(v, dict) else {}
+        if "plugin_update_cache" in updates:
+            v = updates["plugin_update_cache"]
+            state["plugin_update_cache"] = v if isinstance(v, dict) else {}
         if "platform_priority" in updates:
             import re as _re
             _plat_re = _re.compile(r'^[a-z][a-z0-9_]*$')

@@ -832,9 +832,20 @@ def install_plugin_from_github():
 def check_plugin_updates():
     import concurrent.futures
 
-    TTL = 6 * 3600
+    TTL = 24 * 3600   # one GitHub check per plugin per day, persisted across restarts
+    from config import load_state, save_state
+    _st = load_state()
+    if not _plugin_update_cache:
+        _plugin_update_cache.update(_st.get('plugin_update_cache') or {})
+    _seen = _st.get('plugin_updates_seen') or {}
 
     def _check_one(pid):
+        r = _check_one_inner(pid)
+        if r is not None:
+            r['seen'] = bool(r.get('update_available')) and _seen.get(pid) == r.get('latest_version')
+        return r
+
+    def _check_one_inner(pid):
         manifest = plugin_manifest(pid)
         source = manifest.get('source', '')
         if not source:
@@ -845,9 +856,14 @@ def check_plugin_updates():
             return {'id': pid, 'source': source, 'update_available': False, 'latest_version': None, 'error': 'Invalid source in plugin.json'}
 
         cached = _plugin_update_cache.get(pid, {})
-        if cached.get('checked_at') and (time.time() - cached['checked_at']) < TTL:
-            return {'id': pid, 'source': source,
-                    **{k: cached.get(k) for k in ('update_available', 'latest_version', 'requires_core', 'error')}}
+        if cached.get('checked_at') and 0 <= (time.time() - cached['checked_at']) < TTL \
+                and not cached.get('error'):
+            out = {'id': pid, 'source': source,
+                   **{k: cached.get(k) for k in ('update_available', 'latest_version', 'requires_core', 'error')}}
+            if out['update_available'] and out['latest_version']:
+                # The installed version may have changed since this was cached.
+                out['update_available'] = _semver(out['latest_version']) > _semver(manifest.get('version', '0'))
+            return out
 
         try:
             _, tag = _fetch_github_plugin_release(owner, repo)
@@ -911,6 +927,11 @@ def check_plugin_updates():
             except Exception:
                 pass
 
+    # Persist good entries (not failures) so a restart doesn't re-hit GitHub.
+    try:
+        save_state({'plugin_update_cache': {k: v for k, v in _plugin_update_cache.items() if not v.get('error')}})
+    except Exception:
+        pass
     return jsonify(results)
 
 @plugins_bp.route('/api/plugins/launcher-status', methods=['GET'])

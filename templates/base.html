@@ -768,6 +768,17 @@
         function toggleHamburger() {
             document.getElementById('hamburger-menu').classList.toggle('open');
             document.getElementById('update-dot').classList.remove('visible');
+            _recordUpdatesSeen();
+        }
+        // Remember which update/plugin versions the user has now seen, so the
+        // hamburger dot doesn't relight for them on every page load.
+        function _recordUpdatesSeen() {
+            const body = {};
+            if (_updateAvailable && _latestVersion) body.version = _latestVersion;
+            const pend = (window._pendingPluginUpdates || []).filter(p => !p.requires_core);
+            if (pend.length) body.plugins = Object.fromEntries(pend.map(p => [p.id, p.latest_version]));
+            if (!body.version && !body.plugins) return;
+            fetch('/api/update-seen', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }).catch(() => {});
         }
         function closeHamburger() {
             document.getElementById('hamburger-menu').classList.remove('open');
@@ -882,11 +893,12 @@
         let _isPortable = false;
         let _updateCheckBusy = false;
 
-        function _setUpdateAvailable(version, isPortable) {
+        function _setUpdateAvailable(version, isPortable, seen) {
             _updateAvailable = true;
             _latestVersion = version;
             if (isPortable !== undefined) _isPortable = isPortable;
-            document.getElementById('update-dot').classList.add('visible');
+            // The ☰ dot is for news; the "Install Update" dot below stays until installed.
+            if (!seen) document.getElementById('update-dot').classList.add('visible');
             document.getElementById('update-menu-dot').classList.add('visible');
             document.getElementById('update-check-label').textContent = `${_isPortable ? 'Download' : 'Install'} Update (v${version})`;
         }
@@ -1015,7 +1027,7 @@
                     // made a real failure indistinguishable from nothing having happened.
                     status.className = 'hamburger-status error';
                 } else if (data.update_available) {
-                    _setUpdateAvailable(data.latest_version, data.is_portable);
+                    _setUpdateAvailable(data.latest_version, data.is_portable, data.seen);
                     status.textContent = '';
                     status.className = 'hamburger-status';
                 } else if (pu.standalone) {
@@ -1246,7 +1258,7 @@
                 // Plugin updates are checked alongside the core check rather than on
                 // their own separate timer -- one combined "check for updates" concept.
                 if (typeof _checkPluginUpdates === 'function') _checkPluginUpdates();
-                if (data.update_available) { _setUpdateAvailable(data.latest_version, data.is_portable); return; }
+                if (data.update_available) { _setUpdateAvailable(data.latest_version, data.is_portable, data.seen); return; }
                 // Startup check runs after 5s — poll until it completes
                 if (!data.checked) {
                     let polls = 0;
@@ -1255,7 +1267,7 @@
                         try {
                             const r = await fetch('/api/update-status');
                             const d = await r.json();
-                            if (d.update_available) { _setUpdateAvailable(d.latest_version, d.is_portable); clearInterval(poller); }
+                            if (d.update_available) { _setUpdateAvailable(d.latest_version, d.is_portable, d.seen); clearInterval(poller); }
                             else if (d.checked) clearInterval(poller);
                         } catch (e) { clearInterval(poller); }
                     }, 2000);

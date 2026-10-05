@@ -5411,10 +5411,11 @@ async function _checkPluginUpdates() {
         const updates = await r.json();
         let anyStandalone = false;  // installable on its own right now
         let anyGated = false;       // update exists but needs a newer core first
+        let anyUnseen = false;      // a standalone update the user hasn't seen yet
         window._pendingPluginUpdates = [];
         for (const u of updates) {
             if (!u.update_available) continue;
-            if (u.requires_core) anyGated = true; else anyStandalone = true;
+            if (u.requires_core) anyGated = true; else { anyStandalone = true; if (!u.seen) anyUnseen = true; }
             // Keep gated updates in the pending list: the "Update PlayDate &
             // Plugins" flow installs them against the target core version, which
             // clears their min_core_version requirement. Only the standalone
@@ -5450,7 +5451,7 @@ async function _checkPluginUpdates() {
         // A gated plugin update is surfaced through the PlayDate-update prompt
         // instead (which lights this dot on its own when a core update exists);
         // lighting it here too would be a dead end when no core update is available.
-        if (anyStandalone) {
+        if (anyUnseen) {
             document.getElementById('update-dot')?.classList.add('visible');
         }
         return {

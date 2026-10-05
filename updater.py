@@ -172,17 +172,46 @@ def _do_update_check():
             'error': None
         })
         log.info(f"Update check: latest={latest}, current={__build__}, available={available}")
+        from config import save_state
+        save_state({'update_check_cache': {k: v for k, v in _update_cache.items() if k != 'error'}})
     except Exception as e:
         _update_cache.update({'available': False, 'checked_at': time.time(),
                               'error': 'Update check failed (network or GitHub error).'})
         log.warning(f"Update check failed: {e}")
 
 
+UPDATE_CHECK_INTERVAL = 24 * 3600   # at most one real GitHub check per day
+UPDATE_WAKE_INTERVAL = 6 * 3600     # how often the running app re-tests that gate
+
+
+def _maybe_update_check():
+    """Real check only if the last good one is older than UPDATE_CHECK_INTERVAL;
+    otherwise load the saved result into memory (no network)."""
+    from config import load_state, __build__
+    state = load_state()
+    if not state.get('check_for_updates', True):
+        return
+    saved = state.get('update_check_cache') or {}
+    age = time.time() - float(saved.get('checked_at') or 0)
+    if saved.get('latest_version') and 0 <= age < UPDATE_CHECK_INTERVAL:
+        if not _update_cache or _update_cache.get('error'):
+            _update_cache.update(saved)
+            _update_cache['error'] = None
+        # Drop a saved "available" the running build has since caught up with.
+        _update_cache['available'] = bool(saved.get('available')) and \
+            _build_is_newer(saved['latest_version'], __build__)
+        return
+    _do_update_check()
+
+
 def _startup_update_check():
     time.sleep(5)
-    from config import load_state
-    if load_state().get('check_for_updates', True):
-        _do_update_check()
+    while True:
+        try:
+            _maybe_update_check()
+        except Exception as e:
+            log.warning(f"Scheduled update check failed: {e}")
+        time.sleep(UPDATE_WAKE_INTERVAL)
 
 
 @updater_bp.route('/api/update-status')
@@ -198,7 +227,28 @@ def update_status():
         'checked': bool(_update_cache),
         'error': _update_cache.get('error'),
         'is_portable': IS_PORTABLE,
+        'seen': bool(_update_cache.get('latest_version')) and
+                state.get('update_seen_version') == _update_cache.get('latest_version'),
     })
+
+@updater_bp.route('/api/update-seen', methods=['POST'])
+def update_seen():
+    """Record that the user opened the menu while these updates were showing, so
+    the hamburger dot stays off for them on later page loads."""
+    from flask import request
+    from config import save_state, load_state
+    data = request.get_json(silent=True) or {}
+    updates = {}
+    if data.get('version'):
+        updates['update_seen_version'] = data['version']
+    plugins = data.get('plugins')
+    if isinstance(plugins, dict) and plugins:
+        seen = dict(load_state().get('plugin_updates_seen') or {})
+        seen.update(plugins)
+        updates['plugin_updates_seen'] = seen
+    if updates:
+        save_state(updates)
+    return jsonify({'status': 'ok'})
 
 def _flatpak_install_scope(app_id):
     """'--user' or '--system' for the installation of the *running* copy.
@@ -231,7 +281,7 @@ def flatpak_scope():
 
 @updater_bp.route('/api/check-update', methods=['POST'])
 def check_update():
-    from config import __version__, IS_PORTABLE
+    from config import __version__, IS_PORTABLE, load_state
     _do_update_check()
     return jsonify({
         'update_available': _update_cache.get('available', False),
@@ -239,11 +289,15 @@ def check_update():
         'current_version': __version__,
         'error': _update_cache.get('error'),
         'is_portable': IS_PORTABLE,
+        'seen': bool(_update_cache.get('latest_version')) and
+                load_state().get('update_seen_version') == _update_cache.get('latest_version'),
     })
 
 @updater_bp.route('/api/reset-update-cache', methods=['POST'])
 def reset_update_cache():
     _update_cache.clear()
+    from config import save_state
+    save_state({'update_check_cache': {}})
     return jsonify({'status': 'ok'})
 
 @updater_bp.route('/api/perform-update', methods=['POST'])
