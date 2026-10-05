@@ -214,7 +214,7 @@
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
-    const W = { open: false, padId: null, map: '', shape: 'xbox', style: 'xbox', parts: [], dirty: false, sel: null, steps: [], i: -1, rec: {}, base: [],
+    const W = { open: false, padId: null, map: '', fresh: new Set(), shape: 'xbox', style: 'xbox', parts: [], dirty: false, sel: null, steps: [], i: -1, rec: {}, base: [],
                 prev: new Set(), phase: 'listen', after: 'advance', det: null, calmSince: 0, releaseSince: 0, sig: '', lastChange: 0, raf: null, notice: '' };
     const $ = id => document.getElementById(id);
     const rawPad = () => (typeof _firstGamepad === 'function' ? _firstGamepad(true) : null);
@@ -243,11 +243,13 @@
         return rec;
     }
 
-    // Raw buttons and axes already given to another slot.
+    // Raw buttons and axes already given to another slot *in this run*. What the layout in use had for
+    // controls not visited yet does not count: on a pad whose triggers share an axis with a stick, the
+    // control being asked about would otherwise be ignored and the step could never finish.
     function usedBy(exceptKey) {
         const buttons = new Map(), axes = new Map();
         for (const [k, s] of Object.entries(W.rec)) {
-            if (k === exceptKey) continue;
+            if (k === exceptKey || !W.fresh.has(k)) continue;
             if (s.t === 'b') buttons.set(s.i, k); else if (s.t === 'a') axes.set(s.i, k);
         }
         return { buttons, axes };
@@ -364,7 +366,11 @@
     const settled = (v, base) => Math.abs(v - base) < 0.3 || v < -0.9 || Math.abs(v) < 0.3;
 
     function commit(src) {
-        W.rec[stepNow().key] = src;
+        const key = stepNow().key;
+        // A recording wins over what the old layout had on the same button or axis for another control.
+        for (const [k, o] of Object.entries(W.rec)) if (k !== key && !W.fresh.has(k) && o.t === src.t && o.i === src.i && src.t !== 'h') delete W.rec[k];
+        W.rec[key] = src;
+        W.fresh.add(key);
         W.phase = 'release';
         W.after = 'advance';
         W.calmSince = 0;
@@ -634,6 +640,7 @@
         W.steps = stepsFor(W.parts);
         if (!W.steps.length) { toast('Add at least one control to the drawing first.'); return; }
         W.sel = null;
+        W.fresh = new Set();
         W.i = 0;
         beginStep(pad);
     };
