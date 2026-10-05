@@ -678,5 +678,8 @@
         });
     }
 
+    // True while a step is waiting for a button or axis (input.js then stops the pad from navigating).
+    window._gpwRecording = () => W.open && W.i >= 0 && W.i < W.steps.length;
+
     window.PDWizard = { BODIES, derive, slotsOf, stepsFor, diagram, drawingFor, liveUpdate, state: W };
 })();

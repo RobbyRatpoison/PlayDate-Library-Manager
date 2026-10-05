@@ -62,7 +62,7 @@
             // buttons (e.g. Start) independent of the Gamepad API polling that
             // capture mode guards, so it needs its own check here too.
             const gpOpen = id => { const m = document.getElementById(id); return !!m && m.style.display !== 'none' && m.style.display !== ''; };
-            if ((window._gpdLive === true && gpOpen('gamepad-diag-modal')) || gpOpen('gamepad-wizard-modal') || gpOpen('gamepad-names-modal')) return;
+            if ((window._gpdLive === true && gpOpen('gamepad-diag-modal')) || window._gpwRecording?.() || gpOpen('gamepad-names-modal')) return;
             // A focused text field takes priority over closing the modal
             // underneath it — see the identical check in _handleB() for why:
             // gamescope's on-screen keyboard (Steam Deck) dismisses itself on
@@ -2910,7 +2910,9 @@
         // is open, buttons are only reported (they don't navigate), so each one can be watched or
         // recorded. With the live view hidden the pad navigates that screen like any other.
         const isOpen = id => { const m = document.getElementById(id); return !!m && m.style.display !== 'none' && m.style.display !== ''; };
-        const recording = isOpen('gamepad-wizard-modal') || isOpen('gamepad-names-modal');
+        // The layout wizard only reports buttons while a step is waiting for one; its drawing editor and
+        // finished screen are navigated with the pad like any other dialog.
+        const recording = !!window._gpwRecording?.() || isOpen('gamepad-names-modal');
         const liveOn = window._gpdLive === true && isOpen('gamepad-diag-modal');
         if (recording || liveOn) {
             gp.buttons.forEach((btn, i) => {
