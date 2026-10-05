@@ -23,7 +23,7 @@
     // Steam's virtual pad in as window._pdPad. Every other platform --
     // desktop Linux, Windows, macOS, a Deck app launched outside Steam --
     // keeps the full Gamepad API path unchanged.
-    const _DECK_SESSION = window._STEAM_DECK_SESSION === true;
+    const _DECK_SESSION = window._STEAM_DECK_SESSION === true || window._EVDEV_PAD === true;   // true: read the evdev-fed window._pdPad, never the Gamepad API
 
     // Steam Deck/gamescope: while PlayDate is backgrounded (the Steam overlay,
     // the Deck home screen, or an install popup is frontmost), Steam Input can

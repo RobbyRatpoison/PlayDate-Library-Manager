@@ -60,6 +60,8 @@
     window._GAMEPAD_REPEAT_INITIAL_MS  = {{ gamepad_repeat_initial_ms | tojson }};
     window._GAMEPAD_REPEAT_RATE_MS     = {{ gamepad_repeat_rate_ms | tojson }};
     window._STEAM_DECK_SESSION         = {{ steam_deck_session | tojson }};
+    window._EVDEV_PAD                  = {{ evdev_pad_active | tojson }};   // this run reads the controller via evdev (window._pdPad)
+    window._EVDEV_PAD_SETTING          = {{ evdev_gamepad | tojson }};
     window._IN_FLATPAK                 = {{ in_flatpak | tojson }};
     </script>
     <script src="{{ url_for('static', filename='js/input.js') }}?v={{ app_version }}"></script>
@@ -1215,9 +1217,21 @@
             _updateGamepadSuppressLabel();
             savePreference({ gamepad_suppress_on_launch: window._GAMEPAD_SUPPRESS_ON_LAUNCH });
         }
+        function _updateEvdevLabel() {
+            const btn = document.getElementById('gamepad-evdev-btn');
+            if (btn) btn.textContent = 'Read controller directly: ' + (window._EVDEV_PAD_SETTING ? 'ON' : 'OFF');
+        }
+        function toggleEvdevGamepad() {
+            window._EVDEV_PAD_SETTING = !window._EVDEV_PAD_SETTING;
+            _updateEvdevLabel();
+            savePreference({ evdev_gamepad: window._EVDEV_PAD_SETTING });
+            confirmCustom('Reading the controller directly takes effect after PlayDate restarts. Restart now?', 'Restart now', 'Later')
+                .then(ok => { if (ok) _restartPlayDate(); });
+        }
         document.addEventListener('DOMContentLoaded', () => {
             _updateGamepadEnabledLabel();
             _updateGamepadSuppressLabel();
+            _updateEvdevLabel();
         });
 
         (async function initUpdateUI() {

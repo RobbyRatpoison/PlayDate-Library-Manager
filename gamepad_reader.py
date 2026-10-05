@@ -1,8 +1,10 @@
 """
-gamepad_reader.py -- direct evdev gamepad reader for the Steam Deck.
+gamepad_reader.py -- direct evdev gamepad reader.
 
-Only used when PlayDate runs as a Steam shortcut on a Deck
-(config._is_steam_deck_session()). There, WebKit's own gamepad support
+Used on a Steam Deck (config._is_steam_deck_session()) and, as an opt-in
+(Settings > Gamepad > "Read controller directly"), on desktop Linux with the
+GTK renderer, where libmanette's built-in mapping can be wrong for a pad.
+On the Deck, WebKit's own gamepad support
 (libmanette) is blocked from the built-in controller's hidraw node (see
 flatpak/libnohidraw.c) so it can't fight Steam Input over lizard mode --
 which means WebKit's Gamepad API sees nothing. Steam still exposes a
@@ -103,8 +105,25 @@ def _norm(val, rng, signed):
     return f * 2.0 - 1.0 if signed else f
 
 
-def find_gamepad():
-    """Return (path, name) of the first evdev node that looks like a gamepad."""
+_STEAM_VIRTUAL_PAD = 'Microsoft X-Box 360 pad'
+
+
+def _device_ids(fd):
+    """(vendor, product) from EVIOCGID, or (0, 0)."""
+    import fcntl
+    buf = bytearray(8)
+    try:
+        fcntl.ioctl(fd, (2 << 30) | (ord('E') << 8) | 0x02 | (8 << 16), buf)
+    except OSError:
+        return 0, 0
+    _bus, vendor, product, _ver = struct.unpack('HHHH', bytes(buf))
+    return vendor, product
+
+
+def find_gamepad(desktop=False):
+    """Return (path, name) of the first evdev node that looks like a gamepad.
+    On the Deck Steam's virtual pad is preferred; on a desktop it is the last
+    resort (with Steam Input on it duplicates the real pad under another name)."""
     best = None
     for path in sorted(glob.glob('/dev/input/event*'),
                        key=lambda s: int(s.rsplit('event', 1)[1] or 0)):
@@ -121,6 +140,12 @@ def find_gamepad():
             except OSError:
                 name = ''
             if _BTN_SOUTH in _key_caps(fd):
+                if desktop:
+                    if name != _STEAM_VIRTUAL_PAD:
+                        return path, name
+                    if best is None:
+                        best = (path, name)
+                    continue
                 # Prefer Steam's virtual pad if several match.
                 if 'X-Box' in name or 'Xbox' in name or 'X-Box 360' in name:
                     return path, name
@@ -132,9 +157,11 @@ def find_gamepad():
 
 
 class GamepadReader(threading.Thread):
-    def __init__(self, on_state):
+    def __init__(self, on_state, desktop=False):
         super().__init__(daemon=True, name='gamepad-reader')
         self._on_state = on_state
+        self._desktop = desktop
+        self._ident = 'Steam Deck (evdev)'   # the pad's id in the page; a desktop pad uses its real name
         self._stop = threading.Event()
         self._btn = {}     # standard index -> bool
         self._abs = {}     # evdev abs code -> raw int
@@ -188,7 +215,7 @@ class GamepadReader(threading.Thread):
             return round(_norm(ax.get(code, (rng[0] + rng[1]) // 2), rng, True), 3)
         axes = [stick(_ABS_X), stick(_ABS_Y), stick(self._rsx), stick(self._rsy)]
         self._on_state({
-            'id': 'Steam Deck (evdev)',
+            'id': self._ident,
             'mapping': 'standard',
             'connected': True,
             'buttons': buttons,
@@ -200,7 +227,7 @@ class GamepadReader(threading.Thread):
         fmt = 'llHHi'
         sz = struct.calcsize(fmt)
         while not self._stop.is_set():
-            path, name = find_gamepad()
+            path, name = find_gamepad(self._desktop)
             if not path:
                 if self._btn or self._abs:
                     self._btn.clear(); self._abs.clear()
@@ -218,6 +245,10 @@ class GamepadReader(threading.Thread):
                 self._stop.wait(2.0)
                 continue
             self._configure(fd)
+            if self._desktop:
+                # Same shape the Chromium/Qt ids have, so saved layouts and the vendor-based label guess work.
+                vendor, product = _device_ids(fd)
+                self._ident = f'{name} (Vendor: {vendor:04x} Product: {product:04x})'
             last_emit = 0.0
             dirty = False
             try:

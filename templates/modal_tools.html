@@ -1011,6 +1011,10 @@
             <button id="gamepad-suppress-btn" class="settings-item" data-modal-row="1" onclick="toggleGamepadSuppress()">Pause gamepad on launch: ON</button>
             <button id="gamepad-controls-btn" class="settings-item" data-modal-row="2" onclick="openGamepadDependent(openGamepadRemap)">Gamepad Controls</button>
             <button id="gamepad-setup-btn" class="settings-item" data-modal-row="3" onclick="openGamepadDependent(openGamepadDiag)">Gamepad Setup</button>
+            {% if evdev_gamepad_available %}
+            <button id="gamepad-evdev-btn" class="settings-item" data-modal-row="3" onclick="toggleEvdevGamepad()">Read controller directly: OFF</button>
+            <div style="font-size:0.75rem; color:#8f98a0; padding:2px 10px 6px; line-height:1.4;">For a controller whose buttons, d-pad, triggers or sticks are wrong or dead under the GTK renderer. PlayDate reads it from the system itself instead of through the browser, bypassing its built-in mapping. Needs a restart.</div>
+            {% endif %}
         </div>
         <div class="hub-section">
             <div class="hub-section-label">Stick Feel</div>

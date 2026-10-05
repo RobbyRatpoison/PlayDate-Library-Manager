@@ -417,7 +417,7 @@ function describeCustomExprSql(sql) {
 // Elite 2 and the Deck's built-in pad. Used by input.js (BTN_IDX) and the
 // Gamepad Setup/Remap screens (modal_tools.js) so all three agree.
 function pdGamepadXYSwapped() {
-    if (window._STEAM_DECK_SESSION === true) return false;   // evdev path, standard indices
+    if (window._STEAM_DECK_SESSION === true || window._EVDEV_PAD === true) return false;   // evdev path, standard indices
     const ua = navigator.userAgent || '';
     return /Linux|X11/.test(ua) && /AppleWebKit/.test(ua) && !/Chrome|Chromium|QtWebEngine/.test(ua);
 }

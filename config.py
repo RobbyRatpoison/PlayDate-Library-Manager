@@ -456,6 +456,7 @@ DEFAULT_STATE = {
     "auto_downgrade_completed": True,
     "startup_page": "home",
     "renderer": "gtk",
+    "evdev_gamepad": False,   # Linux/GTK: read the controller via evdev instead of the browser (see gamepad_reader.py)
     "tag_similarity_min_library_rate": 2.0,
     "tag_similarity_smoothing_k": 4,
     "tag_similarity_playtime_cap_hours": 60,
@@ -489,6 +490,15 @@ def _current_renderer_display(state):
         return state.get('renderer', 'gtk')
     from updater import _running_flatpak_app_id
     return 'qt' if _running_flatpak_app_id().endswith('.Qt') else 'gtk'
+
+
+def evdev_gamepad_available(state=None):
+    """True when the Gamepad settings should offer "Read controller directly": Linux, not a Steam Deck
+    session (which always reads evdev), and not the Qt renderer (Chromium's own gamepad layer is fine,
+    and the reader's GLib main-loop hand-off only works under GTK)."""
+    if sys.platform != 'linux' or _is_steam_deck_session():
+        return False
+    return _current_renderer_display(state if state is not None else load_state()) != 'qt'
 
 
 def qt_renderer_relevant():
@@ -644,6 +654,9 @@ def inject_config_status():
         app_version=__build__,
         tutorial_seen=config.get('tutorial_seen', False),
         steam_deck_session=_is_steam_deck_session(),
+        evdev_gamepad_available=evdev_gamepad_available(state),
+        evdev_gamepad=bool(state.get('evdev_gamepad', False)),
+        evdev_pad_active=os.environ.get('PLAYDATE_EVDEV_PAD') == '1',
         renderer=_current_renderer_display(state),
         qt_renderer_relevant=qt_renderer_relevant(),
         qt_renderer_available=qt_renderer_available(),
@@ -1443,6 +1456,8 @@ def save_state(updates):
             state["gamepad_enabled"] = bool(updates["gamepad_enabled"])
         if "gamepad_suppress_on_launch" in updates:
             state["gamepad_suppress_on_launch"] = bool(updates["gamepad_suppress_on_launch"])
+        if "evdev_gamepad" in updates:
+            state["evdev_gamepad"] = bool(updates["evdev_gamepad"])
         if "renderer" in updates and updates["renderer"] in ("gtk", "qt"):
             state["renderer"] = updates["renderer"]
         if "button_remaps" in updates:

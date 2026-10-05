@@ -108,6 +108,22 @@ if _WANT_QT:
             except Exception:
                 pass
 
+# ── Optional direct (evdev) gamepad reading on desktop Linux ─────────────────
+# Opt-in (Settings > Gamepad): WebKitGTK hands the page whatever libmanette's built-in mapping makes of a
+# pad, which is wrong for some (an 8BitDo Ultimate 2 reported as "standard" with triggers sharing the
+# sticks' axes and a dead d-pad). With this on, the page reads gamepad_reader.py's pad (window._pdPad,
+# the same path the Steam Deck uses) instead of navigator.getGamepads(). GTK only: the hand-off to the
+# page uses GLib.idle_add, which never fires under Qt's event loop.
+_EVDEV_PAD = False
+if sys.platform == "linux" and not _USE_QT:
+    try:
+        from config import load_state as _load_state_ev, _is_steam_deck_session as _is_deck_ev
+        _EVDEV_PAD = bool(_load_state_ev().get('evdev_gamepad')) and not _is_deck_ev()
+    except Exception:
+        _EVDEV_PAD = False
+if _EVDEV_PAD:
+    os.environ['PLAYDATE_EVDEV_PAD'] = '1'   # read by config.inject_config_status() for the page
+
 # ── Linux WebKit detection — must run before importing webview ────────────────
 # Set PLAYDATE_GTK4=1 to force the GTK4/WebKit6 renderer (useful for testing
 # on systems that have both GTK3 and GTK4 WebKit installed).
@@ -1854,7 +1870,7 @@ if __name__ == '__main__':
     #     means its Gamepad API sees nothing, so input.js reads _pdPad instead.
     try:
         from config import _is_steam_deck_session
-        if _is_steam_deck_session():
+        if _is_steam_deck_session() or _EVDEV_PAD:
             import json as _json
             from gi.repository import GLib as _GPGLib
             from gamepad_reader import GamepadReader
@@ -1891,7 +1907,7 @@ if __name__ == '__main__':
                     _gp_pending['scheduled'] = True
                 _GPGLib.idle_add(_gp_flush)
 
-            _gp_reader = GamepadReader(_push_pad)
+            _gp_reader = GamepadReader(_push_pad, desktop=not _is_steam_deck_session())
 
             def _start_gp_reader():
                 if not _gp_reader.is_alive():
@@ -1901,7 +1917,7 @@ if __name__ == '__main__':
                         pass  # already started (page reload fires 'loaded' again)
 
             window.events.loaded += _start_gp_reader
-            log.info("Steam Deck session: evdev gamepad reader armed")
+            log.info("%s: evdev gamepad reader armed", "Steam Deck session" if _is_steam_deck_session() else "Direct gamepad reading")
     except Exception as e:
         log.warning(f"Gamepad reader setup failed: {e}")
 

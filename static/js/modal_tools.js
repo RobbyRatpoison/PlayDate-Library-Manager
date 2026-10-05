@@ -6134,7 +6134,7 @@ function _faceButtonColor(physIdx, gpId) {
 // raw = true skips pdStandardizeGamepad(): Diagnostics shows the pad as the browser
 // reports it next to what the app makes of it.
 function _firstGamepad(raw) {
-    if (window._STEAM_DECK_SESSION) {
+    if (window._STEAM_DECK_SESSION || window._EVDEV_PAD) {
         return (window._pdPad && window._pdPad.connected) ? window._pdPad : null;
     }
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -6197,7 +6197,7 @@ const _GPD_LAYOUT_STATUS = {
     standard: () => 'Using the pad as the browser reports it (your choice)',
     mismatch: () => "Your saved layout doesn't fit this pad, so the browser's own order is used",
     none: () => 'No layout change needed: using the pad as the browser reports it',
-    browser: () => 'The browser already maps this controller, so no layout change is needed',
+    browser: () => window._EVDEV_PAD ? 'Read directly from the system, so no layout change is needed' : 'The browser already maps this controller, so no layout change is needed',
 };
 
 function _gpdRenderLayout(rawGp) {
