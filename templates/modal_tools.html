@@ -1203,9 +1203,10 @@ window._TUNE_INIT = {{ {
             <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:10px; line-height:1.5;">Pick the shape and button names that match your controller, so the drawing looks like it. You will then be asked to press each control in turn. Anything you skip keeps its current setting.</div>
             <div id="gpw-setup-diagram" style="margin-bottom:10px;"></div>
             <div style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Shape</div>
-            <div style="display:flex; gap:6px; margin-bottom:10px;">
+            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
                 <button id="gpw-shape-xbox" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('xbox')" style="font-size:0.8rem;">Xbox-style (offset sticks)</button>
                 <button id="gpw-shape-ps" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('ps')" style="font-size:0.8rem;">PlayStation-style (even sticks)</button>
+                <button id="gpw-shape-retro" class="nav-btn" data-modal-row="0" onclick="gpwSetShape('retro')" style="font-size:0.8rem;">Retro pad (d-pad, no sticks)</button>
             </div>
             <div style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Button names</div>
             <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">

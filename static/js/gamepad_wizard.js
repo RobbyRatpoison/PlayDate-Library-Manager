@@ -12,7 +12,7 @@
     // ── Steps ─────────────────────────────────────────────────────────────────
     // id = the SDL field it records; hl = the controls highlighted on the drawing.
     const FACE = (id, hl, text, hint) => ({ id, kind: 'button', hl: [hl], text, hint });
-    const STEPS = [
+    const ALL_STEPS = [
         FACE('a', 'a', 'Press the bottom face button', 'A on Xbox, ✕ on PlayStation, B on Nintendo'),
         FACE('b', 'b', 'Press the right face button', 'B on Xbox, ○ on PlayStation, A on Nintendo'),
         FACE('x', 'x', 'Press the left face button', 'X on Xbox, □ on PlayStation, Y on Nintendo'),
@@ -35,6 +35,17 @@
         { id: 'start', kind: 'button', hl: ['start'], text: 'Press the small button right of center', hint: 'Start, Options or Plus' },
         { id: 'guide', kind: 'button', hl: ['guide'], text: 'Press the center logo button, or skip if there is none', hint: 'Guide, PS or Home' },
     ];
+    // A retro pad (NES, SNES, Genesis, Saturn...) has no sticks, analog triggers or stick clicks, and with up to six
+    // face buttons a position doesn't say which one should confirm: it asks for what each should do instead.
+    const RETRO_FACE_TEXT = {
+        a: 'Press the button you want to use to confirm', b: 'Press the button you want to use to go back or cancel',
+        x: 'Press the button you want to use to open a game\'s menu', y: 'Press the button you want to use to edit a game',
+    };
+    function stepsFor(shape) {
+        if (shape !== 'retro') return ALL_STEPS;
+        return ALL_STEPS.filter(st => !['trigger', 'stick'].includes(st.kind) && !['leftstick', 'rightstick', 'guide'].includes(st.id))
+            .map(st => RETRO_FACE_TEXT[st.id] ? { ...st, text: RETRO_FACE_TEXT[st.id], hint: 'Any of the face buttons', hl: ['f1', 'f2', 'f3', 'f4', 'f5', 'f6'] } : st);
+    }
     const FIELD_LABEL = { a: 'the bottom face button', b: 'the right face button', x: 'the left face button', y: 'the top face button',
         leftshoulder: 'the left bumper', rightshoulder: 'the right bumper', leftstick: 'the left stick click', rightstick: 'the right stick click',
         back: 'the left center button', start: 'the right center button', guide: 'the center button',
@@ -58,7 +69,24 @@
         ps: { a: '#3a7bd5', b: '#e0393e', x: '#e05fa0', y: '#3bb143' },
     };
 
+    // Retro pad: d-pad on the left, two rows of three face buttons, two shoulder buttons.
+    function retroDiagram(hl) {
+        const g = (key, inner) => `<g class="gpw-ctl${hl.has(key) ? ' gpw-hl' : ''}">${inner}</g>`;
+        const circle = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}"/>`;
+        const rect = (x, y, w, h, r = 4) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}"/>`;
+        const faces = [[236, 100], [276, 100], [316, 100], [236, 140], [276, 140], [316, 140]]
+            .map(([x, y], i) => g('f' + (i + 1), circle(x, y, 12))).join('');
+        return `<svg class="gpw-svg" viewBox="0 0 400 244" xmlns="${SVG_NS}" role="img" aria-label="Retro controller drawing">` +
+            `<path class="gpw-body" d="M44,70 Q44,44 76,44 L324,44 Q356,44 356,70 L356,170 Q356,212 316,212 L84,212 Q44,212 44,170 Z"/>` +
+            g('lb', rect(60, 24, 80, 14)) + g('rb', rect(260, 24, 80, 14)) +
+            g('dpup', rect(96, 76, 14, 18, 3)) + g('dpdown', rect(96, 120, 14, 18, 3)) +
+            g('dpleft', rect(74, 98, 18, 14, 3)) + g('dpright', rect(114, 98, 18, 14, 3)) +
+            faces + g('back', circle(172, 176, 7)) + g('start', circle(228, 176, 7)) +
+            `</svg>`;
+    }
+
     function diagram(shape, style, highlight) {
+        if (shape === 'retro') return retroDiagram(new Set(highlight || []));
         const s = SHAPES[shape] || SHAPES.xbox, hl = new Set(highlight || []);
         const g = (key, inner) => `<g class="gpw-ctl${hl.has(key) ? ' gpw-hl' : ''}">${inner}</g>`;
         const circle = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}"/>`;
@@ -85,11 +113,11 @@
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
-    const W = { open: false, padId: null, shape: 'xbox', style: 'xbox', i: -1, rec: {}, base: [], prev: new Set(),
+    const W = { open: false, padId: null, shape: 'xbox', style: 'xbox', steps: ALL_STEPS, i: -1, rec: {}, base: [], prev: new Set(),
                 phase: 'listen', after: 'advance', det: null, calmSince: 0, releaseSince: 0, sig: '', lastChange: 0, raf: null, notice: '' };
     const $ = id => document.getElementById(id);
     const rawPad = () => (typeof _firstGamepad === 'function' ? _firstGamepad(true) : null);
-    const stepNow = () => STEPS[W.i];
+    const stepNow = () => W.steps[W.i];
 
     function styleFor(id) {
         const saved = (window._GAMEPAD_LAYOUTS || {})[id];
@@ -131,20 +159,20 @@
     function render() {
         const stepsView = W.i >= 0;
         showView(stepsView ? 'steps' : 'setup');
-        const done = W.i >= STEPS.length;
+        const done = W.i >= W.steps.length;
         $('gpw-back').style.display = stepsView && W.i > 0 ? '' : 'none';
         $('gpw-skip').style.display = stepsView && !done ? '' : 'none';
         $('gpw-save').style.display = stepsView ? '' : 'none';
         $('gpw-start').style.display = stepsView ? 'none' : '';
         if (!stepsView) {
             $('gpw-setup-diagram').innerHTML = diagram(W.shape, W.style, []);
-            for (const key of ['xbox', 'ps']) $('gpw-shape-' + key).classList.toggle('gpw-on', W.shape === key);
+            for (const key of ['xbox', 'ps', 'retro']) $('gpw-shape-' + key).classList.toggle('gpw-on', W.shape === key);
             for (const key of ['xbox', 'ps', 'nintendo', 'other']) $('gpw-style-' + key).classList.toggle('gpw-on', W.style === key);
             return;
         }
         const step = done ? null : stepNow();
         $('gpw-diagram').innerHTML = diagram(W.shape, W.style, step ? step.hl : []);
-        $('gpw-progress').textContent = done ? 'All steps done' : `Step ${W.i + 1} of ${STEPS.length}`;
+        $('gpw-progress').textContent = done ? 'All steps done' : `Step ${W.i + 1} of ${W.steps.length}`;
         $('gpw-caption').textContent = done ? 'That is every control. Save to use this layout.' : step.text;
         $('gpw-hint').textContent = done ? '' : (step.hint || '');
         const have = step && W.rec[step.id];
@@ -186,7 +214,7 @@
         notice('Got it. Let go.');
     }
 
-    function advance(pad) { W.i++; if (W.i >= STEPS.length) { W.phase = 'done'; render(); } else beginStep(pad); }
+    function advance(pad) { W.i++; if (W.i >= W.steps.length) { W.phase = 'done'; render(); } else beginStep(pad); }
 
     // The axis that moved furthest from where it started, not already used by another control.
     // restReports: an axis that has never moved reads 0, and when it first reports it often jumps
@@ -269,7 +297,7 @@
 
     function tick() {
         W.raf = requestAnimationFrame(tick);
-        if (!W.open || W.i < 0 || W.i >= STEPS.length) return;
+        if (!W.open || W.i < 0 || W.i >= W.steps.length) return;
         const pad = rawPad();
         if (!pad || pad.id !== W.padId) { notice('Controller not detected. Press a button on it.'); return; }
         const t = performance.now();
@@ -323,12 +351,13 @@
     window.gpwStart = function () {
         const pad = rawPad();
         if (!pad) return;
+        W.steps = stepsFor(W.shape);
         W.i = 0;
         beginStep(pad);
     };
 
-    window.gpwSkip = function () { const pad = rawPad(); if (pad && W.i < STEPS.length) advance(pad); };
-    window.gpwBack = function () { const pad = rawPad(); if (pad && W.i > 0) { W.i = Math.min(W.i, STEPS.length) - 1; beginStep(pad); } };
+    window.gpwSkip = function () { const pad = rawPad(); if (pad && W.i < W.steps.length) advance(pad); };
+    window.gpwBack = function () { const pad = rawPad(); if (pad && W.i > 0) { W.i = Math.min(W.i, W.steps.length) - 1; beginStep(pad); } };
 
     window.gpwSave = function () {
         const pad = rawPad();
@@ -348,5 +377,5 @@
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && W.open) { e.stopPropagation(); window.closeGamepadWizard(); } }, true);
 
     // Exposed for tests.
-    window.PDWizard = { STEPS, diagram, recFromMap, mapFromRec, state: W };
+    window.PDWizard = { stepsFor, diagram, recFromMap, mapFromRec, state: W };
 })();
