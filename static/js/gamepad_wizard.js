@@ -412,11 +412,18 @@
         // Once the d-pad is a hat, its two axes are not a stick or trigger (but the d-pad steps still read them).
         if (step.kind !== 'dpad' && hatHasBeenSet()) { skipAxes.add(pad.axes.length - 2); skipAxes.add(pad.axes.length - 1); }
 
+        // Some pads move the same axis for two controls (a trigger that also moves a stick axis). When nothing
+        // free moves, an axis another control already took is accepted rather than leaving the step stuck.
+        const reuse = new Set();   // axes to ignore in that second pass: the free ones (already tried) and a hat
+        for (let i = 0; i < pad.axes.length; i++) if (!used.axes.has(i)) reuse.add(i);
+        if (step.kind !== 'dpad' && hatHasBeenSet()) { reuse.add(pad.axes.length - 2); reuse.add(pad.axes.length - 1); }
+        const moved = (thr, rest) => movedAxis(pad, thr, skipAxes, rest) || (used.axes.size ? movedAxis(pad, thr, reuse, rest) : null);
+
         if (step.kind === 'stick') {
-            const m = movedAxis(pad, 0.6, skipAxes);
+            const m = moved(0.6);
             if (m) commit({ t: 'a', i: m.i, half: 0, inv: m.d < 0, mask: 0 });   // right and down read positive on a normal axis
         } else if (step.kind === 'trigger') {
-            const m = movedAxis(pad, 0.5, skipAxes, true);
+            const m = moved(0.5, true);
             if (m) { W.det = { axis: m.i, sign: m.d > 0 ? 1 : -1, peak: m.v }; W.phase = 'trigger'; notice('Now let go.'); }
         } else if (step.kind === 'dpad') {
             const m = movedAxis(pad, 0.5, skipAxes);
