@@ -169,6 +169,16 @@
         return score;
     }
 
+    // The mapping Auto would pick for this pad, ignoring any saved choice (null when Auto changes nothing).
+    function autoMap(gp) {
+        if (vendorProduct(gp.id) && db) {
+            const cands = candidates(gp);
+            if (cands.length === 1) return cands[0].map;
+            if (cands.length > 1) return cands.map(c => ({ c, s: restScore(c.layout, gp) })).sort((a, b) => b.s - a.s)[0].c.map;
+        }
+        return looksXboxRaw(gp) ? XBOX_RAW : null;
+    }
+
     function resolve(gp) {
         const key = gp.id + '#' + gp.index;
         const hit = cache.get(key);
@@ -237,11 +247,16 @@
 
     // For the Diagnostics screen: what is in use and what could be chosen instead.
     window.PDLayout = {
-        XBOX_RAW, parse, fits, apply, vendorProduct, invalidate, loadDb,
+        XBOX_RAW, parse, fits,
+        // Two mapping strings that feed every standard control from the same source (field order and spelling aside).
+        sameMap(a, b) {
+            const la = a && parse(a), lb = b && parse(b);
+            return !!la && !!lb && JSON.stringify([la.btn, la.ax]) === JSON.stringify([lb.btn, lb.ax]);
+        }, apply, vendorProduct, invalidate, loadDb,
         info(gp) {
             if (vendorProduct(gp.id)) loadDb();   // the choices come from the database even when a saved one is in use
             const r = resolve(gp);
-            return { source: r.source, map: r.map || null, name: r.name || null,
+            return { source: r.source, map: r.map || null, name: r.name || null, autoMap: autoMap(gp),
                      candidates: candidates(gp).map(c => ({ name: c.name, map: c.map })),
                      xboxFits: !!fits(parse(XBOX_RAW), gp) };
         },

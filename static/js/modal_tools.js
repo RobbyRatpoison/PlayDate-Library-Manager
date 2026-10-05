@@ -6085,9 +6085,10 @@ const _BTN_LABEL_SETS = { xbox: BTN_LABELS, ps: BTN_LABELS_PS, nintendo: BTN_LAB
 
 // Which naming a pad gets: the user's saved choice (Gamepad Setup, or the layout wizard),
 // else a guess from the vendor id or name.
-function _labelStyleFor(id) {
+// ignoreSaved = true gives the guess from the vendor id alone, whatever the user picked.
+function _labelStyleFor(id, ignoreSaved) {
     const saved = (window._GAMEPAD_LAYOUTS || {})[id];
-    if (saved && _BTN_LABEL_SETS[saved.style]) return saved.style;
+    if (!ignoreSaved && saved && _BTN_LABEL_SETS[saved.style]) return saved.style;
     if (_isPlayStationPad(id)) return 'ps';
     if (/057e|nintendo|switch|joy-?con/i.test(id || '')) return 'nintendo';
     return 'xbox';
@@ -6208,19 +6209,21 @@ function _gpdRenderLayout(rawGp) {
     for (const id of ['gpd-layout-status', 'gpd-layout-choices', 'gpd-layout-help']) document.getElementById(id).style.display = isStd ? 'none' : (id === 'gpd-layout-choices' ? 'flex' : '');
     const info = isStd ? { source: 'none', map: null, candidates: [], xboxFits: false } : PDLayout.info(rawGp);
     const saved = (window._GAMEPAD_LAYOUTS || {})[rawGp.id] || null;
-    const sig = [rawGp.id, info.source, info.map, info.candidates.length, info.xboxFits, saved && saved.kind, saved && saved.map, saved && saved.style].join('|');
+    const sig = [rawGp.id, info.source, info.map, info.candidates.length, info.autoMap, info.xboxFits, saved && saved.kind, saved && saved.map, saved && saved.style].join('|');
     if (sig === _gpdLayoutSig) return;
     _gpdLayoutSig = sig;
     _gpdLayoutPadId = rawGp.id;
     section.style.display = '';
 
+    // Only choices that change something: a database layout or the Xbox-style order that Auto already
+    // resolves to would just repeat Auto. Standard is kept only for someone who already chose it.
     const choices = [{ label: 'Auto', rec: { kind: 'auto' }, on: !saved || !saved.kind }];
-    choices.push({ label: 'Standard (as reported)', rec: { kind: 'standard' }, on: !!saved && saved.kind === 'standard' });
-    info.candidates.forEach((c, i) => choices.push({
-        label: info.candidates.length > 1 ? `${c.name} (layout ${i + 1})` : c.name,
+    if (saved && saved.kind === 'standard') choices.push({ label: 'Standard (as reported)', rec: { kind: 'standard' }, on: true });
+    info.candidates.filter(c => !PDLayout.sameMap(c.map, info.autoMap)).forEach((c, i, others) => choices.push({
+        label: others.length > 1 ? `${c.name} (layout ${i + 1})` : c.name,
         rec: { kind: 'map', map: c.map }, on: !!saved && saved.kind === 'map' && saved.map === c.map,
     }));
-    if (info.xboxFits) choices.push({ label: 'Xbox-style order', rec: { kind: 'map', map: PDLayout.XBOX_RAW }, on: !!saved && saved.kind === 'map' && saved.map === PDLayout.XBOX_RAW });
+    if (info.xboxFits && !PDLayout.sameMap(PDLayout.XBOX_RAW, info.autoMap)) choices.push({ label: 'Xbox-style order', rec: { kind: 'map', map: PDLayout.XBOX_RAW }, on: !!saved && saved.kind === 'map' && saved.map === PDLayout.XBOX_RAW });
     if (saved && saved.kind === 'map' && !choices.some(c => c.on)) choices.push({ label: 'Custom (saved)', rec: saved, on: true });
     choices.push({ label: 'Set up custom layout...', action: 'wizard', on: false });
     _gpdLayoutChoices = choices;
@@ -6232,10 +6235,11 @@ function _gpdRenderLayout(rawGp) {
         `style="font-size:0.78rem; padding:3px 10px;${c.on ? ' border-color:var(--accent);' : ''}">${c.on ? '&#10003; ' : ''}${escHtml(c.label)}</button>`
     ).join('');
 
-    // Button names: Auto guesses from the vendor; the others are the user's pick.
-    const style = saved && saved.style ? saved.style : 'auto';
-    const guess = { xbox: 'Xbox', ps: 'PlayStation', nintendo: 'Nintendo', other: 'Other' }[_labelStyleFor(rawGp.id)];
-    document.getElementById('gpd-style-choices').innerHTML = [['auto', `Auto (${guess})`], ['xbox', 'Xbox'], ['ps', 'PlayStation'], ['nintendo', 'Nintendo'], ['other', 'Other']].map(([key, label]) =>
+    // Button names: the guess from the vendor id is highlighted until another style is picked; picking
+    // the guess again goes back to guessing.
+    const guessKey = _labelStyleFor(rawGp.id, true);
+    const style = saved && saved.style ? saved.style : guessKey;
+    document.getElementById('gpd-style-choices').innerHTML = [['xbox', 'Xbox'], ['ps', 'PlayStation'], ['nintendo', 'Nintendo'], ['other', 'Other']].map(([key, label]) =>
         `<button class="nav-btn" data-modal-row="0" onclick="gpdPickStyle('${key}')" ` +
         `style="font-size:0.78rem; padding:3px 10px;${key === style ? ' border-color:var(--accent);' : ''}">${key === style ? '&#10003; ' : ''}${escHtml(label)}</button>`
     ).join('') + `<button class="nav-btn" data-modal-row="0" onclick="gpdOpenNames()" style="font-size:0.78rem; padding:3px 10px;">Rename buttons...</button>`;
@@ -6307,7 +6311,7 @@ document.addEventListener('keydown', e => {
 
 function gpdPickStyle(style) {
     if (!window.PDLayout || !_gpdLayoutPadId) return;
-    PDLayout.setStyle(_gpdLayoutPadId, style);
+    PDLayout.setStyle(_gpdLayoutPadId, style === _labelStyleFor(_gpdLayoutPadId, true) ? 'auto' : style);
     _gpdLayoutSig = '';
 }
 
