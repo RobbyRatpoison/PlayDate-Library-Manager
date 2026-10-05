@@ -138,6 +138,12 @@
         xbox: { a: '#3bb143', b: '#e0393e', x: '#3a7bd5', y: '#f4c20d' },
         ps: { a: '#3a7bd5', b: '#e0393e', x: '#e05fa0', y: '#3bb143' },
     };
+    const PS_SYMBOLS = {
+        a: (x, y) => `M${x - 4},${y - 4}L${x + 4},${y + 4}M${x + 4},${y - 4}L${x - 4},${y + 4}`,            // cross
+        b: (x, y) => `M${x - 5},${y}a5,5 0 1,0 10,0a5,5 0 1,0 -10,0`,                                    // circle
+        x: (x, y) => `M${x - 4},${y - 4}h8v8h-8Z`,                                                        // square
+        y: (x, y) => `M${x},${y - 5}L${x + 5},${y + 3.5}L${x - 5},${y + 3.5}Z`,                          // triangle
+    };
     const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     // drawing = { shape, parts }; highlight = keys ('p3', 'p3.up') to pulse; opts.selected = part index.
@@ -171,9 +177,13 @@
             } else if (p.type === 'center') {
                 inner = g(k, circle(x, y, 6), btnAttr(d, p));
             } else {   // face, other
-                const label = p.label || (p.type === 'face' && p.role ? (FACE_LABELS[style] || {})[p.role] || '' : '');
-                const color = !p.label && p.type === 'face' && p.role ? (FACE_COLORS[style] || {})[p.role] : null;
-                inner = g(k, circle(x, y, 10) + (label ? `<text class="gpw-lbl" x="${x}" y="${y + 4}" text-anchor="middle"${color ? ` style="fill:${color}"` : ''}>${esc(label)}</text>` : ''), btnAttr(d, p));
+                const role = p.type === 'face' && !p.label ? p.role : null;
+                const label = p.label || (role ? (FACE_LABELS[style] || {})[role] || '' : '');
+                const color = role ? (FACE_COLORS[style] || {})[role] : null;
+                // PlayStation symbols are drawn as shapes: font glyphs of them differ in size and baseline and look small and off-centre.
+                const symbol = style === 'ps' && role ? PS_SYMBOLS[role](x, y) : null;
+                inner = g(k, circle(x, y, 10) + (symbol ? `<path class="gpw-sym" d="${symbol}" style="stroke:${color}"/>` :
+                    label ? `<text class="gpw-lbl" x="${x}" y="${y + 4}" text-anchor="middle"${color ? ` style="fill:${color}"` : ''}>${esc(label)}</text>` : ''), btnAttr(d, p));
             }
             return `<g class="gpw-part${opts.selected === i ? ' gpw-sel' : ''}" data-part="${i}">${inner}</g>`;
         }).join('');
