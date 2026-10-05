@@ -277,7 +277,7 @@
             if (typeof savePreference === 'function') savePreference({ gamepad_layouts: all });
         },
         // Remember a choice for this controller: { kind: 'auto' | 'standard' | 'map', map?, style? }.
-        // The button-label style is kept when a later choice doesn't name one.
+        // The button-label style and names are kept when a later choice doesn't name one.
         save(id, choice) {
             const pad = connectedPad(id);
             const before = pad ? rawNumbers(pad) : null;
@@ -287,8 +287,8 @@
             const prev = all[id] || {};
             if (rec.style === undefined && prev.style) rec.style = prev.style;
             if (rec.names === undefined && prev.names) rec.names = prev.names;
-            if (rec.shape === undefined && prev.shape) rec.shape = prev.shape;
-            if (rec.parts === undefined && prev.parts) rec.parts = prev.parts;
+            // The drawing (shape + parts) is not carried over: it belongs to the layout it was recorded for,
+            // so picking another layout (Auto, a database entry) goes back to the default drawing.
             if (!rec.kind && !rec.style && !rec.names && !rec.shape && !rec.parts) delete all[id]; else all[id] = rec;
             window._GAMEPAD_LAYOUTS = all;
             invalidate();
