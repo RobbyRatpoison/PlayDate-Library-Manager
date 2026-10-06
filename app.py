@@ -172,6 +172,27 @@ def create_app(template_folder=None, static_folder=None):
             response.headers['Access-Control-Allow-Private-Network'] = 'true'
         return response
 
+    # ── Update rollback: "this version really started" ───────────────────────
+    # The first real page served to the window (not the __ready__ probe or the
+    # splash) proves the update works; rollback.py's watchdog stops supervising
+    # once pending.json is gone. See rollback.py.
+    import rollback as _rollback
+    from config import BASE_DIR as _RB_BASE
+    try:
+        _rollback.housekeeping(_RB_BASE)
+    except Exception as _e:
+        log.warning("rollback housekeeping failed: %s", _e)
+    _rb_state = {'done': not _rollback.read_pending(_RB_BASE)}
+
+    @app.after_request
+    def _rollback_healthy(response):
+        if (not _rb_state['done'] and response.status_code == 200
+                and request.path in ('/', '/library', '/pick')
+                and response.mimetype == 'text/html'):
+            _rb_state['done'] = True
+            threading.Thread(target=_rollback.mark_healthy, args=(_RB_BASE,), daemon=True).start()
+        return response
+
     # ── User-data static files ────────────────────────────────────────────────
     # When frozen by PyInstaller, Flask's static_folder points into the bundle
     # (sys._MEIPASS), but downloaded covers and the user background are written

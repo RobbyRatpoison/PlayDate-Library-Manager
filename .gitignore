@@ -95,3 +95,6 @@ release.py
 # of the shipped app or meant to be reviewed/shipped as source.
 tools/debug/
 tools/gen_background.py
+
+# --- Update rollback snapshot (rollback.py) ---
+.rollback/

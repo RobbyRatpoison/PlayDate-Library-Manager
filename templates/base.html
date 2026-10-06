@@ -1399,6 +1399,24 @@
     </script>
 
     <script>
+    // An update that failed to start was rolled back (rollback.py): say so once.
+    (function () {
+        if (!_configExists) return;
+        fetch('/api/rollback-notice').then(r => r.json()).then(data => {
+            if (!data.show) return;
+            const msg = 'The update to ' + (data.from_version || 'the new version') +
+                ' failed, so PlayDate went back to ' + (data.to_version || 'your previous version') +
+                '. Your library is unchanged. That version won’t be offered again; a newer one will. ' +
+                'Sending the log helps get it fixed.';
+            Promise.resolve(window.confirmCustom(msg, 'Send Log', 'Close')).then(send => {
+                fetch('/api/rollback-notice/dismiss', { method: 'POST' }).catch(() => {});
+                if (send && typeof openSendLogModal === 'function') openSendLogModal();
+            });
+        }).catch(() => {});
+    })();
+    </script>
+
+    <script>
     (function () {
         if (!_configExists) return;
         const banner = document.getElementById('notice-banner');

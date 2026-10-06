@@ -58,6 +58,9 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 [Files]
 Source: "dist\PlayDate\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\.rollback"
+
 [Icons]
 Name: "{group}\{#AppName}";         FileName: "{app}\{#AppExeName}"
 Name: "{group}\Uninstall PlayDate"; FileName: "{uninstallexe}"

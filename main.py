@@ -10,6 +10,14 @@ import sys
 import threading
 import time
 
+# Update-rollback watchdog (Windows): the old exe, copied aside before an
+# update, runs itself with this flag. Must come before anything that opens the
+# log or touches the app's own paths. See rollback.py.
+if len(sys.argv) > 1 and sys.argv[1] == '--pd-watchdog':
+    import rollback
+    rollback.watchdog_main(sys.argv[2:])
+    sys.exit(0)
+
 # ── PyInstaller frozen-path fix ───────────────────────────────────────────────
 # When running as a bundled .exe, sys._MEIPASS points to the folder where
 # PyInstaller extracted everything. We need Flask to find templates and static

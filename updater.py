@@ -1,9 +1,11 @@
 """Self-update: GitHub release polling and applying the update in place
 (Windows installer download, Flatpak bundle reinstall, or source zip
 extraction + pip install, depending on how PlayDate is running)."""
+import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -11,6 +13,7 @@ import time
 
 from flask import Blueprint, jsonify
 
+import rollback
 from config import BASE_DIR
 from runners.sandbox import IN_FLATPAK, host_run, host_popen
 
@@ -89,6 +92,27 @@ def _asset_this_install_needs_is_missing(installer_url, flatpak_url, zipball_url
     return not zipball_url  # source install
 
 
+def _is_failed_version(version):
+    """True for a version an earlier update rolled back from: don't offer the
+    same broken build again (a newer one is offered as usual)."""
+    return version in rollback.failed_versions(BASE_DIR)
+
+
+@updater_bp.route('/api/rollback-notice')
+def rollback_notice():
+    n = rollback.read_notice(BASE_DIR)
+    if not n:
+        return jsonify({'show': False})
+    return jsonify({'show': True, 'from_version': n.get('from_version') or '',
+                    'to_version': n.get('to_version') or ''})
+
+
+@updater_bp.route('/api/rollback-notice/dismiss', methods=['POST'])
+def rollback_notice_dismiss():
+    rollback.clear_notice(BASE_DIR)
+    return jsonify({'status': 'ok'})
+
+
 def _do_update_check():
     """Hit the GitHub releases API and populate _update_cache. Thread-safe."""
     from config import __build__, load_state
@@ -127,7 +151,7 @@ def _do_update_check():
             data = resp.json()
         tag = data.get('tag_name', '')
         latest = tag.lstrip('v')
-        available = _build_is_newer(latest, __build__)
+        available = _build_is_newer(latest, __build__) and not _is_failed_version(latest)
 
         # Two Flatpak variants (GTK default, Qt alternate) can both be
         # attached to the same release -- CI names the Qt one with a "-qt"
@@ -199,7 +223,8 @@ def _maybe_update_check():
             _update_cache['error'] = None
         # Drop a saved "available" the running build has since caught up with.
         _update_cache['available'] = bool(saved.get('available')) and \
-            _build_is_newer(saved['latest_version'], __build__)
+            _build_is_newer(saved['latest_version'], __build__) and \
+            not _is_failed_version(saved['latest_version'])
         return
     _do_update_check()
 
@@ -300,9 +325,53 @@ def reset_update_cache():
     save_state({'update_check_cache': {}})
     return jsonify({'status': 'ok'})
 
+def _rb_begin(kind, snapshot_code):
+    """Snapshot what the update will replace and mark it in flight. Returns
+    True when a rollback is possible. Any failure here is logged and the update
+    goes ahead unprotected: a missing safety net must not block updating."""
+    from config import __build__
+    try:
+        os.makedirs(rollback.rb_dir(BASE_DIR), exist_ok=True)
+        rollback.backup_data(BASE_DIR)
+        if snapshot_code() is False:
+            raise RuntimeError('no code snapshot taken')
+        if kind == 'source':
+            # The zip is about to replace rollback.py; the watchdog runs this copy.
+            shutil.copy2(os.path.join(os.path.dirname(os.path.abspath(rollback.__file__)), 'rollback.py'),
+                         os.path.join(rollback.rb_dir(BASE_DIR), 'watchdog.py'))
+        rollback.begin(BASE_DIR, kind, __build__, _update_cache.get('latest_version') or '')
+        return True
+    except Exception:
+        log.warning("Update rollback unavailable; updating without a safety net", exc_info=True)
+        rollback.abort(BASE_DIR)
+        return False
+
+
+def _rb_flatpak_export_start(app_id):
+    """Start `flatpak build-bundle` of the installed version into
+    .rollback/old.flatpak on the host. Returns the Popen, or None if it
+    couldn't be started."""
+    try:
+        data_home = host_run(['sh', '-c', 'printf %s "${XDG_DATA_HOME:-$HOME/.local/share}"'],
+                             capture_output=True, text=True).stdout.strip()
+        ref = host_run(['flatpak', 'info', '--user', '--show-ref', app_id],
+                       capture_output=True, text=True).stdout.strip()
+        branch = ref.split('/')[3] if ref.count('/') == 3 else 'master'
+        os.makedirs(rollback.rb_dir(BASE_DIR), exist_ok=True)
+        out = os.path.join(rollback.rb_dir(BASE_DIR), 'old.flatpak')
+        if os.path.exists(out):
+            os.remove(out)
+        return host_popen(['flatpak', 'build-bundle', os.path.join(data_home, 'flatpak', 'repo'),
+                           out, app_id, branch],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        log.warning("Could not start exporting the installed version", exc_info=True)
+        return None
+
+
 @updater_bp.route('/api/perform-update', methods=['POST'])
 def perform_update():
-    from config import IS_PORTABLE
+    from config import IS_PORTABLE, __build__
     if IS_PORTABLE:
         return jsonify({'status': 'error', 'message': 'Portable builds update manually — download the new zip from GitHub.'}), 400
     if not _update_cache.get('available'):
@@ -350,7 +419,6 @@ def perform_update():
                 bundle_path = os.path.join(BASE_DIR, 'playdate-update.flatpak')
                 log.info(f"Downloading flatpak bundle: {url}")
                 _update_dl_state['manual_url'] = url
-                _fetch(url, bundle_path)
 
                 app_id = _running_flatpak_app_id()
 
@@ -364,6 +432,20 @@ def perform_update():
                 # installed in at least one of the two scopes already.
                 scope = _flatpak_install_scope(app_id)
 
+                # Export the version that is installed now so it can be put
+                # back. Takes a couple of minutes, so it runs while the new
+                # bundle downloads. --system installs can't update themselves
+                # anyway (Polkit), so only --user is covered.
+                export = _rb_flatpak_export_start(app_id) if scope == '--user' else None
+                _fetch(url, bundle_path)
+                protected = False
+                if export is not None:
+                    export_ok = export.wait() == 0
+                    protected = export_ok and _rb_begin('flatpak', lambda: True)
+                    if not export_ok:
+                        log.warning("Could not export the installed version; updating without a safety net")
+                        rollback.abort(BASE_DIR)
+
                 log.info(f"Installing flatpak bundle ({scope}): {bundle_path}")
                 result = host_run(
                     ['flatpak', 'install', scope, '-y', '--reinstall', bundle_path],
@@ -371,6 +453,8 @@ def perform_update():
                 )
                 if result.returncode != 0:
                     log.error(f"perform-update: flatpak install failed: {result.stderr.strip()}")
+                    if protected:
+                        rollback.abort(BASE_DIR)   # nothing was replaced
                     if scope == '--system':
                         # Polkit refuses a system install with no terminal to prompt on.
                         # Keep the already-downloaded bundle and hand the user the
@@ -400,7 +484,22 @@ def perform_update():
                 from config import _is_steam_deck_session
                 _sgid = os.environ.get('SteamGameId', '')
                 try:
-                    if _is_steam_deck_session() and _sgid.isdigit():
+                    if protected:
+                        # A host-side watchdog starts the new version and puts the
+                        # old one back if it fails to come up (see rollback.py).
+                        # On the Deck, Steam does the launching, so it can only
+                        # watch whether the app is running, not its exit code.
+                        deck = _is_steam_deck_session() and _sgid.isdigit()
+                        launch = f'exec steam "steam://rungameid/{_sgid}"' if deck else f'exec flatpak run {app_id}'
+                        script = os.path.join(rollback.rb_dir(BASE_DIR), 'watchdog.sh')
+                        with open(script, 'w', encoding='utf-8') as f:
+                            f.write(rollback.FLATPAK_WATCHDOG_SH)
+                        log.info("Relaunching under the rollback watchdog (%s)", 'observe' if deck else 'child')
+                        host_popen(['sh', script, BASE_DIR, app_id, 'observe' if deck else 'child', launch,
+                                    _update_cache.get('latest_version') or '', __build__],
+                                   start_new_session=True, stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    elif _is_steam_deck_session() and _sgid.isdigit():
                         # `steam steam://rungameid/<id>` forwards to the running
                         # Steam and relaunches the shortcut. `xdg-open` for the
                         # same URL does NOT reach Steam from a flatpak-spawn
@@ -439,6 +538,18 @@ def perform_update():
                 log.info(f"Downloading installer: {url}")
                 _update_dl_state['manual_url'] = url
                 _fetch(url, tmp)
+                if _rb_begin('frozen', lambda: rollback.snapshot_frozen(BASE_DIR)):
+                    # Runs from the copy of this exe taken just now (the installer
+                    # replaces the real one) and watches for the new version the
+                    # installer starts.
+                    subprocess.Popen(
+                        [os.path.join(rollback.rb_dir(BASE_DIR), 'code', rollback.WATCHDOG_EXE), '--pd-watchdog',
+                         '--base-dir', BASE_DIR, '--kind', 'frozen',
+                         '--launch', json.dumps([os.path.join(BASE_DIR, 'PlayDate.exe')]),
+                         '--exe-name', 'PlayDate.exe'],
+                        creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                                      | subprocess.CREATE_NO_WINDOW,
+                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 log.info(f"Launching installer: {tmp}")
                 subprocess.Popen(
                     [tmp],
@@ -461,17 +572,27 @@ def perform_update():
                 with zipfile.ZipFile(tmp_zip) as zf:
                     members = zf.namelist()
                     prefix = members[0].split('/')[0] + '/' if members else ''
-                    for member in members:
-                        rel = member[len(prefix):]
-                        if not rel:
-                            continue
-                        target = os.path.join(BASE_DIR, rel)
-                        if member.endswith('/'):
-                            os.makedirs(target, exist_ok=True)
-                        else:
-                            os.makedirs(os.path.dirname(target), exist_ok=True)
-                            with zf.open(member) as src, open(target, 'wb') as dst:
-                                dst.write(src.read())
+                    rels = [m[len(prefix):] for m in members if not m.endswith('/') and m[len(prefix):]]
+                    protected = _rb_begin('source', lambda: rollback.snapshot_source(BASE_DIR, rels))
+                    try:
+                        for member in members:
+                            rel = member[len(prefix):]
+                            if not rel:
+                                continue
+                            target = os.path.join(BASE_DIR, rel)
+                            if member.endswith('/'):
+                                os.makedirs(target, exist_ok=True)
+                            else:
+                                os.makedirs(os.path.dirname(target), exist_ok=True)
+                                with zf.open(member) as src, open(target, 'wb') as dst:
+                                    dst.write(src.read())
+                    except Exception:
+                        # A half-extracted tree is worse than the old version.
+                        if protected:
+                            log.error("Extraction failed; restoring the previous version", exc_info=True)
+                            rollback.restore_source(BASE_DIR)
+                            rollback.abort(BASE_DIR)
+                        raise
 
                 venv_pip = os.path.join(BASE_DIR, '.venv', 'bin', 'pip')
                 if os.path.exists(venv_pip):
@@ -482,13 +603,19 @@ def perform_update():
                     )
 
                 launcher = os.path.join(BASE_DIR, 'playdate-launch.sh')
-                if os.path.exists(launcher):
-                    subprocess.Popen([launcher], start_new_session=True)
-                else:
+                launch = [launcher] if os.path.exists(launcher) \
+                    else [sys.executable, os.path.join(BASE_DIR, 'main.py')]
+                if protected:
+                    # The watchdog is the old version's copy of rollback.py, taken
+                    # before the zip replaced it. It starts the new version and
+                    # restores the old one if that fails to come up.
                     subprocess.Popen(
-                        [sys.executable, os.path.join(BASE_DIR, 'main.py')],
-                        start_new_session=True
-                    )
+                        [sys.executable, os.path.join(rollback.rb_dir(BASE_DIR), 'watchdog.py'), 'watch',
+                         '--base-dir', BASE_DIR, '--kind', 'source', '--launch', json.dumps(launch)],
+                        start_new_session=True, stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    subprocess.Popen(launch, start_new_session=True)
         except Exception as e:
             log.error(f"perform-update failed: {e}", exc_info=True)
             _update_dl_state.update({'status': 'error',
