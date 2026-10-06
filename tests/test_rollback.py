@@ -218,3 +218,30 @@ def test_failed_beta_does_not_block_later_betas_or_the_final(tmp_path, monkeypat
     rollback._write_json(rollback._p(str(tmp_path), 'failed.json'), ['1.12.1'])
     assert updater._is_failed_version('1.12.1')
     assert not updater._is_failed_version('1.12.2-beta.1')
+
+
+def test_frozen_snapshot_and_restore_swap_the_whole_tree(tmp_path):
+    base = str(tmp_path)
+    (tmp_path / 'PlayDate.exe').write_text('old exe')
+    (tmp_path / '_internal').mkdir()
+    (tmp_path / '_internal' / 'lib.dll').write_text('old dll')
+    (tmp_path / 'games.db').write_text('user data, must be left alone')
+    assert rollback.snapshot_frozen(base)
+    assert (tmp_path / '.rollback' / 'code' / rollback.WATCHDOG_EXE).read_text() == 'old exe'
+    # the installer lays down the new version, adding and replacing files
+    (tmp_path / 'PlayDate.exe').write_text('new exe')
+    (tmp_path / '_internal' / 'lib.dll').write_text('new dll')
+    (tmp_path / '_internal' / 'extra.dll').write_text('only in new')
+    assert rollback.restore_frozen(base)
+    assert (tmp_path / 'PlayDate.exe').read_text() == 'old exe'
+    assert (tmp_path / '_internal' / 'lib.dll').read_text() == 'old dll'
+    assert not (tmp_path / '_internal' / 'extra.dll').exists()
+    assert (tmp_path / 'games.db').read_text() == 'user data, must be left alone'
+    leftovers = [n for n in os.listdir(base) if n.endswith(('.restoring', '.failed'))]
+    assert leftovers == []
+
+
+def test_frozen_snapshot_declines_an_unexpected_layout(tmp_path):
+    (tmp_path / 'PlayDate.exe').write_text('exe')       # no _internal next to it
+    assert rollback.snapshot_frozen(str(tmp_path)) is False
+    assert not (tmp_path / '.rollback' / 'code').exists()

@@ -63,6 +63,13 @@ def handle_exception(exc_type, exc_value, exc_traceback):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
     log.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+    # First start after an update (rollback.py's marker exists): die now. A
+    # windowed PyInstaller build would otherwise sit on an "Unhandled
+    # exception" dialog until someone clicks OK, and the watchdog, seeing a
+    # live process, would never treat it as a failed start.
+    if os.path.exists(os.path.join(_APP_DIR, '.rollback', 'pending.json')):
+        logging.shutdown()
+        os._exit(1)
 
 sys.excepthook = handle_exception
 

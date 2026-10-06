@@ -262,16 +262,35 @@ def restore_frozen(base):
     root = _p(base, 'code')
     if not os.path.isdir(os.path.join(root, '_internal')):
         return False
-    for attempt in range(10):   # the crashed process may still hold locks
+    live, staged, failed = (os.path.join(base, n) for n in ('_internal', '_internal.restoring', '_internal.failed'))
+    exe, exe_new = os.path.join(base, 'PlayDate.exe'), os.path.join(base, 'PlayDate.exe.restoring')
+    # Stage the old files beside the live ones, then swap by rename: a rename
+    # that fails (a crashed process still holding a lock) leaves the tree as it
+    # was, where deleting _internal first could leave it half gone.
+    _rm(staged)
+    _rm(failed)
+    shutil.copytree(os.path.join(root, '_internal'), staged)
+    shutil.copy2(os.path.join(root, 'PlayDate.exe'), exe_new)
+    for attempt in range(10):
         try:
-            _rm(os.path.join(base, '_internal'))
-            if os.path.exists(os.path.join(base, '_internal')):
-                raise OSError('_internal still present')
-            shutil.copytree(os.path.join(root, '_internal'), os.path.join(base, '_internal'))
-            shutil.copy2(os.path.join(root, 'PlayDate.exe'), os.path.join(base, 'PlayDate.exe'))
-            return True
+            os.rename(live, failed)
+        except FileNotFoundError:
+            pass
         except OSError:
             time.sleep(1.5)
+            continue
+        try:
+            os.rename(staged, live)
+            os.replace(exe_new, exe)
+        except OSError:
+            if not os.path.exists(live) and os.path.exists(failed):
+                os.rename(failed, live)   # put back what was there
+            time.sleep(1.5)
+            continue
+        _rm(failed)
+        return True
+    _rm(staged)
+    _rm(exe_new)
     return False
 
 
