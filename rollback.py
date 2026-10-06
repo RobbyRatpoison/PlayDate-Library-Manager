@@ -23,6 +23,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+import uuid
 
 DIR_NAME = '.rollback'
 ATTEMPTS = 2           # starts of the new version before giving up on it
@@ -82,11 +83,17 @@ def read_pending(base):
     return _read_json(_p(base, 'pending.json'))
 
 
+# Identifies this process. A pid can't: every Flatpak sandbox has its own PID
+# namespace, so the old app and the new one both ran as pid 2 and the new
+# version took itself for the old one (found on a real Steam Deck).
+_TOKEN = uuid.uuid4().hex
+
+
 def begin(base, kind, old_version, new_version):
     """Mark an update as in flight. Call last, once the snapshot is complete."""
     _write_json(_p(base, 'pending.json'), {
         'kind': kind, 'old_version': old_version, 'new_version': new_version,
-        'old_pid': os.getpid(), 'started': time.time(),
+        'old_token': _TOKEN, 'started': time.time(),
     })
 
 
@@ -105,7 +112,7 @@ def mark_healthy(base):
     """Called by the app once it has rendered a page. The one that wrote the
     pending marker (the old process, still alive for a moment) doesn't count."""
     pend = read_pending(base)
-    if not pend or pend.get('old_pid') == os.getpid():
+    if not pend or pend.get('old_token') == _TOKEN:
         return False
     _rm(_p(base, 'pending.json'))
     discard_snapshot(base)

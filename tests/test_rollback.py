@@ -69,10 +69,10 @@ def test_source_snapshot_restores_changed_and_removes_created(tmp_path):
 def test_mark_healthy_ignores_the_process_that_started_the_update(tmp_path, monkeypatch):
     base = str(tmp_path)
     rollback.begin(base, 'source', '1.0.0', '1.1.0')
-    assert rollback.mark_healthy(base) is False          # same pid: the old app
+    assert rollback.mark_healthy(base) is False          # same process: the old app
     assert rollback.read_pending(base)
     pend = rollback.read_pending(base)
-    pend['old_pid'] = -1                                  # a different process
+    pend['old_token'] = 'some other process'              # not this one
     rollback._write_json(rollback._p(base, 'pending.json'), pend)
     os.makedirs(rollback._p(base, 'code'))
     assert rollback.mark_healthy(base) is True
@@ -305,3 +305,23 @@ def test_observe_mode_does_not_roll_back_a_healthy_start(tmp_path):
     assert '--reinstall' not in calls.read_text()
     assert not (base / '.rollback' / 'rolled_back.json').exists()
     subprocess.run(['rm', '-f', str(tmp_path / 'state' / 'new')])
+
+
+def test_mark_healthy_does_not_trust_pids(tmp_path):
+    """Every Flatpak sandbox has its own PID namespace: the old and new app
+    both ran as pid 2, and the new one mistook itself for the old one."""
+    base = str(tmp_path)
+    rollback.begin(base, 'flatpak', '1.0.0', '1.1.0')
+    pend = rollback.read_pending(base)
+    pend['old_token'] = 'the old process'
+    pend['old_pid'] = os.getpid()                         # a coinciding pid must not matter
+    rollback._write_json(rollback._p(base, 'pending.json'), pend)
+    assert rollback.mark_healthy(base) is True
+
+
+def test_mark_healthy_accepts_a_marker_written_by_an_older_build(tmp_path):
+    base = str(tmp_path)
+    rollback._write_json(rollback._p(base, 'pending.json'),
+                         {'kind': 'flatpak', 'old_version': '1', 'new_version': '2',
+                          'old_pid': 2, 'started': time.time()})
+    assert rollback.mark_healthy(base) is True
