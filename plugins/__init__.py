@@ -228,9 +228,13 @@ def reinstall_configured_official_plugins():
 
 
 def _semver(v):
-    """Parse 'X.Y.Z'-ish into a comparable tuple. Non-numeric/missing parts -> 0."""
+    """Parse 'X.Y.Z'-ish into a comparable tuple. Non-numeric/missing parts -> 0.
+    A -beta.N/-rc.N suffix is ignored (a beta compares as its base version):
+    the combined "update PlayDate & plugins" flow passes the target release tag,
+    and "1.12.0-beta.8" used to fail to parse and read as 0.0.0, rejecting every
+    plugin whose min_core_version was anything at all."""
     try:
-        return tuple(int(x) for x in str(v).split('.'))
+        return tuple(int(x) for x in str(v).lstrip('v').split('-')[0].split('.'))
     except Exception:
         return (0, 0, 0)
 
