@@ -19,7 +19,7 @@
 - Gamepad input is no longer labelled experimental.
 - Mouse actions replace "Require double-click to launch/install". Your setting carries over.
 - Automatic update checks now run at most once a day.
-- If a future update fails, PlayDate now goes back to the previous version automatically, restores your library and settings, and offers to send the log.
+- If a future update fails, PlayDate goes back to the previous version automatically, restores your library and settings, and offers to send the log.
 
 ### Fixes
 
