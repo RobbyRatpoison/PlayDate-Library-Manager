@@ -245,3 +245,63 @@ def test_frozen_snapshot_declines_an_unexpected_layout(tmp_path):
     (tmp_path / 'PlayDate.exe').write_text('exe')       # no _internal next to it
     assert rollback.snapshot_frozen(str(tmp_path)) is False
     assert not (tmp_path / '.rollback' / 'code').exists()
+
+
+def _observe_setup(tmp_path, new_instance_lifetime):
+    """Fake host for the Game Mode watchdog: the OLD version's sandbox (111) is
+    listed for the whole test, as it was on the Deck, and launching starts a
+    new instance (222) that lives `new_instance_lifetime` seconds."""
+    base, bindir, state = tmp_path / 'data', tmp_path / 'bin', tmp_path / 'state'
+    for d in (base, bindir, state):
+        d.mkdir()
+    _make_db(str(base / 'games.db'), ['mine'])
+    rollback.backup_data(str(base))
+    (base / '.rollback' / 'old.flatpak').write_text('bundle')
+    rollback.begin(str(base), 'flatpak', 'old', 'new')
+    calls = tmp_path / 'calls.log'
+    fake = bindir / 'flatpak'
+    fake.write_text(textwrap.dedent(f'''\
+        #!/bin/sh
+        echo "$@" >> {calls}
+        case "$1" in
+          ps) printf '111\\torg.x.App\\n'; [ -f {state}/new ] && printf '222\\torg.x.App\\n'; exit 0 ;;
+          install) exit 0 ;;
+        esac
+    '''))
+    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+    launch = bindir / 'launch.sh'
+    launch.write_text(textwrap.dedent(f'''\
+        #!/bin/sh
+        echo launch >> {calls}
+        touch {state}/new
+        ( sleep {new_instance_lifetime}; rm -f {state}/new ) &
+    '''))
+    launch.chmod(launch.stat().st_mode | stat.S_IEXEC)
+    script = base / '.rollback' / 'watchdog.sh'
+    script.write_text(rollback.FLATPAK_WATCHDOG_SH)
+    env = dict(os.environ, PATH=f'{bindir}:{os.environ["PATH"]}')
+    return base, script, launch, calls, env
+
+
+@pytest.mark.skipif(sys.platform == 'win32', reason='POSIX sh script')
+def test_observe_mode_detects_a_crash_despite_a_lingering_old_instance(tmp_path):
+    base, script, launch, calls, env = _observe_setup(tmp_path, new_instance_lifetime=2)
+    subprocess.run(['sh', str(script), str(base), 'org.x.App', 'observe', str(launch), 'new', 'old'],
+                   env=env, timeout=90, check=True)
+    assert _wait_for(lambda: calls.read_text().count('launch') >= 3)
+    assert '--reinstall' in calls.read_text()
+    assert (base / '.rollback' / 'rolled_back.json').exists()
+    assert _names(str(base / 'games.db')) == ['mine']
+
+
+@pytest.mark.skipif(sys.platform == 'win32', reason='POSIX sh script')
+def test_observe_mode_does_not_roll_back_a_healthy_start(tmp_path):
+    base, script, launch, calls, env = _observe_setup(tmp_path, new_instance_lifetime=25)
+    # the new version proves itself shortly after it starts
+    proc = subprocess.Popen(['sh', str(script), str(base), 'org.x.App', 'observe', str(launch), 'new', 'old'], env=env)
+    assert _wait_for(lambda: calls.exists() and 'launch' in calls.read_text(), 20)
+    os.remove(base / '.rollback' / 'pending.json')
+    assert proc.wait(timeout=30) == 0
+    assert '--reinstall' not in calls.read_text()
+    assert not (base / '.rollback' / 'rolled_back.json').exists()
+    subprocess.run(['rm', '-f', str(tmp_path / 'state' / 'new')])

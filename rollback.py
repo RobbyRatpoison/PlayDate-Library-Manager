@@ -428,7 +428,13 @@ RB="$BASE/.rollback"
 LOG="$RB/watchdog.log"
 say() { printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG"; }
 pending() { [ -f "$RB/pending.json" ]; }
-running() { flatpak ps --columns=application 2>/dev/null | grep -qx "$APP"; }
+instances() { flatpak ps --columns=instance,application 2>/dev/null | awk -v a="$APP" '$2 == a { print $1 }'; }
+new_instance() {
+    for i in $(instances); do
+        case "$OLD_INST" in *" $i "*) ;; *) echo "$i"; return 0 ;; esac
+    done
+    return 1
+}
 
 # One start of the new version. 0 = fine (healthy, quit cleanly, or still
 # starting after HANG_LIMIT), 1 = failed.
@@ -447,15 +453,22 @@ start_once() {
         [ "$rc" -eq 0 ] && return 0
         return 1
     fi
+    # Judge only the instance this launch creates: the old version's sandbox
+    # can still be listed for a while after it exits, and treating "any
+    # instance of the app" as the new version made a crash look like a start
+    # (or a start look like a crash once the old one finally went away).
     sh -c "$LAUNCH" >/dev/null 2>&1 &
     waited=0
-    while ! running; do
+    inst=""
+    while [ -z "$inst" ]; do
         pending || return 0
+        inst=$(new_instance)
+        [ -n "$inst" ] && break
         sleep 1; waited=$((waited + 1))
         [ "$waited" -ge 90 ] && return 0
     done
     waited=0
-    while running; do
+    while instances | grep -qx "$inst"; do
         pending || return 0
         sleep 1; waited=$((waited + 1))
         [ "$waited" -ge 180 ] && return 0
@@ -466,6 +479,7 @@ start_once() {
 
 say "watchdog start mode=$MODE"
 sleep 2
+OLD_INST=" $(instances | tr '\n' ' ') "
 attempt=1
 while [ "$attempt" -le 2 ]; do
     start_once && { say "start ok"; exit 0; }

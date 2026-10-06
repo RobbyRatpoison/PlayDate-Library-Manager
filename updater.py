@@ -495,7 +495,13 @@ def perform_update():
                         with open(script, 'w', encoding='utf-8') as f:
                             f.write(rollback.FLATPAK_WATCHDOG_SH)
                         log.info("Relaunching under the rollback watchdog (%s)", 'observe' if deck else 'child')
-                        host_popen(['sh', script, BASE_DIR, app_id, 'observe' if deck else 'child', launch,
+                        # Hand it to a throwaway host shell that backgrounds it under
+                        # setsid and exits at once. Spawned directly, the
+                        # flatpak-spawn client would stay alive inside this sandbox for
+                        # as long as the watchdog runs, which keeps the OLD instance
+                        # listed (and Steam's "running" state held) the whole time.
+                        host_popen(['sh', '-c', 'setsid "$@" >/dev/null 2>&1 </dev/null &', 'sh',
+                                    'sh', script, BASE_DIR, app_id, 'observe' if deck else 'child', launch,
                                     _update_cache.get('latest_version') or '', __build__],
                                    start_new_session=True, stdin=subprocess.DEVNULL,
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
