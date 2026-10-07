@@ -113,22 +113,38 @@ def rollback_notice_dismiss():
     return jsonify({'status': 'ok'})
 
 
+# Repos the update check asks, in order; the first that answers wins. A renamed
+# repo is redirected by GitHub, so every installed copy keeps finding releases
+# under the old name too, but listing the new name here as well (first) stops
+# depending on that redirect. See CLAUDE.md, "Renaming PlayDate to Zest".
+UPDATE_REPOS = ['RobbyRatpoison/PlayDate-Library-Manager']
+
+
+def _github_api(path, **kwargs):
+    """GET repos/<repo>/<path> as JSON from the first of UPDATE_REPOS that
+    answers 200. If none does, the last answer's body, so the caller's usual
+    handling of an error document applies unchanged."""
+    import requests
+    resp = None
+    for repo in UPDATE_REPOS:
+        resp = requests.get(
+            f'https://api.github.com/repos/{repo}/{path}',
+            headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'PlayDate-App'},
+            timeout=10, **kwargs)
+        if resp.status_code == 200:
+            break
+    return resp.json()
+
+
 def _do_update_check():
     """Hit the GitHub releases API and populate _update_cache. Thread-safe."""
     from config import __build__, load_state
     try:
-        import requests as _req
         if load_state().get('beta_updates', False):
             # Opted into beta: the plain /releases/latest endpoint always
             # excludes prereleases by GitHub's own definition, so beta/rc
             # builds need the full list instead — newest entry first.
-            resp = _req.get(
-                'https://api.github.com/repos/RobbyRatpoison/PlayDate-Library-Manager/releases',
-                headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'PlayDate-App'},
-                params={'per_page': 30},
-                timeout=10
-            )
-            releases = resp.json()
+            releases = _github_api('releases', params={'per_page': 30})
             # GitHub's /releases list order is not reliably newest-first (its
             # index lags, and rewriting a tag's commit reshuffles it), so pick
             # the highest version explicitly rather than trusting releases[0].
@@ -143,12 +159,7 @@ def _do_update_check():
                 if not data or _build_is_newer(tag, best_tag):
                     data, best_tag = r, tag
         else:
-            resp = _req.get(
-                'https://api.github.com/repos/RobbyRatpoison/PlayDate-Library-Manager/releases/latest',
-                headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'PlayDate-App'},
-                timeout=10
-            )
-            data = resp.json()
+            data = _github_api('releases/latest')
         tag = data.get('tag_name', '')
         latest = tag.lstrip('v')
         available = _build_is_newer(latest, __build__) and not _is_failed_version(latest)
@@ -544,15 +555,20 @@ def perform_update():
                 log.info(f"Downloading installer: {url}")
                 _update_dl_state['manual_url'] = url
                 _fetch(url, tmp)
-                if _rb_begin('frozen', lambda: rollback.snapshot_frozen(BASE_DIR)):
+                # The running exe's own name, not a literal: a renamed build ships a
+                # differently named exe, and it is this (old) version's watchdog
+                # that has to recognise it.
+                own_exe = os.path.basename(sys.executable)
+                if _rb_begin('frozen', lambda: rollback.snapshot_frozen(BASE_DIR, own_exe)):
                     # Runs from the copy of this exe taken just now (the installer
                     # replaces the real one) and watches for the new version the
                     # installer starts.
+                    new_names = [n for n in (*rollback.ALT_EXE_NAMES, own_exe)]
                     subprocess.Popen(
                         [os.path.join(rollback.rb_dir(BASE_DIR), 'code', rollback.WATCHDOG_EXE), '--pd-watchdog',
                          '--base-dir', BASE_DIR, '--kind', 'frozen',
-                         '--launch', json.dumps([os.path.join(BASE_DIR, 'PlayDate.exe')]),
-                         '--exe-name', 'PlayDate.exe'],
+                         '--launch', json.dumps([os.path.join(BASE_DIR, own_exe)]),
+                         '--exe-name', ','.join(new_names)],
                         creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
                                       | subprocess.CREATE_NO_WINDOW,
                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

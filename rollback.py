@@ -30,7 +30,11 @@ ATTEMPTS = 2           # starts of the new version before giving up on it
 HANG_LIMIT = 180       # seconds still alive but never healthy: leave it alone
 PENDING_MAX_AGE = 24 * 3600
 USER_JSON = ('config.json', 'state.json', 'theme.json')
-FROZEN_PARTS = ('PlayDate.exe', '_internal')
+DEFAULT_EXE_NAME = 'PlayDate.exe'
+# Names a renamed build may use for its exe. The update that renames the exe is
+# run by the OLD version's watchdog, so it has to know the new name in advance
+# (it watches for any of these starting, and clears the leftover on rollback).
+ALT_EXE_NAMES = ('Zest.exe',)
 WATCHDOG_EXE = 'PlayDate-Rollback.exe'
 
 
@@ -243,10 +247,11 @@ def _tree_size(path):
     return total
 
 
-def snapshot_frozen(base):
-    """Copy PlayDate.exe and _internal. Returns False (and leaves nothing
-    behind) if the layout is unexpected or the disk is too full."""
-    exe = os.path.join(base, 'PlayDate.exe')
+def snapshot_frozen(base, exe_name=DEFAULT_EXE_NAME):
+    """Copy the exe (named exe_name, the running one's own name) and _internal.
+    Returns False (and leaves nothing behind) if the layout is unexpected or
+    the disk is too full."""
+    exe = os.path.join(base, exe_name)
     internal = os.path.join(base, '_internal')
     if not (os.path.isfile(exe) and os.path.isdir(internal)):
         return False
@@ -257,9 +262,10 @@ def snapshot_frozen(base):
     _rm(root)
     os.makedirs(root, exist_ok=True)
     shutil.copytree(internal, os.path.join(root, '_internal'))
-    shutil.copy2(exe, os.path.join(root, 'PlayDate.exe'))
+    shutil.copy2(exe, os.path.join(root, exe_name))
+    _write_json(os.path.join(root, '.exe-name.json'), exe_name)
     # The watchdog runs from here under another name: the installer replaces
-    # base\PlayDate.exe and the watchdog must not share its image name with the
+    # the real exe and the watchdog must not share its image name with the
     # app it is waiting for.
     shutil.copy2(exe, os.path.join(root, WATCHDOG_EXE))
     return True
@@ -269,15 +275,16 @@ def restore_frozen(base):
     root = _p(base, 'code')
     if not os.path.isdir(os.path.join(root, '_internal')):
         return False
+    exe_name = _read_json(os.path.join(root, '.exe-name.json'), DEFAULT_EXE_NAME)
     live, staged, failed = (os.path.join(base, n) for n in ('_internal', '_internal.restoring', '_internal.failed'))
-    exe, exe_new = os.path.join(base, 'PlayDate.exe'), os.path.join(base, 'PlayDate.exe.restoring')
+    exe, exe_new = os.path.join(base, exe_name), os.path.join(base, exe_name + '.restoring')
     # Stage the old files beside the live ones, then swap by rename: a rename
     # that fails (a crashed process still holding a lock) leaves the tree as it
     # was, where deleting _internal first could leave it half gone.
     _rm(staged)
     _rm(failed)
     shutil.copytree(os.path.join(root, '_internal'), staged)
-    shutil.copy2(os.path.join(root, 'PlayDate.exe'), exe_new)
+    shutil.copy2(os.path.join(root, exe_name), exe_new)
     for attempt in range(10):
         try:
             os.rename(live, failed)
@@ -295,6 +302,10 @@ def restore_frozen(base):
             time.sleep(1.5)
             continue
         _rm(failed)
+        # A renamed build leaves its own exe beside the restored one.
+        for alt in ALT_EXE_NAMES:
+            if alt.lower() != exe_name.lower():
+                _rm(os.path.join(base, alt))
         return True
     _rm(staged)
     _rm(exe_new)
@@ -340,19 +351,35 @@ def _image_running(name):
         return False
 
 
-def _wait_installer_launch(base, exe_name, give_up=900):
-    """Windows: the installer, not us, starts the new exe. Wait for it to show
-    up, then for it to either go healthy or vanish. 'failed' only if it vanished."""
+def _any_image_running(names):
+    return any(_image_running(n) for n in names)
+
+
+def _new_launch(base, names, fallback):
+    """The command that starts the NEW version's exe: the first of `names`
+    that exists in the install folder (renamed builds are listed first)."""
+    for n in names:
+        if os.path.isfile(os.path.join(base, n)):
+            return [os.path.join(base, n)]
+    return fallback
+
+
+def _wait_installer_launch(base, names, give_up=900):
+    """Windows: the installer, not us, starts the new exe (which may have a new
+    name, hence several). Wait for it to show up, then for it to either go
+    healthy or vanish. 'failed' only if it vanished."""
+    if isinstance(names, str):
+        names = [names]
     time.sleep(6)   # the old process is exiting; don't mistake it for the new one
     t0 = time.time()
-    while not _image_running(exe_name):
+    while not _any_image_running(names):
         if not read_pending(base):
             return 'healthy'
         if time.time() - t0 > give_up:
             return 'gave_up'   # installer cancelled or never finished
         time.sleep(2)
     t1 = time.time()
-    while _image_running(exe_name):
+    while _any_image_running(names):
         if not read_pending(base):
             return 'healthy'
         if time.time() - t1 > HANG_LIMIT:
@@ -383,7 +410,9 @@ def _do_rollback(base, kind, reason):
 
 
 def watchdog_main(argv):
-    """`--base-dir B --kind source|frozen --launch <json argv> [--exe-name N]`"""
+    """`--base-dir B --kind source|frozen --launch <json argv> [--exe-name N[,N2]]`
+    --launch starts the version being restored. --exe-name lists the image
+    names the new version may run as (frozen builds only)."""
     args = {}
     it = iter(argv)
     for a in it:
@@ -395,17 +424,20 @@ def watchdog_main(argv):
     _log(base, f'watchdog start kind={kind}')
 
     attempts = ATTEMPTS
+    new_launch = launch
     if kind == 'frozen':
-        state = _wait_installer_launch(base, args.get('exe-name', 'PlayDate.exe'))
+        names = [n for n in args.get('exe-name', DEFAULT_EXE_NAME).split(',') if n]
+        state = _wait_installer_launch(base, names)
         if state in ('healthy', 'gave_up', 'hung'):
             _log(base, f'first start: {state}; done')
             return
         attempts -= 1   # the installer's launch was attempt one
+        new_launch = _new_launch(base, names, launch)
     else:
         time.sleep(2)   # let the old process release the port
 
     while attempts > 0:
-        child = _spawn(launch, cwd)
+        child = _spawn(new_launch, cwd)
         state = _supervise(base, child)
         _log(base, f'start result: {state}')
         if state != 'failed':

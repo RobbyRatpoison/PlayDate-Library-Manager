@@ -325,3 +325,63 @@ def test_mark_healthy_accepts_a_marker_written_by_an_older_build(tmp_path):
                          {'kind': 'flatpak', 'old_version': '1', 'new_version': '2',
                           'old_pid': 2, 'started': time.time()})
     assert rollback.mark_healthy(base) is True
+
+
+def test_frozen_rollback_removes_the_renamed_exe_and_restores_the_old_one(tmp_path):
+    """The update that renames PlayDate.exe to Zest.exe must still be undoable."""
+    base = str(tmp_path)
+    (tmp_path / 'PlayDate.exe').write_text('old exe')
+    (tmp_path / '_internal').mkdir()
+    (tmp_path / '_internal' / 'lib.dll').write_text('old dll')
+    assert rollback.snapshot_frozen(base, 'PlayDate.exe')
+    # the installer lays down a renamed exe and replaces the rest
+    (tmp_path / 'PlayDate.exe').unlink()
+    (tmp_path / 'Zest.exe').write_text('new exe')
+    (tmp_path / '_internal' / 'lib.dll').write_text('new dll')
+    assert rollback.restore_frozen(base)
+    assert (tmp_path / 'PlayDate.exe').read_text() == 'old exe'
+    assert not (tmp_path / 'Zest.exe').exists()
+    assert (tmp_path / '_internal' / 'lib.dll').read_text() == 'old dll'
+
+
+def test_snapshot_and_restore_use_the_running_exes_own_name(tmp_path):
+    base = str(tmp_path)
+    (tmp_path / 'Zest.exe').write_text('zest exe')
+    (tmp_path / '_internal').mkdir()
+    assert rollback.snapshot_frozen(base, 'Zest.exe')
+    (tmp_path / 'Zest.exe').write_text('broken')
+    assert rollback.restore_frozen(base)
+    assert (tmp_path / 'Zest.exe').read_text() == 'zest exe'
+    assert not (tmp_path / 'PlayDate.exe').exists()
+
+
+def test_new_launch_prefers_the_renamed_exe(tmp_path):
+    base = str(tmp_path)
+    names = ['Zest.exe', 'PlayDate.exe']
+    fallback = ['old']
+    assert rollback._new_launch(base, names, fallback) == fallback          # neither exists yet
+    (tmp_path / 'PlayDate.exe').write_text('x')
+    assert rollback._new_launch(base, names, fallback) == [str(tmp_path / 'PlayDate.exe')]
+    (tmp_path / 'Zest.exe').write_text('x')                                 # both: the new name wins
+    assert rollback._new_launch(base, names, fallback) == [str(tmp_path / 'Zest.exe')]
+
+
+def test_installer_launch_wait_recognises_either_exe_name(tmp_path, monkeypatch):
+    base = str(tmp_path)
+    rollback.begin(base, 'frozen', '1.0.0', '2.0.0')
+    seen = []
+    state = {'calls': 0}
+
+    def fake_running(name):
+        seen.append(name)
+        state['calls'] += 1
+        if state['calls'] == 3:                    # the renamed exe starts...
+            return name == 'Zest.exe'
+        if state['calls'] > 3:                     # ...then goes healthy
+            os.path.exists(rollback._p(base, 'pending.json')) and os.remove(rollback._p(base, 'pending.json'))
+        return False
+
+    monkeypatch.setattr(rollback, '_image_running', fake_running)
+    monkeypatch.setattr(rollback.time, 'sleep', lambda s: None)
+    assert rollback._wait_installer_launch(base, ['Zest.exe', 'PlayDate.exe']) == 'healthy'
+    assert 'Zest.exe' in seen and 'PlayDate.exe' in seen
