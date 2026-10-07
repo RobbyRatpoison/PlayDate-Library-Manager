@@ -1,6 +1,6 @@
 # Release Notes
 
-## v1.12.0
+## v1.12.0 - 2026-10-07
 ### New
 
 - Customizable mouse actions: choose what each mouse button does on a game cover, on a single or double click. (suggested by woutercools)
