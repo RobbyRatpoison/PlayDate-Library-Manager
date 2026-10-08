@@ -167,7 +167,9 @@ People who've helped make PlayDate better - bug reports, feature suggestions, te
 - Reported inconsistent naming (Platform, Sources, Library) for the same thing across the filter window and card tooltip - led to "Library" being used consistently
 - Reported spacing around the cover in the info tooltip (empty gap beside the cover) - led to the cover filling the tooltip's width
 - Suggested toggling the info tooltip separately for Library, Home and Pick 6 - led to the per-page tooltip settings and the Pick 6 tooltip
-- Suggested choosing what each mouse button does on a game card (tooltip, context menu, launch, store page, edit) - planned for a future version
+- Suggested choosing what each mouse button does on a game card (tooltip, context menu, launch, store page, edit) - led to the Mouse Actions settings and the gamepad shortcuts
+- Reported Epic Games release dates being wrong (e.g. Luftrausers showing August 2026) - led to release dates coming from Epic's own Release Date field
+- Reported Epic Games store links not working for newer games, especially free ones added in 2026 - led to links using the real store page address
 
 **Celine**
 - Startup crash (`JSONDecodeError`) from a corrupted `config.json`, with no window ever opening
