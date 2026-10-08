@@ -40,16 +40,20 @@ def is_restore_in_progress():
     return _restore_state['status'] == 'running'
 
 
-def _extract_backup_zip(raw: bytes, logger):
+def _extract_backup_zip(source, logger):
     """
     Extract a PlayDate backup zip's contents into BASE_DIR / static/img/library.
-    Shared by the upload and path-based restore routes. Returns (restored, skipped)
-    lists of arcnames. Raises zipfile.BadZipFile or other exceptions on failure.
+    Shared by the upload and path-based restore routes. `source` is a file path
+    (the zip is read from disk as it goes, so a multi-GB backup needs almost no
+    memory) or the zip's bytes (the browser-upload route). Returns (restored,
+    skipped) lists of arcnames. Raises zipfile.BadZipFile or other exceptions
+    on failure.
     """
     import zipfile, io
 
-    buf = io.BytesIO(raw)
-    with zipfile.ZipFile(buf, 'r') as zf:
+    if isinstance(source, (bytes, bytearray)):
+        source = io.BytesIO(source)
+    with zipfile.ZipFile(source, 'r') as zf:
         names = zf.namelist()
         logger.info(f"Restore: zip contains {len(names)} entries: {names[:20]}")
 
@@ -112,7 +116,7 @@ def _extract_backup_zip(raw: bytes, logger):
                     continue
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 with zf.open(arcname) as src, open(dest, 'wb') as dst:
-                    dst.write(src.read())
+                    shutil.copyfileobj(src, dst)
             logger.info(f"Restore: wrote {len(art_files)} cover image(s)")
             restored.append(f"{len(art_files)} cover image(s)")
 
@@ -129,7 +133,7 @@ def _extract_backup_zip(raw: bytes, logger):
                 continue
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             with zf.open(arcname) as src, open(dest, 'wb') as dst:
-                dst.write(src.read())
+                shutil.copyfileobj(src, dst)
             wrote_img += 1
         if wrote_img:
             logger.info(f"Restore: wrote {wrote_img} badge/background image(s)")
@@ -187,7 +191,7 @@ def _sanitize_restored_state(logger):
         logger.warning(f"Restore: could not sanitize config.json: {e}")
 
 
-def _run_restore_thread(raw: bytes, logger):
+def _run_restore_thread(source, logger):
     """Runs off the request thread: extract, migrate, and update _restore_state."""
     # Stop any long-running job before the DB files get swapped out from
     # under it -- the automatic metadata-backfill sweep, a bulk rescrape, a
@@ -215,7 +219,7 @@ def _run_restore_thread(raw: bytes, logger):
         logger.warning("Restore: could not signal running jobs to stop", exc_info=True)
 
     try:
-        _do_restore(raw, logger)
+        _do_restore(source, logger)
     finally:
         # Re-arm the cancel flags latched above -- their consumers
         # (bulk_op_start, the startup sweep, the store migrations) only
@@ -225,10 +229,10 @@ def _run_restore_thread(raw: bytes, logger):
             ev.clear()
 
 
-def _do_restore(raw: bytes, logger):
+def _do_restore(source, logger):
     import zipfile
     try:
-        restored, skipped = _extract_backup_zip(raw, logger)
+        restored, skipped = _extract_backup_zip(source, logger)
     except zipfile.BadZipFile:
         logger.exception("Restore: bad zip file")
         _restore_state.update({'status': 'error', 'error': 'Invalid zip file. Make sure this is a PlayDate backup.'})
@@ -304,6 +308,11 @@ def _do_restore(raw: bytes, logger):
 
 def _fill_backup_zip(zf, include_art):
     import glob as _glob
+    import zipfile
+    # JPEG/PNG are already compressed: deflating them saves ~2% and costs ~25x
+    # the time to write (and ~13x to read back on restore), so they are stored.
+    # The database and JSON files do compress, and stay deflated.
+    store = zipfile.ZIP_STORED
     for arcname, filepath in {'config.json':      os.path.join(BASE_DIR, 'config.json'),
                                'state.json':       os.path.join(BASE_DIR, 'state.json'),
                                'theme.json':       os.path.join(BASE_DIR, 'theme.json'),
@@ -342,10 +351,10 @@ def _fill_backup_zip(zf, include_art):
         for fname in os.listdir(badges_dir):
             full = os.path.join(badges_dir, fname)
             if fname.lower().endswith('.png') and os.path.isfile(full):
-                zf.write(full, f'static/img/badges/{fname}')
+                zf.write(full, f'static/img/badges/{fname}', compress_type=store)
     bg_path = os.path.join(BASE_DIR, 'static', 'img', 'backgrounds', 'background.jpg')
     if os.path.isfile(bg_path):
-        zf.write(bg_path, 'static/img/backgrounds/background.jpg')
+        zf.write(bg_path, 'static/img/backgrounds/background.jpg', compress_type=store)
     if include_art:
         art_dir = os.path.join(BASE_DIR, 'static', 'img', 'library')
         if os.path.isdir(art_dir):
@@ -353,7 +362,8 @@ def _fill_backup_zip(zf, include_art):
                 for fname in filenames:
                     if fname.lower().endswith('.jpg'):
                         full = os.path.join(dirpath, fname)
-                        zf.write(full, os.path.relpath(full, BASE_DIR).replace(os.sep, '/'))
+                        zf.write(full, os.path.relpath(full, BASE_DIR).replace(os.sep, '/'),
+                                 compress_type=store)
 
 
 def _build_csv_rows(filter_tree=None, columns=None):
@@ -587,14 +597,17 @@ def restore_from_path():
         return jsonify({"status": "error", "message": "File must be a .zip backup."}), 400
 
     def _read_then_restore():
+        # Check the file opens before the restore starts (so the user gets the
+        # specific "could not read" message), then hand over the path itself:
+        # the zip is read from disk as it is extracted, never loaded whole.
         try:
-            with open(path, 'rb') as fh:
-                raw = fh.read()
+            with open(path, 'rb'):
+                pass
         except Exception as e:
             log.warning(f"Restore-from-path: could not read file: {e}")
             _restore_state.update({'status': 'error', 'error': 'Could not read that file.'})
             return
-        _run_restore_thread(raw, log)
+        _run_restore_thread(path, log)
 
     with _restore_lock:
         if _restore_state['status'] == 'running':
