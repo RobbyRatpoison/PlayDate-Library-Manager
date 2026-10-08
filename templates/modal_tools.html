@@ -1556,10 +1556,10 @@ window._TUNE_INIT = {{ {
                      onclick="var cb=document.getElementById('backup-include-art');cb.checked=!cb.checked;"
                      style="background:var(--bg-input); border:1px solid var(--border); border-radius:6px; padding:10px 14px; cursor:pointer;">
                     <div style="display:flex; align-items:flex-start; gap:10px;">
-                        <input type="checkbox" id="backup-include-art" onclick="event.stopPropagation()" style="width:auto; margin:2px 0 0; flex-shrink:0; cursor:pointer;">
+                        <input type="checkbox" id="backup-include-art" checked onclick="event.stopPropagation()" style="width:auto; margin:2px 0 0; flex-shrink:0; cursor:pointer;">
                         <div>
                             <span style="font-size:0.82rem; color:var(--text-primary); font-weight:bold;">🖼️ Include cover art</span>
-                            <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:2px;">Recommended if you've manually set any artwork. Can add hundreds of MB.</div>
+                            <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:2px;">Keeps any artwork you've picked or fixed by hand. Uncheck to make the backup smaller; missing art can be fetched again, but custom art can't.</div>
                         </div>
                     </div>
                 </div>

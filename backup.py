@@ -449,7 +449,7 @@ def backup():
     from flask import send_file
 
     data        = request.json or {}
-    include_art = data.get('include_art', False)
+    include_art = data.get('include_art', True)
     buf         = io.BytesIO()
     _backup_in_progress.set()
     try:
@@ -480,7 +480,7 @@ def backup_to_path():
     import zipfile
     data        = request.json or {}
     save_path   = validate_user_path(data.get('path', '').strip())
-    include_art = data.get('include_art', False)
+    include_art = data.get('include_art', True)
     if not save_path:
         return jsonify({"status": "error", "message": "No path provided."}), 400
     tmp_path = save_path + '.tmp'

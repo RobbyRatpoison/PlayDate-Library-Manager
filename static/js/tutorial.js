@@ -415,7 +415,7 @@ const TUTORIAL_SECTIONS = [
         steps: [
             {
                 title: 'Backup and restore',
-                body: `<p>Hamburger menu → ${tutOpen('data', '<strong>Data</strong>')} → ${tutOpen('backup', '<strong>Backup &amp; Restore</strong>')} saves your library and settings to one zip you can restore later. PlayDate offers a backup before updating unless you made one in the last 24 hours.</p>`,
+                body: `<p>Hamburger menu → ${tutOpen('data', '<strong>Data</strong>')} → ${tutOpen('backup', '<strong>Backup &amp; Restore</strong>')} saves your library and settings to one zip you can restore later. Cover art is included by default, so artwork you picked or fixed by hand is kept; untick it for a smaller file. PlayDate offers a backup before updating unless you made one in the last 24 hours.</p>`,
             },
             {
                 title: 'Imports and exports',

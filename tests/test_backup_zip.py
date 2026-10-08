@@ -108,3 +108,24 @@ def test_restore_from_path_hands_over_the_path_not_the_file_contents(tmp_path, m
     assert done.wait(5)
     assert seen['source'] == str(zpath)          # a path, not the bytes
     backup._restore_state.update({'status': 'idle'})
+
+
+def _post_backup(tmp_path, monkeypatch, body):
+    from flask import Flask
+    src = tmp_path / 'src'
+    _make_install(src)
+    monkeypatch.setattr(backup, 'BASE_DIR', str(src))
+    monkeypatch.setattr(backup, 'validate_user_path', lambda p: p)
+    monkeypatch.setattr(backup, 'save_state', lambda *a, **k: None)
+    out = tmp_path / 'out.zip'
+    app = Flask(__name__)
+    app.register_blueprint(backup.backup_bp)
+    r = app.test_client().post('/api/backup-to-path', json={'path': str(out), **body})
+    assert r.status_code == 200, r.get_json()
+    with zipfile.ZipFile(out) as zf:
+        return [n for n in zf.namelist() if n.startswith('static/img/library/')]
+
+
+def test_a_backup_includes_cover_art_unless_told_otherwise(tmp_path, monkeypatch):
+    assert len(_post_backup(tmp_path, monkeypatch, {})) == 2                      # default: art in
+    assert _post_backup(tmp_path / 'b', monkeypatch, {'include_art': False}) == []   # opted out
