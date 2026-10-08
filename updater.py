@@ -68,6 +68,28 @@ def _build_is_newer(a, b):
     return a_pre > b_pre
 
 
+def _stamp_source_build(base_dir, build):
+    """After a source update, record the full release tag (with any -beta.N
+    suffix) as config.py's __build__. CI does this for the Windows and Flatpak
+    builds, but a source install extracts GitHub's tag zip, which still says
+    `__build__ = __version__` (the bare X.Y.Z), so a source install on a beta
+    reported the final version number and was never offered the next beta.
+    Returns True if the line was rewritten. `build` is checked against a strict
+    version pattern first because it ends up inside Python source."""
+    build = (build or '').lstrip('v')
+    if not re.fullmatch(r'\d+(\.\d+)*(-[0-9A-Za-z.]+)?', build):
+        return False
+    path = os.path.join(base_dir, 'config.py')
+    with open(path, encoding='utf-8') as f:
+        src = f.read()
+    new, n = re.subn(r'^__build__ = __version__[ \t]*$', f'__build__ = "{build}"', src, count=1, flags=re.M)
+    if not n:
+        return False
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(new)
+    return True
+
+
 def _asset_this_install_needs_is_missing(installer_url, flatpak_url, zipball_url):
     """True if the download _do_update() would actually use for this
     running install isn't attached to the release yet.
@@ -615,6 +637,12 @@ def perform_update():
                             rollback.restore_source(BASE_DIR)
                             rollback.abort(BASE_DIR)
                         raise
+
+                try:
+                    if _stamp_source_build(BASE_DIR, _update_cache.get('latest_version')):
+                        log.info("Stamped __build__ = %s", _update_cache.get('latest_version'))
+                except Exception:
+                    log.warning("Could not stamp __build__ after extracting", exc_info=True)
 
                 venv_pip = os.path.join(BASE_DIR, '.venv', 'bin', 'pip')
                 if os.path.exists(venv_pip):
