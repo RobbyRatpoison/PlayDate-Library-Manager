@@ -29,13 +29,18 @@ def api_error(message, status=500, *, exc=None, log_label=None):
         log.error("%s: %s", log_label or message, exc, exc_info=True)
     return jsonify({"status": "error", "message": message}), status
 
-__version__ = "1.12.0"
+__version__ = "2026.10.1"
 # Full tag this build came from (e.g. "1.6.5-beta.2"), overwritten by CI —
 # __version__ above is always the bare X.Y.Z (stripped of any -beta/-rc
 # suffix, since Inno Setup/display code assume that), so it alone can't tell
 # two betas of the same base version apart. The update checker compares
 # against this instead. Defaults to __version__ for local/source runs.
 __build__ = __version__
+
+# Versions are calendar versions (YYYY.M.N). From this one on, the update texts
+# name the app by its new name (see base.html's _updateAppName), so an older
+# install offered such a version can say so before it is installed.
+RENAME_FROM_VERSION = "2026.11.0"
 
 IN_FLATPAK = os.path.exists('/.flatpak-info')
 
@@ -652,6 +657,7 @@ def inject_config_status():
         gamepad_repeat_rate_ms=state.get('gamepad_repeat_rate_ms', 150),
         platform_priority=_active_platform_priority(state),
         app_version=__build__,
+        rename_from=RENAME_FROM_VERSION,
         tutorial_seen=config.get('tutorial_seen', False),
         steam_deck_session=_is_steam_deck_session(),
         evdev_gamepad_available=evdev_gamepad_available(state),
