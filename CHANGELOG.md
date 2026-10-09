@@ -1,5 +1,10 @@
 # Changelog
 
+## v2026.10.3
+### Fixes
+
+- Fixed Flatpak updates taking much longer than they should.
+
 ## v2026.10.2
 ### Improvements
 
