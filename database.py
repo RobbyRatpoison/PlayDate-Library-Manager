@@ -374,20 +374,42 @@ def get_art_edges(kind='vertical'):
     return {str(r[0]): r[1] for r in rows if _EDGE_VALUE_RE.match(r[1] or '')}
 
 
-def hide_duplicates_where(where, params):
+def _platform_rank_sql(column, priority):
+    """CASE expression ranking `column` by platform priority (0 = shown first);
+    a platform not in the list ranks last. Names are validated and inlined."""
+    order = [p for p in (priority or PLATFORM_PRIORITY_DEFAULT) if re.match(r'^[a-z][a-z0-9_]*$', p or '')]
+    whens = ' '.join(f"WHEN '{p}' THEN {i}" for i, p in enumerate(order))
+    return f"(CASE {column} {whens} ELSE {len(order)} END)"
+
+
+def hide_duplicates_where(where, params, priority=None):
     """Add "Hide duplicate entries" to a finished WHERE clause (filter tree,
-    platform filter and all): a copy is hidden only when the copy it points at
-    (duplicate_of) passes that same clause, i.e. would be listed in its place.
-    Filtering to one store, a tag or a status the preferred copy doesn't match
-    therefore keeps the copy that does. The clause is repeated inside a subquery
-    on the preferred copy's row, where its unqualified column names resolve to
-    that row, so its parameters are repeated too. Returns (where, params)."""
+    platform filter and all). A game owned on several stores shows once: the
+    highest-priority copy that passes the clause. A copy is hidden when another
+    copy of the same game, ranked above it by the platform priority, passes the
+    same clause. Exclude the top copy and the second shows, not every lower one;
+    exclude a middle copy and the top still hides the lowest.
+
+    Groups are stars around the shown copy (duplicate_of points at it, see
+    _flatten_duplicate_links). The clause is repeated inside subqueries on the
+    other copies' rows, where its unqualified column names resolve to them, so
+    its parameters are repeated too (three times in all). Returns (where, params)."""
     if not where or where == '1=1':
         return "(duplicate_of IS NULL OR duplicate_of = '')", list(params)
-    pref = ("NOT EXISTS (SELECT 1 FROM games AS _pref WHERE _pref.appid = CAST(games.duplicate_of AS INTEGER)"
-            f" AND ({where}))")
-    return (f"({where}) AND (duplicate_of IS NULL OR duplicate_of = '' OR {pref})",
-            list(params) + list(params))
+    if priority is None:
+        priority = effective_platform_priority()
+    mine, theirs = _platform_rank_sql('games.platform', priority), _platform_rank_sql('_g.platform', priority)
+    top = "COALESCE(NULLIF(games.duplicate_of, ''), CAST(games.appid AS TEXT))"   # the group's shown copy
+    rank = f"({theirs} < {mine} OR ({theirs} = {mine} AND _g.appid < games.appid))"
+    # Two lookups, each on an index: the shown copy by appid, the others by duplicate_of
+    # (one OR'd lookup made SQLite scan the table for every grouped row).
+    better = (f"(EXISTS (SELECT 1 FROM games AS _g WHERE _g.appid = CAST({top} AS INTEGER)"
+              f" AND _g.appid != games.appid AND {rank} AND ({where}))"
+              f" OR EXISTS (SELECT 1 FROM games AS _g WHERE _g.duplicate_of = {top}"
+              f" AND _g.appid != games.appid AND {rank} AND ({where})))")
+    grouped = ("(games.duplicate_of IS NOT NULL AND games.duplicate_of != '' OR CAST(games.appid AS TEXT) IN "
+               "(SELECT duplicate_of FROM games WHERE duplicate_of IS NOT NULL AND duplicate_of != ''))")
+    return (f"({where}) AND (NOT {grouped} OR NOT {better})", list(params) * 3)
 
 
 def auto_detect_duplicates(platform_priority=None):
@@ -436,10 +458,28 @@ def auto_detect_duplicates(platform_priority=None):
                         updated += 1
 
         _align_manual_duplicate_links(conn, platform_priority)
+        _flatten_duplicate_links(conn)
         conn.commit()
         return updated
     finally:
         conn.close()
+
+
+def _flatten_duplicate_links(conn):
+    """Make every duplicate_of point straight at the copy that is shown. With
+    three copies the pairwise pass above leaves a chain (Humble -> Epic -> Steam),
+    which says nothing about the Humble copy's relation to the Steam one; the
+    Hide-duplicates filter needs each group to be a star around its top copy."""
+    for _ in range(5):                      # chains are short; bounded in case of a cycle
+        n = conn.execute(
+            "UPDATE games SET duplicate_of = (SELECT t.duplicate_of FROM games t WHERE t.appid = CAST(games.duplicate_of AS INTEGER)) "
+            "WHERE duplicate_of IS NOT NULL AND duplicate_of != '' "
+            "AND EXISTS (SELECT 1 FROM games t WHERE t.appid = CAST(games.duplicate_of AS INTEGER) "
+            "AND t.duplicate_of IS NOT NULL AND t.duplicate_of != '' "
+            "AND t.duplicate_of != CAST(games.appid AS TEXT))"
+        ).rowcount
+        if not n:
+            break
 
 
 def _align_manual_duplicate_links(conn, platform_priority):
@@ -475,6 +515,20 @@ def _align_manual_duplicate_links(conn, platform_priority):
                          (other['appid'],))
 
 
+def effective_platform_priority():
+    """The platform order that decides which copy of a game is shown: the user's
+    saved order, then any registered plugin platforms not in it. None if it
+    can't be read (callers fall back to PLATFORM_PRIORITY_DEFAULT)."""
+    try:
+        from config import load_state
+        from plugins import get_platform_priority
+        saved   = load_state().get('platform_priority') or []
+        dynamic = get_platform_priority()
+        return saved + [p for p in dynamic if p not in saved]
+    except Exception:
+        return None
+
+
 def refresh_duplicate_detection():
     """Re-run cross-platform duplicate auto-detection with the user's saved
     platform priority (plus any newly registered plugin platforms), refresh the
@@ -484,14 +538,7 @@ def refresh_duplicate_detection():
     once at startup so a plugin library sync done in a previous session gets
     picked up without the user having to click "Detect Duplicates".
     """
-    try:
-        from config import load_state
-        from plugins import get_platform_priority
-        saved   = load_state().get('platform_priority') or []
-        dynamic = get_platform_priority()
-        priority = saved + [p for p in dynamic if p not in saved]
-    except Exception:
-        priority = None
+    priority = effective_platform_priority()
     # auto_detect_duplicates() clears its prior auto-marks first, so its return
     # value is the full current auto-detected total, not just newly-added ones.
     count = auto_detect_duplicates(platform_priority=priority)
