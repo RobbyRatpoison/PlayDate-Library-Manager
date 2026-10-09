@@ -385,3 +385,132 @@ def test_installer_launch_wait_recognises_either_exe_name(tmp_path, monkeypatch)
     monkeypatch.setattr(rollback.time, 'sleep', lambda s: None)
     assert rollback._wait_installer_launch(base, ['Zest.exe', 'PlayDate.exe']) == 'healthy'
     assert 'Zest.exe' in seen and 'PlayDate.exe' in seen
+
+
+def _fake_flatpak(bindir, calls, install_rc=0):
+    fake = bindir / 'flatpak'
+    fake.write_text(textwrap.dedent(f'''\
+        #!/bin/sh
+        echo "$@" >> {calls}
+        case "$1" in
+          run) exit 1 ;;      # the new version always crashes
+          ps) exit 0 ;;
+          install) exit {install_rc} ;;
+        esac
+    '''))
+    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+
+
+def _run_flatpak_watchdog(tmp_path, side_repo, install_rc=0):
+    base = tmp_path / 'data'
+    bindir = tmp_path / 'bin'
+    base.mkdir()
+    bindir.mkdir()
+    _make_db(str(base / 'games.db'), ['mine'])
+    rollback.backup_data(str(base))
+    rb = base / '.rollback'
+    if side_repo:
+        rollback.make_empty_ostree_repo(str(rb / 'repo'))
+        (rb / 'repo.ref').write_text('app/org.x.App/x86_64/master')
+    else:
+        (rb / 'old.flatpak').write_text('bundle')
+    rollback.begin(str(base), 'flatpak', 'old', 'new')
+    calls = tmp_path / 'calls.log'
+    _fake_flatpak(bindir, calls, install_rc)
+    script = rb / 'watchdog.sh'
+    script.write_text(rollback.FLATPAK_WATCHDOG_SH)
+    env = dict(os.environ, PATH=f'{bindir}:{os.environ["PATH"]}')
+    subprocess.run(['sh', str(script), str(base), 'org.x.App', 'child', 'exec flatpak run org.x.App',
+                    'new', 'old'], env=env, timeout=60)
+    return base, calls
+
+
+@pytest.mark.skipif(sys.platform == 'win32', reason='POSIX sh script')
+def test_flatpak_watchdog_restores_from_the_side_repo(tmp_path):
+    base, calls = _run_flatpak_watchdog(tmp_path, side_repo=True)
+    assert _wait_for(lambda: calls.read_text().count('run org.x.App') >= 3)
+    lines = calls.read_text().splitlines()
+    add = [x for x in lines if x.startswith('remote-add')]
+    assert add and '--no-gpg-verify' in add[0] and 'pd-rollback' in add[0] and f'file://{base}/.rollback/repo' in add[0]
+    inst = [x for x in lines if x.startswith('install')]
+    assert len(inst) == 1 and '--reinstall' in inst[0] and inst[0].endswith('pd-rollback app/org.x.App/x86_64/master')
+    assert 'old.flatpak' not in ' '.join(lines)
+    assert lines[-2].startswith('remote-delete') or any(x.startswith('remote-delete') for x in lines[-3:])   # temporary remote removed again
+    assert _names(str(base / 'games.db')) == ['mine']
+    assert not (base / '.rollback' / 'repo').exists() and not (base / '.rollback' / 'pending.json').exists()
+
+
+@pytest.mark.skipif(sys.platform == 'win32', reason='POSIX sh script')
+def test_flatpak_watchdog_leaves_things_alone_when_the_side_repo_install_fails(tmp_path):
+    base, calls = _run_flatpak_watchdog(tmp_path, side_repo=True, install_rc=1)
+    log = calls.read_text()
+    assert log.count('run org.x.App') == 2                   # no third start: nothing was restored
+    assert not (base / '.rollback' / 'pending.json').exists()
+    assert not (base / '.rollback' / 'rolled_back.json').exists()
+    assert any(x.startswith('remote-delete') for x in log.splitlines()[-2:])
+
+
+def test_empty_ostree_repo_has_what_flatpak_needs(tmp_path):
+    repo = tmp_path / 'repo'
+    rollback.make_empty_ostree_repo(str(repo))
+    assert (repo / 'config').read_text() == '[core]\nrepo_version=1\nmode=archive-z2\n'
+    for d in ('objects', 'tmp', 'extensions', 'state', 'refs/heads', 'refs/remotes'):
+        assert (repo / d).is_dir()
+    rollback.make_empty_ostree_repo(str(repo))                # safe to repeat
+
+
+def test_discard_snapshot_removes_the_side_repo(tmp_path):
+    base = tmp_path / 'data'
+    rb = base / '.rollback'
+    rollback.make_empty_ostree_repo(str(rb / 'repo'))
+    (rb / 'repo.ref').write_text('ref')
+    (rb / 'old.flatpak').write_text('x')
+    rollback.discard_snapshot(str(base))
+    assert not any((rb / n).exists() for n in ('repo', 'repo.ref', 'old.flatpak'))
+
+
+class _Result:
+    def __init__(self, out='', rc=0, err=''):
+        self.stdout, self.returncode, self.stderr = out, rc, err
+
+
+def _patch_updater_host(monkeypatch, tmp_path, fail=()):
+    import updater
+    monkeypatch.setattr(updater, 'BASE_DIR', str(tmp_path))
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        if cmd[:2] == ['sh', '-c']:
+            return _Result('/home/u/.local/share')
+        if cmd[:3] == ['flatpak', 'info', '--user']:
+            return _Result('qt-origin' if '--show-origin' in cmd else 'app/org.x.App/x86_64/master')
+        for name in fail:
+            if name in cmd:
+                return _Result(rc=1, err='boom')
+        return _Result()
+    popens = []
+    monkeypatch.setattr(updater, 'host_run', fake_run)
+    monkeypatch.setattr(updater, 'host_popen', lambda cmd, **kw: popens.append(cmd) or updater._Done(0))
+    return updater, calls, popens
+
+
+def test_export_copies_the_commit_into_a_side_repo(tmp_path, monkeypatch):
+    updater, calls, popens = _patch_updater_host(monkeypatch, tmp_path)
+    handle = updater._rb_flatpak_export_start('org.x.App')
+    assert handle.wait() == 0 and popens == []                # no slow bundle
+    copy = next(c for c in calls if 'build-commit-from' in c)
+    assert '--src-repo=/home/u/.local/share/flatpak/repo' in copy
+    assert '--src-ref=qt-origin:app/org.x.App/x86_64/master' in copy
+    assert copy[-2:] == [str(tmp_path / '.rollback' / 'repo'), 'app/org.x.App/x86_64/master']
+    assert any('build-update-repo' in c for c in calls)
+    assert (tmp_path / '.rollback' / 'repo' / 'config').exists()
+    assert (tmp_path / '.rollback' / 'repo.ref').read_text() == 'app/org.x.App/x86_64/master'
+
+
+def test_export_falls_back_to_a_bundle_when_the_copy_fails(tmp_path, monkeypatch):
+    updater, calls, popens = _patch_updater_host(monkeypatch, tmp_path, fail=('build-commit-from',))
+    handle = updater._rb_flatpak_export_start('org.x.App')
+    assert handle.wait() == 0
+    assert len(popens) == 1 and popens[0][:2] == ['flatpak', 'build-bundle']
+    assert not (tmp_path / '.rollback' / 'repo').exists() and not (tmp_path / '.rollback' / 'repo.ref').exists()

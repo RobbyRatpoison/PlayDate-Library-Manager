@@ -108,8 +108,18 @@ def abort(base):
 
 
 def discard_snapshot(base):
-    for name in ('code', 'data', 'old.flatpak'):
+    for name in ('code', 'data', 'old.flatpak', 'repo', 'repo.ref'):
         _rm(_p(base, name))
+
+
+def make_empty_ostree_repo(path):
+    """Create an empty archive-mode OSTree repository: what `ostree init
+    --mode=archive` makes, without needing the ostree command, which not every
+    host has. `flatpak build-commit-from` can then copy a commit into it."""
+    for d in ('objects', 'tmp', 'extensions', 'state', 'refs/heads', 'refs/mirrors', 'refs/remotes'):
+        os.makedirs(os.path.join(path, d), exist_ok=True)
+    with open(os.path.join(path, 'config'), 'w', encoding='utf-8') as f:
+        f.write('[core]\nrepo_version=1\nmode=archive-z2\n')
 
 
 def mark_healthy(base):
@@ -528,8 +538,25 @@ while [ "$attempt" -le 2 ]; do
 done
 
 say "rolling back to $OLD"
-if ! flatpak install --user -y --reinstall "$RB/old.flatpak" >> "$LOG" 2>&1; then
-    say "reinstall of the old bundle failed; leaving things as they are"
+if [ -f "$RB/repo.ref" ] && [ -d "$RB/repo" ]; then
+    # The old version was copied into a small local repository (seconds, see
+    # updater._rb_flatpak_export_start); install it back from there through a
+    # temporary remote.
+    # --no-deps: the repo holds only the app, and the runtime it needs was
+    # installed for it to have been running at all.
+    flatpak remote-delete --user --force pd-rollback >/dev/null 2>&1
+    if flatpak remote-add --user --no-gpg-verify pd-rollback "file://$RB/repo" >> "$LOG" 2>&1 \
+       && flatpak install --user -y --noninteractive --reinstall --no-deps --no-related pd-rollback "$(cat "$RB/repo.ref")" >> "$LOG" 2>&1; then
+        restored=1
+    else
+        restored=0
+    fi
+    flatpak remote-delete --user --force pd-rollback >> "$LOG" 2>&1
+else
+    flatpak install --user -y --reinstall "$RB/old.flatpak" >> "$LOG" 2>&1 && restored=1 || restored=0
+fi
+if [ "$restored" != 1 ]; then
+    say "reinstall of the old version failed; leaving things as they are"
     rm -f "$RB/pending.json"
     exit 1
 fi
@@ -543,7 +570,7 @@ fi
 printf '{"from_version": "%s", "to_version": "%s", "reason": "the new version failed to start twice", "time": %s}\n' \
     "$NEW" "$OLD" "$(date +%s)" > "$RB/rolled_back.json"
 rm -f "$RB/pending.json"
-rm -rf "$RB/code" "$RB/data" "$RB/old.flatpak"
+rm -rf "$RB/code" "$RB/data" "$RB/old.flatpak" "$RB/repo" "$RB/repo.ref"
 sh -c "$LAUNCH" >/dev/null 2>&1 &
 exit 0
 '''

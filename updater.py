@@ -380,10 +380,54 @@ def _rb_begin(kind, snapshot_code):
         return False
 
 
+class _Done:
+    """Stands in for a Popen whose work is already finished."""
+    def __init__(self, rc):
+        self.rc = rc
+
+    def wait(self):
+        return self.rc
+
+
+def _rb_flatpak_copy_installed(app_id, data_home, ref):
+    """Copy the installed version's commit into a small local OSTree repository
+    at .rollback/repo (about 3 seconds), plus .rollback/repo.ref naming the ref.
+    The watchdog installs it back from there if the update fails. Only needs
+    the flatpak command (`flatpak build-commit-from`), not ostree. True on
+    success; on failure the partial repo is removed."""
+    rb = rollback.rb_dir(BASE_DIR)
+    repo = os.path.join(rb, 'repo')
+    try:
+        origin = host_run(['flatpak', 'info', '--user', '--show-origin', app_id],
+                          capture_output=True, text=True).stdout.strip()
+        if not origin:
+            return False
+        shutil.rmtree(repo, ignore_errors=True)
+        rollback.make_empty_ostree_repo(repo)
+        r = host_run(['flatpak', 'build-commit-from', '--src-repo=' + os.path.join(data_home, 'flatpak', 'repo'),
+                      f'--src-ref={origin}:{ref}', repo, ref], capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError(r.stderr.strip())
+        r = host_run(['flatpak', 'build-update-repo', repo], capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError(r.stderr.strip())
+        with open(os.path.join(rb, 'repo.ref'), 'w', encoding='utf-8') as f:
+            f.write(ref)
+        return True
+    except Exception as e:
+        log.warning(f"Could not copy the installed version into a rollback repo: {e}")
+        shutil.rmtree(repo, ignore_errors=True)
+        return False
+
+
 def _rb_flatpak_export_start(app_id):
-    """Start `flatpak build-bundle` of the installed version into
-    .rollback/old.flatpak on the host. Returns the Popen, or None if it
-    couldn't be started."""
+    """Save the installed version so it can be put back. Returns something with
+    wait() -> 0 on success, or None if nothing could be started.
+
+    The fast way copies the commit into a local repo (seconds). If that fails
+    (an old flatpak, say) it falls back to `flatpak build-bundle` into
+    .rollback/old.flatpak, which compresses the whole app and takes a couple of
+    minutes, so that one is left running while the new bundle downloads."""
     try:
         data_home = host_run(['sh', '-c', 'printf %s "${XDG_DATA_HOME:-$HOME/.local/share}"'],
                              capture_output=True, text=True).stdout.strip()
@@ -391,6 +435,8 @@ def _rb_flatpak_export_start(app_id):
                        capture_output=True, text=True).stdout.strip()
         branch = ref.split('/')[3] if ref.count('/') == 3 else 'master'
         os.makedirs(rollback.rb_dir(BASE_DIR), exist_ok=True)
+        if ref.count('/') == 3 and _rb_flatpak_copy_installed(app_id, data_home, ref):
+            return _Done(0)
         out = os.path.join(rollback.rb_dir(BASE_DIR), 'old.flatpak')
         if os.path.exists(out):
             os.remove(out)
@@ -465,10 +511,11 @@ def perform_update():
                 # installed in at least one of the two scopes already.
                 scope = _flatpak_install_scope(app_id)
 
-                # Export the version that is installed now so it can be put
-                # back. Takes a couple of minutes, so it runs while the new
-                # bundle downloads. --system installs can't update themselves
-                # anyway (Polkit), so only --user is covered.
+                # Save the version that is installed now so it can be put
+                # back: seconds normally, a couple of minutes on the slow
+                # fallback (which runs while the new bundle downloads).
+                # --system installs can't update themselves anyway (Polkit),
+                # so only --user is covered.
                 export = _rb_flatpak_export_start(app_id) if scope == '--user' else None
                 _fetch(url, bundle_path)
                 protected = False
