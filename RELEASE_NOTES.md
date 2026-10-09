@@ -5,7 +5,7 @@
 
 - Backups now include cover art by default.
 - Backing up is much faster, and restoring is faster too.
-- "Fill Missing Data" now finds more games whose titles differ slightly from the wiki's.
+- "Fill Missing Data" now accounts for slight variations in game titles.
 - Covers that don't fit their card now get a smooth colored backdrop instead of a blurred image.
 
 ### Fixes
