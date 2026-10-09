@@ -97,7 +97,8 @@ def _build_shelf_query(shelf, saved_filters, state):
     # equivalent at all, so "Hide duplicate entries" was only ever honored
     # on the Library page, not Home.
     if state.get('hide_duplicates', True):
-        dup_cond = "(duplicate_of IS NULL OR duplicate_of = '')"
+        from database import duplicate_hide_cond
+        dup_cond = duplicate_hide_cond(shelf.get('hidden_platforms'))
         where = dup_cond if where == '1=1' else f"({where}) AND {dup_cond}"
 
     # Platform filter — values are validated to prevent SQL injection

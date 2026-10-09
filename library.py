@@ -537,7 +537,8 @@ def library():
                 where = tree_sql
 
     if state.get('hide_duplicates', True):
-        dup_cond = "(duplicate_of IS NULL OR duplicate_of = '')"
+        from database import duplicate_hide_cond
+        dup_cond = duplicate_hide_cond(state.get('hidden_platforms', []))
         where = dup_cond if where == '1=1' else f"({where}) AND {dup_cond}"
 
     import re as _re

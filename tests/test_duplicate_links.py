@@ -104,3 +104,27 @@ def test_link_within_one_platform_is_left_alone(games_db):
     link_by_hand(games_db, -4, -3)
     database.auto_detect_duplicates(['steam', 'gog'])
     assert visible(games_db) == [-3]
+
+
+def _visible(db, hidden_platforms):
+    c = db()
+    plat = ("platform NOT IN (%s)" % ','.join("'%s'" % p for p in hidden_platforms)) if hidden_platforms else '1=1'
+    rows = c.execute("SELECT appid FROM games WHERE " + database.duplicate_hide_cond(hidden_platforms)
+                     + " AND " + plat + " ORDER BY appid").fetchall()
+    c.close()
+    return [r['appid'] for r in rows]
+
+
+def test_duplicate_stays_visible_when_preferred_copy_platform_is_hidden(games_db):
+    add(games_db, 100, 'Game', 'steam')
+    add(games_db, -1, 'Game', 'epic_games')
+    link_by_hand(games_db, -1, 100)
+    assert _visible(games_db, []) == [100]                  # both shown: only the preferred copy
+    assert _visible(games_db, ['gog']) == [100]             # preferred copy still shown
+    assert _visible(games_db, ['steam']) == [-1]            # Steam hidden: the Epic copy shows
+    assert _visible(games_db, ['epic_games']) == [100]
+
+
+def test_duplicate_cond_ignores_unsafe_platform_names(games_db):
+    add(games_db, 100, 'Game', 'steam')
+    assert database.duplicate_hide_cond(["x'); DROP TABLE games;--"]) == database.duplicate_hide_cond([])

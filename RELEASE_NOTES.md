@@ -9,3 +9,4 @@
 ### Fixes
 
 - Fixed restoring a large backup using a lot of memory.
+- Fixed games with a copy on another store disappearing when filtering to a single store.
