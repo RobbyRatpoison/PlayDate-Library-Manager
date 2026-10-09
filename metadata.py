@@ -93,6 +93,24 @@ def _clean_query(name):
     return _WS_RE.sub(' ', n).strip()
 
 
+_MAX_SEARCH_TRIES = 4
+
+
+def _search_queries(name):
+    """Queries to try against PCGW's fulltext search, longest first. The search
+    needs every word to appear on the page, so a title that differs by one word
+    ("Hood Outlaws and Legends" vs the wiki's "Hood: Outlaws & Legends") finds
+    nothing as typed; dropping trailing words widens it, and the similarity gate
+    still judges whatever comes back. Never shorter than two words."""
+    words = _clean_query(name).split()
+    out = [' '.join(words)] if words else []
+    n = len(words) - 1
+    while n >= 2 and len(out) < _MAX_SEARCH_TRIES:
+        out.append(' '.join(words[:n]))
+        n -= 1
+    return out
+
+
 def _norm(name):
     """Normalise a title for comparison: drop trademark glyphs, a trailing
     (YYYY) disambiguator, and Humble/GOG distribution suffixes, flatten
@@ -194,23 +212,27 @@ def _pcgw_find_page(name, session):
     if wt and '{{infobox game' in wt.lower():
         return clean, wt
 
-    # 2. Fulltext search fallback.
-    data = _pcgw_get(session, {
-        'action': 'query', 'list': 'search', 'format': 'json',
-        'srsearch': clean, 'srlimit': 6, 'srprop': '',
-    })
-    if data is _PCGW_UNAVAILABLE:
-        return _PCGW_UNAVAILABLE
-    hits = data.get('query', {}).get('search', [])
-    if not hits:
-        return None, None
-    best = max(hits, key=lambda h: _similar(name, h['title']))
-    if _similar(name, best['title']) < _SIM_PCGW:
-        return None, None
-    wt = _pcgw_section0_wikitext(best['title'], session)
-    if wt is _PCGW_UNAVAILABLE:
-        return _PCGW_UNAVAILABLE
-    return best['title'], wt
+    # 2. Fulltext search fallback, widening by dropping trailing words when
+    #    nothing comes back (see _search_queries); the first query with a good
+    #    enough hit wins.
+    for q in _search_queries(name):
+        data = _pcgw_get(session, {
+            'action': 'query', 'list': 'search', 'format': 'json',
+            'srsearch': q, 'srlimit': 6, 'srprop': '',
+        })
+        if data is _PCGW_UNAVAILABLE:
+            return _PCGW_UNAVAILABLE
+        hits = data.get('query', {}).get('search', [])
+        if not hits:
+            continue
+        best = max(hits, key=lambda h: _similar(name, h['title']))
+        if _similar(name, best['title']) < _SIM_PCGW:
+            continue
+        wt = _pcgw_section0_wikitext(best['title'], session)
+        if wt is _PCGW_UNAVAILABLE:
+            return _PCGW_UNAVAILABLE
+        return best['title'], wt
+    return None, None
 
 
 def _pcgw_section0_wikitext(title, session):

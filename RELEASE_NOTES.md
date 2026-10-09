@@ -5,6 +5,7 @@
 
 - Backups now include cover art by default, so artwork you picked or fixed by hand isn't lost.
 - Backing up is much faster, and restoring is faster too.
+- "Fill Missing Data" now finds more games whose titles differ slightly from the wiki's.
 
 ### Fixes
 

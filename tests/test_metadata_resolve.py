@@ -9,6 +9,7 @@ import pytest
 from metadata import (
     _norm,
     _clean_query,
+    _search_queries,
     _similar,
     _INFOBOX_APPID_RE,
     _REDIRECT_RE,
@@ -158,3 +159,18 @@ def test_pcgw_parse_date_junk():
     assert _pcgw_parse_date("TBA") is None
     assert _pcgw_parse_date("") is None
     assert _pcgw_parse_date(None) is None
+
+
+def test_search_queries_widen_by_dropping_trailing_words():
+    assert _search_queries('Hood Outlaws and Legends') == [
+        'Hood Outlaws and Legends', 'Hood Outlaws and', 'Hood Outlaws']
+    assert _search_queries('Portal') == ['Portal']
+    assert _search_queries('Half Life') == ['Half Life']      # never below two words
+    assert len(_search_queries('a b c d e f g h')) <= 4
+    assert _search_queries('') == []
+
+
+def test_near_miss_title_passes_similarity_gate():
+    # PCGW's search finds nothing for the first form (see _search_queries), but
+    # once a page is found the pair must clear the gate.
+    assert _similar('Hood Outlaws and Legends', 'Hood: Outlaws & Legends') >= _SIM_PCGW
