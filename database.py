@@ -120,6 +120,8 @@ def init_db():
         'horizontal_art_source': 'TEXT', # Source of horizontal header art
         'icon_source': 'TEXT',           # Source of game icon
         'icon_hash': 'TEXT',             # Steam icon hash for re-downloading
+        'edge_vertical': 'TEXT',         # Edge colours for a vertical cover that doesn't fit the card ('-' = fits, NULL = not computed); see images.compute_art_edges
+        'edge_horizontal': 'TEXT',       # Same for the horizontal header
         'weighted_percentage': 'INT',    # Scaling penalties for total_reviews under 100
         'total_reviews': 'INT',
         'positive_reviews': 'INT',
@@ -352,6 +354,24 @@ def _normalize_name_for_dup(name):
     name = re.sub(r"[^\w\s']", ' ', name)
     name = re.sub(r'\s+', ' ', name).strip()
     return name
+
+
+_EDGE_VALUE_RE = re.compile(r'^[xy][0-9a-f]{6}(,[0-9a-f]{6}){5}/[0-9a-f]{6}(,[0-9a-f]{6}){5}$')
+
+
+def get_art_edges(kind='vertical'):
+    """{appid (str): edge colours} for every cover of `kind` that doesn't fit its
+    card, for pages that draw cards without the full game row in hand (Home and
+    Pick 6). Only well-formed values are returned: they end up in inline styles."""
+    col = 'edge_vertical' if kind == 'vertical' else 'edge_horizontal'
+    conn = get_db()
+    try:
+        rows = conn.execute(f"SELECT appid, {col} FROM games WHERE {col} IS NOT NULL AND {col} != '-'").fetchall()
+    except sqlite3.Error:
+        return {}
+    finally:
+        conn.close()
+    return {str(r[0]): r[1] for r in rows if _EDGE_VALUE_RE.match(r[1] or '')}
 
 
 def duplicate_hide_cond(hidden_platforms=None):

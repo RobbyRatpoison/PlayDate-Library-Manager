@@ -78,15 +78,53 @@ function pdRect(el) {
     });
 }());
 
-/** Escape a string for safe insertion into innerHTML. */
+/**
+ * Backdrop for a cover that doesn't fit its card: the bars are painted from the
+ * cover's own edge colours (computed when the art is saved, see
+ * images.compute_art_edges) instead of a blurred copy of the cover. `edge` is
+ * 'y'|'x' + 6 colours + '/' + 6 colours; `wide` says the cover is wider than the
+ * card (bars above and below, 'y') or taller (bars at the sides, 'x'). Returns
+ * the three CSS values, or null when there is nothing usable for this shape.
+ */
+const _EDGE_RE = /^([xy])([0-9a-f]{6}(?:,[0-9a-f]{6}){5})\/([0-9a-f]{6}(?:,[0-9a-f]{6}){5})$/;
+function _edgeBackdrop(edge, wide) {
+    const m = _EDGE_RE.exec(edge || '');
+    if (!m || (m[1] === 'y') !== wide) return null;
+    const stops = s => s.split(',').map(c => '#' + c).join(',');
+    return wide
+        ? { under: `linear-gradient(to right,${stops(m[3])})`, over: `linear-gradient(to right,${stops(m[2])})`,
+            mask: 'linear-gradient(to bottom,#000,transparent)' }
+        : { under: `linear-gradient(to bottom,${stops(m[3])})`, over: `linear-gradient(to bottom,${stops(m[2])})`,
+            mask: 'linear-gradient(to right,#000,transparent)' };
+}
+
+/** Edge colours for the cover in `img`: the card's own data-edge, else the
+ *  page-wide vertical map (Home, Pick 6), keyed by the appid in the image URL. */
+function _edgeFor(img, container) {
+    if (container.dataset.edge) return container.dataset.edge;
+    const m = /\/library\/vertical\/(-?\d+)\.jpg/.exec(img.currentSrc || img.src || '');
+    return (m && window._ART_EDGES && window._ART_EDGES[m[1]]) || '';
+}
+
 function applyBlurArt(img, container, containerRatio) {
     if (!container) return;
-    container.style.backgroundImage = `url('${img.src}')`;
     const iw = img.naturalWidth, ih = img.naturalHeight;
     // Use the supplied ratio constant to avoid a forced synchronous layout.
     const cr = containerRatio ?? (container.clientWidth / container.clientHeight);
     const ratioMatch = iw && ih && cr &&
         Math.abs((iw / ih) - cr) / cr < 0.05;
+    const edge = (!ratioMatch && iw && ih && cr) ? _edgeBackdrop(_edgeFor(img, container), iw / ih > cr) : null;
+    if (edge) {
+        // Plain gradients: no filter, so nothing to hide while scrolling.
+        container.style.setProperty('--edge-under', edge.under);
+        container.style.setProperty('--edge-over', edge.over);
+        container.style.setProperty('--edge-mask', edge.mask);
+        container.classList.add('needs-edge');
+        container.classList.remove('needs-blur');
+        return;
+    }
+    container.classList.remove('needs-edge');
+    container.style.backgroundImage = `url('${img.src}')`;
     container.classList.toggle('needs-blur', !ratioMatch);
 }
 

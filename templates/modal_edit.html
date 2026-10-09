@@ -1526,6 +1526,7 @@ const achLink = document.getElementById('achievements-link');
             const orient = isHoriz ? 'horizontal' : 'vertical';
             const v = Date.now();
             const container = card.querySelector('.capsule-container');
+            if (container && ('edge_' + orient) in game) container.dataset.edge = game['edge_' + orient] || '';
             const applyCls = () => {
                 if (typeof _applyArtClasses === 'function') _applyArtClasses(img, container);
                 else if (container) { container.classList.remove('no-art'); container.classList.add('has-art'); }

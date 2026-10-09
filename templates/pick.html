@@ -333,6 +333,16 @@
         display: block;
     }
     .result-art.needs-blur .result-cover { transform: scale(0.95); }
+    .result-art.needs-edge::before {
+        content: ''; position: absolute; inset: 0; z-index: 0;
+        background: var(--edge-under);
+    }
+    .result-art.needs-edge::after {
+        content: ''; position: absolute; inset: 0; z-index: 0;
+        background: var(--edge-over);
+        -webkit-mask-image: var(--edge-mask); mask-image: var(--edge-mask);
+    }
+    .result-art.needs-edge .result-cover { transform: scale(0.95); }
     .result-art.no-art .result-cover { visibility: hidden; }
     .result-art .no-art-name {
         display: none; position: absolute; inset: 0; z-index: 2;

@@ -1741,6 +1741,12 @@ if __name__ == '__main__':
         except Exception as e:
             log.warning(f"Startup metadata backfill failed: {e}")
 
+    def _run_art_edges():
+        from images import sync_art_edges
+        sync_art_edges()
+
+    threading.Thread(target=_run_art_edges, daemon=True, name='art-edges').start()
+
     threading.Thread(target=_run_playtime_sync, daemon=True).start()
     log.info("Playtime sync started in background.")
 

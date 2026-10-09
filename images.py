@@ -79,6 +79,110 @@ def save_badge_icon(image_bytes, save_path):
         return False
 
 
+# ── Edge colours for covers that don't fit the card ───────────────────────────
+# A cover whose shape differs from its card leaves bars above/below or beside
+# it. Instead of blurring a copy of the cover behind it (a filter on every card,
+# hidden while scrolling), the bars are painted from colours sampled along the
+# cover's own edges: see applyBlurArt in playdate.js.
+
+ART_CARD_RATIO  = {'vertical': 2 / 3, 'horizontal': 616 / 353}   # width / height of the card
+ART_FIT_TOLERANCE = 0.05      # same 5% playdate.js's applyBlurArt allows
+EDGE_STOPS      = 6           # colours sampled along each edge
+EDGE_DIM        = 0.7         # the backdrop is darkened, as the blur was
+_EDGE_SAMPLE    = 240         # work on a copy this many pixels on the long side
+_ART_PATH_RE    = re.compile(r'[\\/](vertical|horizontal)[\\/](-?\d+)\.jpg$')
+
+
+def compute_art_edges(img, kind):
+    """Edge colours for a cover shown on a card of `kind` ('vertical' or
+    'horizontal'). '-' when the cover fits the card (nothing to paint), else
+    'y' + top + '/' + bottom when it is wider than the card (bars above and
+    below) or 'x' + left + '/' + right when it is taller, each side
+    EDGE_STOPS comma-separated hex colours without '#', already darkened.
+    None if the image can't be read."""
+    target = ART_CARD_RATIO.get(kind)
+    try:
+        w, h = img.size
+        if not target or w < 2 or h < 2:
+            return None
+        if abs(w / h - target) / target < ART_FIT_TOLERANCE:
+            return '-'
+        im = img.convert('RGB')
+        if max(w, h) > _EDGE_SAMPLE:
+            f = _EDGE_SAMPLE / max(w, h)
+            im = im.resize((max(2, round(w * f)), max(2, round(h * f))), Image.BILINEAR)
+            w, h = im.size
+        wide = w / h > target
+        band = max(1, (h if wide else w) // 12)
+
+        def side(box):
+            # shrink the band to one pixel per stop, then read the stops off it
+            strip = im.crop(box).resize((EDGE_STOPS, 1) if wide else (1, EDGE_STOPS), Image.BOX)
+            px = [strip.getpixel((i, 0) if wide else (0, i)) for i in range(EDGE_STOPS)]
+            return ','.join('%02x%02x%02x' % tuple(int(c * EDGE_DIM) for c in p) for p in px)
+        if wide:
+            return 'y' + side((0, 0, w, band)) + '/' + side((0, h - band, w, h))
+        return 'x' + side((0, 0, band, h)) + '/' + side((w - band, 0, w, h))
+    except Exception as e:
+        log.warning(f"compute_art_edges failed: {e}")
+        return None
+
+
+def _store_art_edges(save_path, img):
+    """Compute and save the edge colours for a cover just written to
+    save_path (a no-op for icons and any other path). Never raises."""
+    m = _ART_PATH_RE.search(save_path or '')
+    if not m:
+        return
+    try:
+        value = compute_art_edges(img, m.group(1))
+        if value is not None:
+            from database import update_game_data
+            update_game_data(int(m.group(2)), **{'edge_' + m.group(1): value})
+    except Exception as e:
+        log.warning(f"art edge colours not stored: {e}")
+
+
+def sync_art_edges():
+    """Startup backfill: compute edge colours for every cover on disk whose
+    game has none yet (artwork saved before this existed, or restored from an
+    older backup). Quick per image, runs on a background thread, and does
+    nothing once everything is computed. Never raises."""
+    try:
+        from database import get_db
+        db = get_db()
+        pending = []
+        for kind in ('vertical', 'horizontal'):
+            col = 'edge_' + kind
+            for r in db.execute(f"SELECT appid FROM games WHERE {col} IS NULL").fetchall():
+                path = os.path.join(LIBRARY_DIR, kind, f"{r['appid']}.jpg")
+                if os.path.exists(path):
+                    pending.append((kind, r['appid'], path))
+        db.close()
+        if not pending:
+            return
+        done = 0
+        db = get_db()
+        for kind, appid, path in pending:
+            try:
+                with Image.open(path) as img:
+                    img.draft('RGB', (_EDGE_SAMPLE * 2, _EDGE_SAMPLE * 2))   # fast JPEG downscale
+                    value = compute_art_edges(img, kind)
+            except Exception:
+                continue
+            if value is None:
+                continue
+            db.execute(f"UPDATE games SET edge_{kind} = ? WHERE appid = ?", (value, appid))
+            done += 1
+            if done % 200 == 0:
+                db.commit()
+        db.commit()
+        db.close()
+        log.info(f"Art edge colours computed for {done} covers")
+    except Exception as e:
+        log.warning(f"Art edge colour backfill failed: {e}")
+
+
 def save_as_jpg(image_bytes, save_path):
     """
     Converts any image format (PNG, WEBP, etc.) to JPG and saves it.
@@ -96,6 +200,7 @@ def save_as_jpg(image_bytes, save_path):
             img = img.convert('RGB')
         img.save(tmp_path, 'JPEG', quality=95)
         os.replace(tmp_path, save_path)
+        _store_art_edges(save_path, img)
         return True
     except Exception as e:
         log.warning(f"save_as_jpg: conversion failed: {e}")

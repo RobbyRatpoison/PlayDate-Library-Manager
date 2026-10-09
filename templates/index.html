@@ -107,6 +107,16 @@
         z-index: 1; transition: box-shadow 0.15s ease;
     }
     .shelf-capsule-inner.needs-blur .shelf-capsule { transform: scale(0.95); }
+    .shelf-capsule-inner.needs-edge::before {
+        content: ''; position: absolute; inset: 0; z-index: 0;
+        background: var(--edge-under);
+    }
+    .shelf-capsule-inner.needs-edge::after {
+        content: ''; position: absolute; inset: 0; z-index: 0;
+        background: var(--edge-over);
+        -webkit-mask-image: var(--edge-mask); mask-image: var(--edge-mask);
+    }
+    .shelf-capsule-inner.needs-edge .shelf-capsule { transform: scale(0.95); }
     .shelf-capsule-wrap[style*="--outline-color"] .shelf-capsule { box-shadow: 0 0 0 3px var(--outline-color); }
     .shelf-capsule-wrap.no-art .shelf-capsule { visibility: hidden; }
     .shelf-capsule-wrap .no-art-name {

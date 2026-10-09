@@ -248,7 +248,7 @@
         // by scheduleImgLoad() so fast-scrolling cards never trigger a fetch.
         // Clicks on the card are handled by card_actions.js (user-configurable rules).
         const html = `
-            <div class="capsule-container" style="cursor:pointer;">
+            <div class="capsule-container" style="cursor:pointer;" data-edge="${escHtml((isHoriz ? game.edge_horizontal : game.edge_vertical) || '')}">
                 <img data-src="${src}"
                     data-fallback="${fallback}"
                     alt=""
