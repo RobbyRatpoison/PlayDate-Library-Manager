@@ -11,4 +11,4 @@
 ### Fixes
 
 - Fixed restoring a large backup using a lot of memory.
-- Fixed some games going missing when hiding duplicates.
+- Fixed duplicate games being hidden when they shouldn't be.
