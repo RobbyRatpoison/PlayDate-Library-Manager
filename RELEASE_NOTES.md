@@ -11,4 +11,4 @@
 ### Fixes
 
 - Fixed restoring a large backup using a lot of memory.
-- Fixed games you own on more than one store not showing when you filter to just one of those stores.
+- Fixed games you own on more than one store disappearing when a filter, such as a single store, matches only one of the copies.

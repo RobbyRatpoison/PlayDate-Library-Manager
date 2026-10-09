@@ -53,9 +53,8 @@ def _build_pick_where(state, use_filtered):
             where = f"({where}) AND ({' AND '.join(plat_conds)})"
 
     if state.get('hide_duplicates', True):
-        from database import duplicate_hide_cond
-        dup_cond = duplicate_hide_cond(hidden_platforms)
-        where = dup_cond if where == '1=1' else f"({where}) AND {dup_cond}"
+        from database import hide_duplicates_where
+        where, params = hide_duplicates_where(where, params)
 
     return where, params
 

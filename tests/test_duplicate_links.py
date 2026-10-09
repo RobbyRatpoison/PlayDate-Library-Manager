@@ -106,25 +106,49 @@ def test_link_within_one_platform_is_left_alone(games_db):
     assert visible(games_db) == [-3]
 
 
-def _visible(db, hidden_platforms):
-    c = db()
-    plat = ("platform NOT IN (%s)" % ','.join("'%s'" % p for p in hidden_platforms)) if hidden_platforms else '1=1'
-    rows = c.execute("SELECT appid FROM games WHERE " + database.duplicate_hide_cond(hidden_platforms)
-                     + " AND " + plat + " ORDER BY appid").fetchall()
-    c.close()
+
+def _listed(where, params=()):
+    """Appids a page would list for `where`, with "Hide duplicate entries" on."""
+    where, params = database.hide_duplicates_where(where, list(params))
+    conn = sqlite3.connect(':memory:')
+    conn.row_factory = sqlite3.Row
+    conn.executescript(_LISTING_SQL)
+    rows = conn.execute(f"SELECT appid FROM games WHERE {where} ORDER BY appid", params).fetchall()
+    conn.close()
     return [r['appid'] for r in rows]
 
 
-def test_duplicate_stays_visible_when_preferred_copy_platform_is_hidden(games_db):
-    add(games_db, 100, 'Game', 'steam')
-    add(games_db, -1, 'Game', 'epic_games')
-    link_by_hand(games_db, -1, 100)
-    assert _visible(games_db, []) == [100]                  # both shown: only the preferred copy
-    assert _visible(games_db, ['gog']) == [100]             # preferred copy still shown
-    assert _visible(games_db, ['steam']) == [-1]            # Steam hidden: the Epic copy shows
-    assert _visible(games_db, ['epic_games']) == [100]
+# Steam 100 is the preferred copy of Epic -1 (same game); 200 is an unrelated game.
+_LISTING_SQL = """
+CREATE TABLE games (appid INTEGER PRIMARY KEY, name TEXT, platform TEXT, tags TEXT,
+                    completion_status TEXT, duplicate_of TEXT);
+INSERT INTO games VALUES (100, 'Game', 'steam',      'Puzzle', 'Beaten',       NULL);
+INSERT INTO games VALUES (-1,  'Game', 'epic_games', 'Action', 'Never Played', '100');
+INSERT INTO games VALUES (200, 'Other','steam',      'Action', 'Never Played', NULL);
+"""
 
 
-def test_duplicate_cond_ignores_unsafe_platform_names(games_db):
-    add(games_db, 100, 'Game', 'steam')
-    assert database.duplicate_hide_cond(["x'); DROP TABLE games;--"]) == database.duplicate_hide_cond([])
+def test_duplicate_hidden_when_preferred_copy_is_listed_too():
+    assert _listed('1=1') == [100, 200]
+    assert _listed("platform != 'gog'") == [100, 200]
+    assert _listed("completion_status = 'Beaten'") == [100]
+
+
+def test_duplicate_shown_when_filtered_to_its_own_store():
+    assert _listed("platform = 'epic_games'") == [-1]
+    assert _listed("platform NOT IN (?)", ['steam']) == [-1]
+    assert _listed("platform != 'epic_games'") == [100, 200]
+
+
+def test_duplicate_shown_when_preferred_copy_fails_any_other_filter():
+    # the Epic copy is the only one tagged Action among the pair
+    assert _listed("',' || tags || ',' LIKE ?", ['%,Action,%']) == [-1, 200]
+    assert _listed("',' || tags || ',' LIKE ?", ['%,Puzzle,%']) == [100]
+    assert _listed("completion_status = 'Never Played'") == [-1, 200]
+
+
+def test_parameters_are_repeated_for_the_subquery():
+    where, params = database.hide_duplicates_where("platform = ? AND tags LIKE ?", ['steam', '%x%'])
+    assert params == ['steam', '%x%', 'steam', '%x%']
+    assert where.count('?') == len(params)
+    assert database.hide_duplicates_where('1=1', ['a']) == ("(duplicate_of IS NULL OR duplicate_of = '')", ['a'])

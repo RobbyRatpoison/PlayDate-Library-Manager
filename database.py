@@ -374,19 +374,20 @@ def get_art_edges(kind='vertical'):
     return {str(r[0]): r[1] for r in rows if _EDGE_VALUE_RE.match(r[1] or '')}
 
 
-def duplicate_hide_cond(hidden_platforms=None):
-    """WHERE fragment for "Hide duplicate entries": a copy is hidden only while
-    the copy it points at (duplicate_of) can actually be shown. When the
-    platform filter hides the preferred copy's platform, the lower-priority
-    copy stays visible, otherwise filtering to one store would drop a game the
-    user owns there. Platform names are validated, so they are inlined."""
-    plats = [p for p in (hidden_platforms or []) if re.match(r'^[a-z][a-z0-9_]*$', p or '')]
-    cond = "(duplicate_of IS NULL OR duplicate_of = ''"
-    if plats:
-        inlist = ','.join(f"'{p}'" for p in plats)
-        cond += (" OR NOT EXISTS (SELECT 1 FROM games AS _pref WHERE CAST(_pref.appid AS TEXT) = games.duplicate_of"
-                 f" AND _pref.platform NOT IN ({inlist}))")
-    return cond + ")"
+def hide_duplicates_where(where, params):
+    """Add "Hide duplicate entries" to a finished WHERE clause (filter tree,
+    platform filter and all): a copy is hidden only when the copy it points at
+    (duplicate_of) passes that same clause, i.e. would be listed in its place.
+    Filtering to one store, a tag or a status the preferred copy doesn't match
+    therefore keeps the copy that does. The clause is repeated inside a subquery
+    on the preferred copy's row, where its unqualified column names resolve to
+    that row, so its parameters are repeated too. Returns (where, params)."""
+    if not where or where == '1=1':
+        return "(duplicate_of IS NULL OR duplicate_of = '')", list(params)
+    pref = ("NOT EXISTS (SELECT 1 FROM games AS _pref WHERE _pref.appid = CAST(games.duplicate_of AS INTEGER)"
+            f" AND ({where}))")
+    return (f"({where}) AND (duplicate_of IS NULL OR duplicate_of = '' OR {pref})",
+            list(params) + list(params))
 
 
 def auto_detect_duplicates(platform_priority=None):

@@ -93,14 +93,6 @@ def _build_shelf_query(shelf, saved_filters, state):
     else:
         where = '1=1'
 
-    # Same condition library.py's grid query applies -- shelves had no
-    # equivalent at all, so "Hide duplicate entries" was only ever honored
-    # on the Library page, not Home.
-    if state.get('hide_duplicates', True):
-        from database import duplicate_hide_cond
-        dup_cond = duplicate_hide_cond(shelf.get('hidden_platforms'))
-        where = dup_cond if where == '1=1' else f"({where}) AND {dup_cond}"
-
     # Platform filter — values are validated to prevent SQL injection
     shelf_hidden = [p for p in (shelf.get('hidden_platforms') or []) if re.match(r'^[a-z][a-z0-9_]*$', p or '')]
     if shelf_hidden:
@@ -113,6 +105,13 @@ def _build_shelf_query(shelf, saved_filters, state):
             plat_conds.append(f"platform NOT IN ({inlist})")
         plat_sql = ' AND '.join(plat_conds)
         where = plat_sql if where == '1=1' else f"({where}) AND ({plat_sql})"
+
+    # Same condition library.py's grid query applies, last so the preferred copy
+    # is tested against the whole shelf filter (shelves had no equivalent at all,
+    # so "Hide duplicate entries" was only ever honored on the Library page).
+    if state.get('hide_duplicates', True):
+        from database import hide_duplicates_where
+        where, params = hide_duplicates_where(where, params)
 
     # Sort order
     sort_col = shelf.get('sort_col')

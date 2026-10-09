@@ -536,11 +536,6 @@ def library():
             if tree_sql and tree_sql != '1=1':
                 where = tree_sql
 
-    if state.get('hide_duplicates', True):
-        from database import duplicate_hide_cond
-        dup_cond = duplicate_hide_cond(state.get('hidden_platforms', []))
-        where = dup_cond if where == '1=1' else f"({where}) AND {dup_cond}"
-
     import re as _re
     hidden_platforms = [p for p in state.get('hidden_platforms', []) if _re.match(r'^[a-z][a-z0-9_]*$', p or '')]
     if hidden_platforms:
@@ -554,6 +549,11 @@ def library():
             params.extend(non_steam)
         plat_cond = ' AND '.join(plat_conds)
         where = plat_cond if where == '1=1' else f"({where}) AND ({plat_cond})"
+
+    # Last, so the preferred copy is tested against the whole filter.
+    if state.get('hide_duplicates', True):
+        from database import hide_duplicates_where
+        where, params = hide_duplicates_where(where, params)
 
     query = f"SELECT * FROM games WHERE {where} ORDER BY {sort_col} {sort_ord}".rstrip()
 
