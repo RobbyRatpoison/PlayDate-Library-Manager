@@ -11,4 +11,4 @@
 ### Fixes
 
 - Fixed restoring a large backup using a lot of memory.
-- Fixed games vanishing when you filter to a store that isn't their highest-priority one.
+- Fixed duplicate games being hidden when they shouldn't be.
