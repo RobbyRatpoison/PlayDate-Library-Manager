@@ -564,6 +564,18 @@ function _libOnReady(fn) {
         return card;
     }
 
+    // Regroup the grid in place for a grouping-only change: grouping never changes which games are
+    // listed (the data key ignores it), so the page need not reload. Grid mode only; returns false
+    // when the caller should reload instead.
+    window.pdRegroup = function(val) {
+        if (_artOrientation === 'list') return false;
+        _groupBy = val || null;
+        window._groupBy = _groupBy;
+        _updateGroupByHeaderLabel();
+        buildGrid();
+        return true;
+    };
+
     function _updateGroupByHeaderLabel() {
         const el = document.getElementById('group-by-label');
         if (!el) return;

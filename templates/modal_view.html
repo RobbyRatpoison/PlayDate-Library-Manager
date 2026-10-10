@@ -226,6 +226,14 @@ async function applyViewModal() {
         return;
     }
 
+    // Grouping alone does not change the game list, so regroup the open grid instead of reloading.
+    const groupOnly = Object.keys(updates).length === 1 && 'group_by' in updates && window.pdRegroup;
+    if (groupOnly) {
+        if (!await sendStateUpdate(updates, false)) return;   // save failed: the error is already shown
+        if (window.pdRegroup(updates.group_by)) { closeViewModal(); return; }
+        window.location.reload();
+        return;
+    }
     await sendStateUpdate(updates);
 }
 

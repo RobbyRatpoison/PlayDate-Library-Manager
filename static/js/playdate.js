@@ -482,6 +482,7 @@ async function sendStateUpdate(payload, reload = true) {
         });
         if (response.ok) {
             if (reload) window.location.reload();
+            return true;
         } else {
             let message = `Server error ${response.status}`;
             try { const d = await response.json(); if (d.message) message = d.message; } catch {}
@@ -491,6 +492,7 @@ async function sendStateUpdate(payload, reload = true) {
         showFilterError('Network error — could not reach the server.');
         console.error('sendStateUpdate failed:', err);
     }
+    return false;
 }
 
 // Shared two-step delete confirmation (remove from library, then optionally
