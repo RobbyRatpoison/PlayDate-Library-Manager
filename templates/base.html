@@ -245,6 +245,8 @@
         document.body.classList.add('loaded');
     }, 300);
     </script>
+    {% if body_fade_mode() == 'off' %}<style>body { opacity: 1 !important; transition: none !important; }</style>
+    {% elif body_fade_mode() == 'faint' %}<style>body:not(.loaded) { opacity: .01 !important; }</style>{% endif %}
 </head>
 <body>
     {% if _from_splash %}

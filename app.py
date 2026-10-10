@@ -546,6 +546,13 @@ def create_app(template_folder=None, static_folder=None):
     app.jinja_env.globals['art_edges'] = get_art_edges
     from images import art_version
     app.jinja_env.globals['art_version'] = art_version
+
+    def body_fade_mode():
+        # TEMPORARY experiment (first paint is ~500 ms late in QtWebEngine because the body starts
+        # at opacity 0): PLAYDATE_BODY_FADE=off shows the page at once, =faint starts at opacity .01.
+        v = os.environ.get('PLAYDATE_BODY_FADE', '')
+        return v if v in ('off', 'faint') else ''
+    app.jinja_env.globals['body_fade_mode'] = body_fade_mode
     app.jinja_env.globals['plugin_js_api']     = _plugins.plugin_js_api
     app.jinja_env.globals['plugin_home_widgets']    = _plugins.home_widgets
     app.jinja_env.globals['plugin_widget_fragment'] = _plugins.widget_fragment
