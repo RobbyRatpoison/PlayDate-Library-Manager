@@ -2329,6 +2329,11 @@ const achLink = document.getElementById('achievements-link');
         background: var(--bg-raised);
     }
     .sgdb-thumb:hover   { border-color: var(--accent); }
+    .sgdb-section {
+        flex-basis: 100%; font-size: 0.78rem; color: var(--text-secondary);
+        padding: 2px 2px 0; letter-spacing: 0.02em;
+    }
+    .sgdb-section.sgdb-section-later { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
     .sgdb-thumb img { display:block; width:auto; height:300px; object-fit:cover; }
     #sgdb-modal-overlay.active { display:flex; }
     .sgdb-game-row {
@@ -2402,7 +2407,17 @@ const achLink = document.getElementById('achievements-link');
             grid.style.display = 'none';
             return;
         }
-        options.forEach(opt => {
+        // Cover shape vs. card shape: images that don't match get a backdrop on the card
+        // (the server flags them with `fits`; icons always fit).
+        const fit   = options.filter(o => o.fits !== false);
+        const other = options.filter(o => o.fits === false);
+        const addHeader = (text, later) => {
+            const h = document.createElement('div');
+            h.className = 'sgdb-section' + (later ? ' sgdb-section-later' : '');
+            h.textContent = text;
+            grid.appendChild(h);
+        };
+        const addThumb = opt => {
             const div = document.createElement('div');
             div.className = 'sgdb-thumb';
             const img = document.createElement('img');
@@ -2412,7 +2427,16 @@ const achLink = document.getElementById('achievements-link');
             div.appendChild(img);
             div.addEventListener('click', () => useSgdbSelection(opt));
             grid.appendChild(div);
-        });
+        };
+        if (fit.length && other.length) {
+            addHeader(`Fits the card (${fit.length})`, false);
+            fit.forEach(addThumb);
+            addHeader(`Different shape, the card shows a backdrop around these (${other.length})`, true);
+            other.forEach(addThumb);
+        } else {
+            if (other.length) addHeader("None of these match the card's shape, so the card shows a backdrop around the image.", false);
+            options.forEach(addThumb);
+        }
     }
 
     async function sgdbSearchByName() {

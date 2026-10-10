@@ -682,12 +682,43 @@ def download_from_url(appid, url, orientation):
     return 'missing'
 
 
+# Icons are square; vertical/horizontal aim for the card ratio (ART_CARD_RATIO).
+_SGDB_TARGET_RATIO = {**ART_CARD_RATIO, 'icon': 1.0}
+
+
+def _sgdb_options_from(data, artwork_type):
+    """Turn a SteamGridDB response into [{url, thumb, width, height, fits}] (static
+    images only), closest to the target aspect ratio first. `fits` is the same
+    5% rule compute_art_edges uses: False means the card shows a backdrop around
+    the image (an icon always fits, it has no card to fill). The sort is stable,
+    so options equally close keep SteamGridDB's own order, and anything with no
+    usable size goes last."""
+    target = _SGDB_TARGET_RATIO.get(artwork_type)
+
+    def distance(opt):
+        w, h = opt['width'], opt['height']
+        if not (target and w and h):
+            return float('inf')
+        return abs(w / h - target) / target
+
+    results = [{
+        'url':    item.get('url', ''),
+        'thumb':  item.get('thumb', ''),
+        'width':  item.get('width', 0),
+        'height': item.get('height', 0),
+    } for item in data['data'] if not item.get('animated')]
+    for opt in results:
+        opt['fits'] = artwork_type == 'icon' or distance(opt) < ART_FIT_TOLERANCE
+    results.sort(key=lambda o: round(distance(o), 3))
+    return results
+
+
 def fetch_sgdb_options(appid, artwork_type):
     """
     Fetches available artwork options from SteamGridDB without downloading.
     artwork_type: 'vertical', 'horizontal', or 'icon'
-    Returns a list of {url, thumb, width, height} dicts (non-animated only),
-    or an empty list if no key configured or request fails.
+    Returns a list of {url, thumb, width, height} dicts (non-animated only,
+    closest to the wanted aspect ratio first), or an empty list if no key configured or request fails.
     """
     sgdb_key = _get_sgdb_key()
     if not sgdb_key:
@@ -706,17 +737,7 @@ def fetch_sgdb_options(appid, artwork_type):
     if not data or not data.get('success') or not data.get('data'):
         return []
 
-    results = []
-    for item in data['data']:
-        if item.get('animated'):
-            continue
-        results.append({
-            'url':    item.get('url', ''),
-            'thumb':  item.get('thumb', ''),
-            'width':  item.get('width', 0),
-            'height': item.get('height', 0),
-        })
-    return results
+    return _sgdb_options_from(data, artwork_type)
 
 
 def search_sgdb_games(term):
@@ -758,17 +779,7 @@ def fetch_sgdb_options_by_id(sgdb_id, artwork_type):
     if not data or not data.get('success') or not data.get('data'):
         return []
 
-    results = []
-    for item in data['data']:
-        if item.get('animated'):
-            continue
-        results.append({
-            'url':    item.get('url', ''),
-            'thumb':  item.get('thumb', ''),
-            'width':  item.get('width', 0),
-            'height': item.get('height', 0),
-        })
-    return results
+    return _sgdb_options_from(data, artwork_type)
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
