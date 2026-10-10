@@ -174,13 +174,15 @@ jobs:
       # (observed: stuck 10+ minutes on this exact step, cancelled manually).
       # timeout-minutes is a second, independent safety net in case something
       # else ever hangs here too -- normally finishes in well under a minute.
+      # elfutils is only a Recommends of flatpak-builder, but it provides eu-strip, which
+      # flatpak-builder runs on every module (beta.6 failed without it), so it is named here.
       - name: Install flatpak tooling
         timeout-minutes: 10
         env:
           NEEDRESTART_MODE: a
         run: |
           sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends flatpak flatpak-builder
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends flatpak flatpak-builder elfutils
           flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
 
       # ── 4b. Cache the installed GNOME runtime + SDK ───────────────────────────
