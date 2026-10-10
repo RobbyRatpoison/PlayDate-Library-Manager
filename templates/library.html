@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{%- set _sort_labels = {'name': 'Alphabetical', 'playtime_forever': 'Hours Played', 'release_date': 'Release Date', 'last_played': 'Recently Played', 'date_added': 'Date Added', 'review_percentage': 'Review Score', 'weighted_percentage': 'Weighted Score', 'metacritic_score': 'Metacritic Score', 'hltb_main': 'HLTB: Main Story', 'hltb_extras': 'HLTB: Main + Extras', 'hltb_completionist': 'HLTB: Completionist', 'hltb_min': 'HLTB: Shortest', 'hltb_max': 'HLTB: Longest', 'achievement_percent': 'Achievement %', 'achievement_remaining': 'Achievements Remaining', 'total_reviews': 'Total Reviews', 'tag_similarity': 'Tag Similarity', 'random': 'Random'} -%}
 
 
 {% block extra_css %}
@@ -703,7 +704,6 @@ window.GAMES_READY.catch(function () { /* reported by the loader at the end of t
     </style>
     {% set _non_default_sort = state.sort not in ('name', '') or state.order != 'ASC' %}
     {% set _has_plat_filter = hidden_platforms | length > 0 %}
-    {%- set _sort_labels = {'name': 'Alphabetical', 'playtime_forever': 'Hours Played', 'release_date': 'Release Date', 'last_played': 'Recently Played', 'date_added': 'Date Added', 'review_percentage': 'Review Score', 'weighted_percentage': 'Weighted Score', 'metacritic_score': 'Metacritic Score', 'hltb_main': 'HLTB: Main Story', 'hltb_extras': 'HLTB: Main + Extras', 'hltb_completionist': 'HLTB: Completionist', 'hltb_min': 'HLTB: Shortest', 'hltb_max': 'HLTB: Longest', 'achievement_percent': 'Achievement %', 'achievement_remaining': 'Achievements Remaining', 'total_reviews': 'Total Reviews', 'tag_similarity': 'Tag Similarity', 'random': 'Random'} -%}
     {%- set _group_labels = {'installed': 'Installed', 'completion_status': 'Completion', 'release_date': 'Release Year', 'date_added': 'Year Added', 'review_percentage': 'Review Score', 'weighted_percentage': 'Weighted Score', 'platform': 'Library'} -%}
     {%- set _plat_labels = platform_labels() -%}
     {%- set ns = namespace(filter_label=none, has_real_filter=false, search_term=none) -%}
@@ -794,7 +794,7 @@ window.GAMES_READY.catch(function () { /* reported by the loader at the end of t
             {%- if ns.search_term is not none %} &middot; "{{ ns.search_term }}"{% endif %}
             {%- if ns.filter_label is not none %} &middot; {{ ns.filter_label }}{% endif %}
             {%- if _has_plat_filter %} &middot; {% for p in available_platforms if p not in hidden_platforms %}{{ _plat_labels.get(p, p) }}{% if not loop.last %}, {% endif %}{% endfor %} only{% endif %}
-            {%- if _non_default_sort %} &middot; {{ _sort_labels.get(state.sort, state.sort) }}{% if state.sort != 'random' %} {{ '↑' if state.order == 'ASC' else '↓' }}{% endif %}{% endif %}
+            {%- if _non_default_sort %}<span id="sort-label"> &middot; {{ _sort_labels.get(state.sort, state.sort) }}{% if state.sort != 'random' %} {{ '↑' if state.order == 'ASC' else '↓' }}{% endif %}</span>{% else %}<span id="sort-label" style="display:none;"></span>{% endif %}
             {%- if group_by %}<span id="group-by-label"> &middot; Grouped by {{ _group_labels.get(group_by, group_by) }}</span>{% else %}<span id="group-by-label" style="display:none;"></span>{% endif %}
         </p>
     </div>
@@ -984,6 +984,7 @@ window.GAMES_READY.catch(function () { /* reported by the loader at the end of t
     window.OUTLINE_COLORS = {{ outline_colors | tojson }};
     window.CURRENT_SORT = {{ state.sort | tojson }};
     window.CURRENT_ORDER = {{ state.order | tojson }};
+    window._SORT_LABELS = {{ _sort_labels | tojson }};
     window._artOrientation = '{{ state.get("artwork_orientation", "vertical") }}';
     window.HOVER_TIP = {{ hover_tooltip | tojson }};
     window.CARD_BADGES = {{ (state.card_badges if state.get('card_badges', {}).get('enabled', {}).get('library', True) else none) | tojson }};

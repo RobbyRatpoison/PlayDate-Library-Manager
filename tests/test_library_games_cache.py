@@ -117,3 +117,13 @@ def test_prewarm_waits_while_a_bulk_job_runs(db, monkeypatch):
     monkeypatch.setitem(library._bulk_op_state, 'running', True)
     with app.test_request_context():
         assert library.library_prewarm().get_json() == {'status': 'busy'}
+
+
+def test_order_route_lists_the_current_appids_in_sort_order(db, monkeypatch):
+    app = Flask('t')
+    state = {'sort': 'name', 'order': 'DESC'}
+    monkeypatch.setattr(library, 'load_state', lambda: state)
+    monkeypatch.setattr(library, '_library_query', lambda st: _q(sort='appid ' + st['order']))
+    with app.test_request_context():
+        d = library.library_order().get_json()
+    assert d == {'status': 'ok', 'appids': [10, -5], 'sort': 'name', 'order': 'DESC'}

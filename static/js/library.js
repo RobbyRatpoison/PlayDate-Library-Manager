@@ -10,8 +10,8 @@ function _libOnReady(fn) {
     // ── All game data in one JS array — no per-card script tags ──
     const GAMES = window.GAMES;
     const OUTLINE_COLORS = window.OUTLINE_COLORS;
-    const CURRENT_SORT = window.CURRENT_SORT;
-    const CURRENT_ORDER = window.CURRENT_ORDER;
+    let CURRENT_SORT = window.CURRENT_SORT;
+    let CURRENT_ORDER = window.CURRENT_ORDER;
 
     // ── Artwork orientation + card size (restored from state) ────────────────
     const _imgV = window._ART_V || Date.now(); // cache-buster: moves when a cover file does, so stale 404s are never reused but the cache still works
@@ -201,9 +201,14 @@ function _libOnReady(fn) {
         total_reviews:       'DESC',
         tag_similarity:      'DESC',
     };
+    async function _applySortChange(updates) {
+        if (!(await sendStateUpdate(updates, false))) return;
+        if (!(await window.pdResort(updates))) window.location.reload();
+    }
+
     function updateSort(column) {
         const order = _sortDefaultOrder[column] ?? 'ASC';
-        sendStateUpdate({ sort: column, order });
+        _applySortChange({ sort: column, order });
     }
 
     async function clearAndReload() {
@@ -226,7 +231,7 @@ function _libOnReady(fn) {
 
     function toggleOrder() {
         const currentOrder = CURRENT_ORDER;
-        sendStateUpdate({ order: currentOrder === 'ASC' ? 'DESC' : 'ASC' });
+        _applySortChange({ order: currentOrder === 'ASC' ? 'DESC' : 'ASC' });
     }
 
     const filterConfig = {};
@@ -573,6 +578,34 @@ function _libOnReady(fn) {
         window._groupBy = _groupBy;
         _updateGroupByHeaderLabel();
         buildGrid();
+        return true;
+    };
+
+    // Reorder the open grid for a sort change (the saved state already holds the new sort/order).
+    // Sorting never changes which games are listed, so the server only sends the new order of
+    // appids. Resolves false when the caller should reload instead: list mode, a failed request, or
+    // a game list that no longer matches this page (something changed it since it was built).
+    window.pdResort = async function(updates, groupBy) {
+        if (_artOrientation === 'list') return false;
+        let d;
+        try { d = await (await fetch('/api/library/order', { credentials: 'same-origin' })).json(); }
+        catch (e) { return false; }
+        if (!d || d.status !== 'ok' || d.appids.length !== GAMES.length || !d.appids.every(a => _GAME_MAP.has(a))) return false;
+        const pos = new Map(d.appids.map((a, i) => [a, i]));
+        GAMES.sort((x, y) => pos.get(x.appid) - pos.get(y.appid));
+        CURRENT_SORT = window.CURRENT_SORT = d.sort;
+        CURRENT_ORDER = window.CURRENT_ORDER = d.order;
+        if (groupBy !== undefined) { _groupBy = groupBy || null; window._groupBy = _groupBy; _updateGroupByHeaderLabel(); }
+        const el = document.getElementById('sort-label');
+        if (el) {
+            const nonDefault = d.sort !== 'name' || d.order !== 'ASC';
+            el.style.display = nonDefault ? '' : 'none';
+            el.textContent = nonDefault
+                ? ' \u00b7 ' + ((window._SORT_LABELS || {})[d.sort] || d.sort) + (d.sort !== 'random' ? (d.order === 'ASC' ? ' \u2191' : ' \u2193') : '')
+                : '';
+        }
+        buildGrid();
+        window.scrollTo({ top: 0, behavior: 'instant' });
         return true;
     };
 

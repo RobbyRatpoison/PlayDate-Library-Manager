@@ -153,7 +153,7 @@ let _vmPendSort = null;
 let _vmPendOrder = null;
 let _vmPendView = null;
 let _vmPendGroupBy = undefined; // undefined = unchanged
-const _vmServerOrder = '{{ state.order if state is defined and state.order is defined else "ASC" }}';
+let _vmServerOrder = '{{ state.order if state is defined and state.order is defined else "ASC" }}';
 
 function _vmSyncViewButtons(mode) {
     ['vertical', 'horizontal', 'list'].forEach(m => {
@@ -226,6 +226,19 @@ async function applyViewModal() {
         return;
     }
 
+    // Sort, order and grouping never change which games are listed, so reorder the open grid
+    // instead of reloading (the server only sends the new order).
+    const inPlace = Object.keys(updates).every(k => k === 'sort' || k === 'order' || k === 'group_by');
+    if (inPlace && window.pdResort && (updates.sort !== undefined || updates.order !== undefined)) {
+        if (!await sendStateUpdate(updates, false)) return;
+        if (await window.pdResort(updates, 'group_by' in updates ? updates.group_by : undefined)) {
+            if (updates.order !== undefined) _vmServerOrder = updates.order;
+            closeViewModal();
+            return;
+        }
+        window.location.reload();
+        return;
+    }
     // Grouping alone does not change the game list, so regroup the open grid instead of reloading.
     const groupOnly = Object.keys(updates).length === 1 && 'group_by' in updates && window.pdRegroup;
     if (groupOnly) {

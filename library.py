@@ -679,6 +679,21 @@ def library_games():
     return resp
 
 
+@library_bp.route('/api/library/order')
+def library_order():
+    """The appids of the current Library list, in the saved sort order. Sorting never changes which
+    games are listed, so a page that already holds the games can reorder itself from this alone
+    instead of reloading. Also leaves the full list cached for the next page load."""
+    state = load_state()
+    q, key, result = _library_current(state)
+    if result['sql_error']:
+        return jsonify({'status': 'error'})
+    resp = jsonify({'status': 'ok', 'appids': result['appids'], 'sort': state.get('sort', 'name'),
+                    'order': state.get('order', 'ASC')})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
 @library_bp.route('/api/library/prewarm', methods=['POST'])
 def library_prewarm():
     """Build the Library's game list now and hand back its URL, so another page can fetch it in idle
