@@ -778,6 +778,7 @@
         'config-modal',        // first-run required setup (modal_edit.html, needs_config) — no close button, blocks everything else
         'update-confirm-overlay', // base.html install-update confirmation
         'whats-new-modal',     // base.html post-update changelog popup
+        'art-crop-modal',      // opened over editModal, so it must come first
         'editModal', 'filterModal', 'viewModal',
         // Library bulk modals
         'bulk-edit-modal', 'bulk-rescrape-modal', 'bulk-delete-modal',

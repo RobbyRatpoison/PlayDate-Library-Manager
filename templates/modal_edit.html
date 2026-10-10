@@ -469,6 +469,7 @@
                         <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                             <button type="button" class="nav-btn art-action-btn" onclick="rescrapeArt('vertical')"       data-modal-row="21">Re-scrape</button>
                             <button type="button" id="art-steam-btn-vertical" class="nav-btn art-action-btn" onclick="artFromSteam('vertical')" data-modal-row="21" style="display:none;">From Steam</button>
+                            <button type="button" class="nav-btn art-action-btn" onclick="openArtCrop('vertical')" data-modal-row="21">Crop</button>
                             <button type="button" class="nav-btn art-action-btn" onclick="toggleArtCustomUrl('vertical')" data-modal-row="21">Custom URL</button>
                             {% if existing_sgdb_key %}<button type="button" class="nav-btn art-action-btn" onclick="openSgdbBrowser('vertical')" data-modal-row="21">Browse SGDB</button>{% endif %}
                             {% if not existing_sgdb_key %}<a id="sgdb-link-vertical" href="#" target="_blank" rel="noopener" style="font-size:0.75rem; color:var(--accent);" data-modal-row="21">Browse SGDB ↗</a>{% endif %}
@@ -493,6 +494,7 @@
                         <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                             <button type="button" class="nav-btn art-action-btn" onclick="rescrapeArt('horizontal')"       data-modal-row="21">Re-scrape</button>
                             <button type="button" id="art-steam-btn-horizontal" class="nav-btn art-action-btn" onclick="artFromSteam('horizontal')" data-modal-row="21" style="display:none;">From Steam</button>
+                            <button type="button" class="nav-btn art-action-btn" onclick="openArtCrop('horizontal')" data-modal-row="21">Crop</button>
                             <button type="button" class="nav-btn art-action-btn" onclick="toggleArtCustomUrl('horizontal')" data-modal-row="21">Custom URL</button>
                             {% if existing_sgdb_key %}<button type="button" class="nav-btn art-action-btn" onclick="openSgdbBrowser('horizontal')" data-modal-row="21">Browse SGDB</button>{% endif %}
                             {% if not existing_sgdb_key %}<a id="sgdb-link-horizontal" href="#" target="_blank" rel="noopener" style="font-size:0.75rem; color:var(--accent);" data-modal-row="21">Browse SGDB ↗</a>{% endif %}
@@ -517,6 +519,7 @@
                         <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                             <button type="button" class="nav-btn art-action-btn" onclick="rescrapeArt('icon')"       data-modal-row="21">Re-scrape</button>
                             <button type="button" id="art-steam-btn-icon" class="nav-btn art-action-btn" onclick="artFromSteam('icon')" data-modal-row="21" style="display:none;">From Steam</button>
+                            <button type="button" class="nav-btn art-action-btn" onclick="openArtCrop('icon')" data-modal-row="21">Crop</button>
                             <button type="button" class="nav-btn art-action-btn" onclick="toggleArtCustomUrl('icon')" data-modal-row="21">Custom URL</button>
                             {% if existing_sgdb_key %}<button type="button" class="nav-btn art-action-btn" onclick="openSgdbBrowser('icon')" data-modal-row="21">Browse SGDB</button>{% endif %}
                             {% if not existing_sgdb_key %}<a id="sgdb-link-icon" href="#" target="_blank" rel="noopener" style="font-size:0.75rem; color:var(--accent);" data-modal-row="21">Browse SGDB ↗</a>{% endif %}
@@ -852,11 +855,14 @@
         safeSet('edit-total-ach', game.total_achievements);
 
         // Reset and populate artwork panels
-        _artCurrentTab = 'vertical';
+        // The art panel starts on the view the Library is in: horizontal view opens it on horizontal,
+        // vertical and list view on vertical.
+        const _startTab = (typeof _artOrientation !== 'undefined' && _artOrientation === 'horizontal') ? 'horizontal' : 'vertical';
+        _artCurrentTab = _startTab;
         _loadArtPanel('vertical',   `/static/img/library/vertical/${parseInt(game.appid)}.jpg?v=${Date.now()}`,   game.vertical_art_source);
         _loadArtPanel('horizontal', `/static/img/library/horizontal/${parseInt(game.appid)}.jpg?v=${Date.now()}`, game.horizontal_art_source);
         _loadArtPanel('icon',       `/static/img/library/icons/${parseInt(game.appid)}.jpg?v=${Date.now()}`,      game.icon_source);
-        openArtTab('vertical');
+        openArtTab(_startTab);
         _probeSteamCopy(game.appid);
 
         const storeLink  = document.getElementById('store-link');
@@ -1190,6 +1196,121 @@ const achLink = document.getElementById('achievements-link');
         } catch {
             status.style.color = '#ff8080'; status.textContent = '✘ Network error.';
         }
+    }
+
+    // ── Crop: the frame stays put at the card's ratio and the image moves under it ──
+    // `scale` maps image pixels to screen pixels. At zoom 1 the image just covers the frame (the
+    // largest area that has the right ratio); the offset is kept so the frame is always covered.
+    let _crop = null;
+    const _CROP_RATIO  = { vertical: 2 / 3, horizontal: 616 / 353, icon: 1 };
+    const _CROP_WIDTH  = { vertical: 300, horizontal: 480, icon: 260 };
+
+    function openArtCrop(type) {
+        const appid = document.getElementById('edit-appid').value;
+        const dir   = { vertical: 'vertical', horizontal: 'horizontal', icon: 'icons' }[type];
+        const src   = `/static/img/library/${dir}/${parseInt(appid)}.jpg?v=${Date.now()}`;
+        const status = document.getElementById(`art-status-${type}`);
+        const probe = new Image();
+        probe.onload = () => {
+            const vw = _CROP_WIDTH[type], vh = Math.round(vw / _CROP_RATIO[type]);
+            const view = document.getElementById('art-crop-view');
+            view.style.width = vw + 'px'; view.style.height = vh + 'px';
+            const img = document.getElementById('art-crop-img');
+            img.src = src;
+            const base = Math.max(vw / probe.naturalWidth, vh / probe.naturalHeight);
+            _crop = { type, appid, W: probe.naturalWidth, H: probe.naturalHeight, vw, vh, base, z: 1,
+                      ox: (vw - probe.naturalWidth * base) / 2, oy: (vh - probe.naturalHeight * base) / 2 };
+            document.getElementById('art-crop-zoom').value = 100;
+            document.getElementById('art-crop-status').textContent = '';
+            _cropRender();
+            _wireCropDrag();
+            document.getElementById('art-crop-modal').style.display = 'flex';
+        };
+        probe.onerror = () => { status.style.color = '#ff8080'; status.textContent = '✘ No image to crop.'; };
+        probe.src = src;
+    }
+
+    function closeArtCrop() {
+        document.getElementById('art-crop-modal').style.display = 'none';
+        _crop = null;
+    }
+
+    function _cropRender() {
+        const c = _crop; if (!c) return;
+        const s = c.base * c.z;
+        c.ox = Math.min(0, Math.max(c.vw - c.W * s, c.ox));
+        c.oy = Math.min(0, Math.max(c.vh - c.H * s, c.oy));
+        const img = document.getElementById('art-crop-img');
+        img.style.width  = (c.W * s) + 'px';
+        img.style.height = (c.H * s) + 'px';
+        img.style.left   = c.ox + 'px';
+        img.style.top    = c.oy + 'px';
+    }
+
+    // Zoom about a point of the frame (its centre unless given), so what is there stays there
+    function artCropSetZoom(z, px, py) {
+        const c = _crop; if (!c) return;
+        z = Math.min(4, Math.max(1, z));
+        px = px ?? c.vw / 2; py = py ?? c.vh / 2;
+        const s0 = c.base * c.z, s1 = c.base * z;
+        const ix = (px - c.ox) / s0, iy = (py - c.oy) / s0;     // the image point under (px, py)
+        c.z = z; c.ox = px - ix * s1; c.oy = py - iy * s1;
+        document.getElementById('art-crop-zoom').value = Math.round(z * 100);
+        _cropRender();
+    }
+
+    function artCropNudge(dx, dy) {
+        const c = _crop; if (!c) return;
+        c.ox -= dx * 12; c.oy -= dy * 12;     // the arrows say where the frame moves over the image
+        _cropRender();
+    }
+
+    let _cropWired = false;
+    function _wireCropDrag() {
+        const view = document.getElementById('art-crop-view');
+        if (!view || _cropWired) return;
+        _cropWired = true;
+        let drag = null;
+        view.addEventListener('pointerdown', e => {
+            if (!_crop) return;
+            drag = { x: e.clientX, y: e.clientY };
+            view.setPointerCapture(e.pointerId);
+            view.style.cursor = 'grabbing';
+        });
+        view.addEventListener('pointermove', e => {
+            if (!drag || !_crop) return;
+            _crop.ox += e.clientX - drag.x; _crop.oy += e.clientY - drag.y;
+            drag = { x: e.clientX, y: e.clientY };
+            _cropRender();
+        });
+        const end = () => { drag = null; view.style.cursor = 'grab'; };
+        view.addEventListener('pointerup', end);
+        view.addEventListener('pointercancel', end);
+        view.addEventListener('wheel', e => {
+            if (!_crop) return;
+            e.preventDefault();
+            const r = view.getBoundingClientRect();
+            artCropSetZoom(_crop.z * (e.deltaY < 0 ? 1.1 : 1 / 1.1), e.clientX - r.left, e.clientY - r.top);
+        }, { passive: false });
+    }
+
+    function applyArtCrop() {
+        const c = _crop; if (!c) return;
+        const s = c.base * c.z;
+        const status = document.getElementById('art-crop-status');
+        status.style.color = '#aaa'; status.textContent = 'Saving...';
+        fetch('/api/artwork/crop', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ appid: c.appid, orientation: c.type, x: -c.ox / (c.W * s), y: -c.oy / (c.H * s), w: c.vw / (c.W * s) })
+        }).then(r => r.json()).then(data => {
+            if (data.status !== 'success') { status.style.color = '#ff8080'; status.textContent = '✘ ' + (data.message || 'Could not crop.'); return; }
+            const dirMap = { vertical: 'vertical', horizontal: 'horizontal', icon: 'icons' };
+            _loadArtPanel(c.type, `/static/img/library/${dirMap[c.type]}/${parseInt(c.appid)}.jpg?v=${Date.now()}`, data.source);
+            _bustPageArtCache(c.appid, c.type);
+            closeArtCrop();
+            const st = document.getElementById(`art-status-${c.type}`);
+            if (st) { st.style.color = '#5c7e10'; st.textContent = '✔ Cropped.'; }
+        }).catch(() => { status.style.color = '#ff8080'; status.textContent = '✘ Network error.'; });
     }
 
     // "From Steam": for a non-Steam game that has a Steam copy, borrow that copy's art. The Steam game
@@ -2338,6 +2459,34 @@ const achLink = document.getElementById('achievements-link');
         }
     });
 </script>
+
+<!-- ── Crop artwork dialog ─────────────────────────────────────────────────── -->
+<div id="art-crop-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:2100; align-items:center; justify-content:center;">
+    <div style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; width:560px; max-width:95vw; max-height:95vh; overflow:auto; padding:16px 20px; display:flex; flex-direction:column; gap:12px;">
+        <div>
+            <div style="font-size:1rem; font-weight:600; color:var(--text-primary);">Crop artwork</div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">Drag the image to choose what to keep. Scroll or use the slider to zoom.</div>
+        </div>
+        <div id="art-crop-view" style="position:relative; overflow:hidden; margin:0 auto; background:#000; border:1px solid var(--border); border-radius:4px; cursor:grab; touch-action:none; user-select:none;">
+            <img id="art-crop-img" alt="" draggable="false" style="position:absolute; left:0; top:0; max-width:none; pointer-events:none; user-select:none;">
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:0.78rem; color:var(--text-secondary);">Zoom</span>
+            <input type="range" id="art-crop-zoom" min="100" max="400" step="5" value="100" data-modal-row="31" style="flex:1;" oninput="artCropSetZoom(this.value / 100)">
+        </div>
+        <div style="display:flex; justify-content:center; gap:6px;">
+            <button type="button" class="nav-btn art-action-btn" onclick="artCropNudge(-1, 0)" data-modal-row="32" aria-label="Move image left">◀</button>
+            <button type="button" class="nav-btn art-action-btn" onclick="artCropNudge(0, -1)" data-modal-row="32" aria-label="Move image up">▲</button>
+            <button type="button" class="nav-btn art-action-btn" onclick="artCropNudge(0, 1)"  data-modal-row="32" aria-label="Move image down">▼</button>
+            <button type="button" class="nav-btn art-action-btn" onclick="artCropNudge(1, 0)"  data-modal-row="32" aria-label="Move image right">▶</button>
+        </div>
+        <div id="art-crop-status" class="art-status" style="min-height:1.1em;"></div>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button type="button" class="nav-btn art-action-btn" onclick="closeArtCrop()" data-modal-row="33">Cancel</button>
+            <button type="button" class="nav-btn art-action-btn" onclick="applyArtCrop()" data-modal-row="33" style="font-weight:600;">Apply crop</button>
+        </div>
+    </div>
+</div>
 
 <!-- ── SteamGridDB Browser Modal ───────────────────────────────────────────── -->
 {% if existing_sgdb_key %}

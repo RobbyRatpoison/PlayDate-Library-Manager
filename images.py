@@ -942,6 +942,58 @@ def download_from_steam(appid, steam_appid, kind, icon_hash=''):
     return 'missing'
 
 
+def crop_to_ratio(img, x, y, w, kind):
+    """Crop `img` to the card ratio of `kind` ('icon' is square). x and y are the top-left corner and w
+    the width of the kept area, all as fractions of the image; the height follows from the ratio, so
+    the result always has exactly the ratio the card wants. The box is moved inside the image if it
+    sticks out. Returns the cropped image."""
+    W, H = img.size
+    target = ART_CARD_RATIO.get(kind, 1.0)
+    cw = max(1, min(W, round(w * W)))
+    ch = round(cw / target)
+    if ch > H:
+        ch = H
+        cw = max(1, round(H * target))
+    left = min(max(0, round(x * W)), W - cw)
+    top = min(max(0, round(y * H)), H - ch)
+    return img.crop((left, top, left + cw, top + ch))
+
+
+@images_bp.route('/api/artwork/crop', methods=['POST'])
+def crop_artwork():
+    """Crop a game's stored cover to the card ratio (the edit modal's Crop dialog). The page sends
+    where the kept area starts and how wide it is as fractions of the image."""
+    import io
+    from database import update_game_data
+    from PIL import Image
+    data = request.json or {}
+    kind = data.get('orientation')
+    try:
+        appid = int(data.get('appid'))
+        x, y, w = float(data.get('x')), float(data.get('y')), float(data.get('w'))
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'message': 'Missing or invalid parameters'}), 400
+    if kind not in ('vertical', 'horizontal', 'icon') or not (0 < w <= 1) or not (0 <= x <= 1) or not (0 <= y <= 1):
+        return jsonify({'status': 'error', 'message': 'Missing or invalid parameters'}), 400
+    _ensure_dirs()
+    path = os.path.join({'vertical': VERTICAL_DIR, 'horizontal': HORIZONTAL_DIR, 'icon': ICONS_DIR}[kind], f'{appid}.jpg')
+    if not os.path.isfile(path):
+        return jsonify({'status': 'error', 'message': 'This game has no image to crop.'}), 404
+    try:
+        with Image.open(path) as im:
+            cropped = crop_to_ratio(im.convert('RGB'), x, y, w, kind)
+        buf = io.BytesIO()
+        cropped.save(buf, 'PNG')          # lossless hand-off; save_as_jpg does the one JPEG encode
+        if not save_as_jpg(buf.getvalue(), path):
+            return jsonify({'status': 'error', 'message': 'Could not save the cropped image.'}), 500
+    except Exception as e:
+        log.warning(f"crop_artwork: {kind} for {appid}: {e}")
+        return jsonify({'status': 'error', 'message': 'Could not crop this image.'}), 500
+    col = {'vertical': 'vertical_art_source', 'horizontal': 'horizontal_art_source', 'icon': 'icon_source'}[kind]
+    update_game_data(appid, **{col: 'custom'})
+    return jsonify({'status': 'success', 'source': 'custom', 'width': cropped.size[0], 'height': cropped.size[1]})
+
+
 @images_bp.route('/api/artwork/steam-copy/<int:appid>')
 def artwork_steam_copy(appid):
     """Which Steam game a non-Steam game could borrow art from (see steam_copy_of)."""

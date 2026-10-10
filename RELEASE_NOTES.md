@@ -5,6 +5,7 @@
 
 - Added a Cover Shape filter for covers that don't fit the card.
 - Added a From Steam button for artwork on games that also exist on Steam.
+- Added a Crop button for artwork, with a draggable image.
 
 ### Improvements
 
@@ -20,6 +21,7 @@
 - Sorting, grouping and filtering the Library no longer reloads the page.
 - The Library now updates when games are installed or uninstalled.
 - Edited games now move to their new place straight away.
+- The artwork tab now opens on the view you're in.
 - Automatic SteamGridDB art now picks the best fit and retries on failure.
 
 ### Fixes
