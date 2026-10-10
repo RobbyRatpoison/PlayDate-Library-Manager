@@ -14,4 +14,4 @@
 - Fixed Xbox stopping a day or so after connecting.
 - Fixed connecting EA with a pasted link or error page appearing to work when it hadn't.
 - Fixed covers briefly showing as missing when a page loads.
-- Fixed a fixed update not being offered right after a failed one was rolled back.
+- Fixed a newer update not being offered right after a failed update was rolled back.
