@@ -590,6 +590,52 @@ def _plugin_description(appid, platform, platform_id):
     return ''
 
 
+def _refresh_art_after_match(appid):
+    """A non-Steam game has just been matched to a Steam game, which can supply art its sync could not
+    (the sync fetches art before the backfill finds the match, so a library with no art of its own
+    got SteamGridDB's wrong-shaped image). Re-fetch vertical and horizontal art through the normal
+    source order, but only for a cover that is missing or does not fit the card, and never one the
+    user set by hand: art that already fits is left alone."""
+    import images
+    from images import _art_fits, _art_path, _sgdb_search_game_id
+    db = get_db()
+    try:
+        row = db.execute("SELECT name, vertical_art_source, horizontal_art_source FROM games WHERE appid = ?",
+                         (appid,)).fetchone()
+    finally:
+        db.close()
+    if not row:
+        return
+    sgdb_id = _sgdb_search_game_id(row['name']) if row['name'] else None
+    for kind in ('vertical', 'horizontal'):
+        col = f'{kind}_art_source'
+        if row[col] == 'custom' or _art_fits(_art_path(kind, appid), kind):
+            continue
+        tag = getattr(images, f'download_{kind}')(appid, sgdb_id=sgdb_id, game_name=row['name'])
+        if tag != 'missing':
+            update_game_data(appid, **{col: tag})
+            log.info('backfill %s: %s art fetched after its Steam match (%s)', appid, kind, tag)
+
+
+def write_backfill(appid, data):
+    """update_game_data(**data) for a backfill result, then the art a first Steam match makes possible
+    (see _refresh_art_after_match). Every caller that saves a backfill result goes through here."""
+    first_match = False
+    if appid < 0 and data.get('steam_appid'):
+        db = get_db()
+        try:
+            row = db.execute("SELECT steam_appid FROM games WHERE appid = ?", (appid,)).fetchone()
+        finally:
+            db.close()
+        first_match = bool(row) and not row['steam_appid']
+    update_game_data(appid, **data)
+    if first_match:
+        try:
+            _refresh_art_after_match(appid)
+        except Exception as e:
+            log.warning('backfill %s: art refresh after its Steam match failed: %s', appid, e)
+
+
 # ── Routes ──────────────────────────────────────────────────────────────────
 
 @metadata_bp.route('/api/metadata/backfill/<int:appid>', methods=['POST'])
@@ -611,7 +657,7 @@ def backfill_route(appid):
     if result is None:
         return jsonify({'status': 'error', 'message': 'Game not found, or a lookup source is temporarily throttled — try again shortly.'}), 400
 
-    update_game_data(appid, **result)
+    write_backfill(appid, result)
 
     outcome = result.get('meta_backfill_fetched')
     filled  = [k for k in result if k not in ('steam_appid', 'meta_backfill_fetched')]

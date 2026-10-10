@@ -3,21 +3,23 @@ one platform (user's Artwork Sources setting + whether the plugin offers store a
 from images import art_source_order
 
 
-def test_untouched_platform_without_store_art_runs_the_original_chain():
-    assert art_source_order('vertical', 'steam', False, None) is None
-    assert art_source_order('vertical', 'gog', False, None) is None
+def test_untouched_vertical_and_horizontal_use_steam_store_sgdb_everywhere():
+    assert art_source_order('vertical', 'steam', False, None) == ['steam', 'sgdb']        # no store art on Steam itself
+    assert art_source_order('horizontal', 'gog', False, None) == ['steam', 'sgdb']
+    assert art_source_order('vertical', 'epic_games', True, None) == ['steam', 'store', 'sgdb']
 
 
-def test_untouched_platform_with_store_art_defaults_to_store_sgdb_steam():
-    assert art_source_order('vertical', 'epic_games', True, None) == ['store', 'sgdb', 'steam']
+def test_a_plugins_own_default_order_no_longer_applies_to_vertical_and_horizontal():
+    assert art_source_order('horizontal', 'ea_app', True, None, ('sgdb', 'store', 'steam')) == ['steam', 'store', 'sgdb']
 
 
-def test_plugin_can_supply_its_own_default_order():
-    assert art_source_order('vertical', 'ea_app', True, None, ('sgdb', 'store', 'steam')) == ['sgdb', 'store', 'steam']
-    # ...but a saved list always wins over the plugin's default
-    assert art_source_order('vertical', 'ea_app', True, ['steam'], ('sgdb', 'store')) == ['steam']
-    # ...and the default only applies where the plugin has store art for this type
-    assert art_source_order('icon', 'ea_app', False, None, ('sgdb', 'store')) is None
+def test_icons_keep_their_older_defaults():
+    assert art_source_order('icon', 'steam', False, None) is None
+    assert art_source_order('icon', 'gog', False, None) is None
+    assert art_source_order('icon', 'epic_games', True, None) == ['store', 'sgdb', 'steam']
+    assert art_source_order('icon', 'ea_app', True, None, ('sgdb', 'store', 'steam')) == ['sgdb', 'store', 'steam']
+    # a saved list always wins over the plugin's default
+    assert art_source_order('icon', 'ea_app', True, ['steam'], ('sgdb', 'store')) == ['steam']
 
 
 def test_saved_order_is_honoured_exactly():

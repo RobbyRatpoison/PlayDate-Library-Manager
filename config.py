@@ -455,6 +455,7 @@ DEFAULT_STATE = {
     "window_state": None,
     "hltb_match_threshold": 99,
     "group_by": None,
+    "art_prefer_fit": True,   # artwork: right shape beats source order (images._download_preferring_fit)
     "ui_scale": 100,
     "auto_promote_unfinished": True,
     "auto_complete_on_100pct": True,
@@ -633,6 +634,7 @@ def inject_config_status():
         card_click_rules=normalize_card_click_rules(state['card_click_rules']) if 'card_click_rules' in state else DEFAULT_CARD_CLICK_RULES,
         hover_tooltip=state.get('hover_tooltip', DEFAULT_HOVER_TIP),
         art_source_prefs=state.get('art_source_prefs', {}),
+        art_prefer_fit=bool(state.get('art_prefer_fit', True)),
         ui_scale=state.get('ui_scale', 100),
         auto_promote_unfinished=state.get('auto_promote_unfinished', True),
         auto_complete_on_100pct=state.get('auto_complete_on_100pct', True),
@@ -1383,6 +1385,8 @@ def save_state(updates):
                 if _k:
                     _clean[_plat] = _k
             state["art_source_prefs"] = _clean
+        if "art_prefer_fit" in updates:
+            state["art_prefer_fit"] = bool(updates["art_prefer_fit"])
         if "hltb_match_threshold" in updates:
             state["hltb_match_threshold"] = int(updates["hltb_match_threshold"])
         if "ui_scale" in updates:

@@ -2264,7 +2264,8 @@ def bulk_rescrape_games(appids, cancel_event, progress_cb):
 
                     combined = {**backfilled, **meta}
                     if combined:
-                        update_game_data(appid, **combined)
+                        from metadata import write_backfill
+                        write_backfill(appid, combined)
                         with lock:
                             counts['done'] += 1
                         if progress_cb:
@@ -3039,7 +3040,8 @@ def _backfill_batch(appids, cancel_event, progress_cb=None, *,
             try:
                 result = backfill_metadata(appid, rerun=rerun)
                 if result:
-                    update_game_data(appid, **result)
+                    from metadata import write_backfill
+                    write_backfill(appid, result)
                     counts['done'] += 1
                     if progress_cb:
                         progress_cb('done', appid, total)

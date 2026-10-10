@@ -6823,9 +6823,11 @@ const _artAllSources = (plat, kind) => _artHasStore(plat, kind) ? ['store', 'sgd
 
 // Mirrors images.art_source_order()'s defaults for a platform nobody has customised.
 function _artDefaultOrder(plat, kind) {
-    if (plat === 'steam') return kind === 'icon' ? ['sgdb', 'steam'] : ['steam', 'sgdb'];
     const all = _artAllSources(plat, kind);
-    // A plugin with store art may prefer its own order (art_default); others use the original SGDB, Steam.
+    // Vertical and horizontal: Steam's art, then the library's own, then SteamGridDB, on every platform
+    if (kind !== 'icon') return ['steam', 'store', 'sgdb'].filter(s => all.includes(s));
+    if (plat === 'steam') return ['sgdb', 'steam'];
+    // Icons: a plugin with store art may prefer its own order (art_default); others use SGDB, Steam.
     const pref = (window._PLUGIN_API[plat] && window._PLUGIN_API[plat].art_default) || [];
     return _artHasStore(plat, kind) && pref.length ? pref.filter(s => all.includes(s)) : all;
 }

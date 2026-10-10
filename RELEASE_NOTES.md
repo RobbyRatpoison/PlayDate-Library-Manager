@@ -23,6 +23,7 @@
 - Edited games now move to their new place straight away.
 - The artwork tab now opens on the view you're in.
 - Automatic SteamGridDB art now picks the best fit and retries on failure.
+- Artwork now prefers Steam art and the right shape, switchable in Settings.
 
 ### Fixes
 

@@ -235,23 +235,76 @@ def _get_sgdb_key():
 
 ART_SOURCES = ('store', 'steam', 'sgdb')
 
+# Where vertical and horizontal art comes from when nobody customised it: the Steam copy's art (always
+# the card's shape and the same wherever the game is owned), then the library's own, then SteamGridDB.
+# Icons keep their older chains (see art_source_order).
+ART_DEFAULT_ORDER = ('steam', 'store', 'sgdb')
+
 
 def art_source_order(kind, platform, has_store, saved, default=None):
     """Ordered sources to try for one art type on one platform, or None to run
-    the original auto chain untouched.
+    the original auto chain untouched (only icons ever get that).
 
     `saved` is the user's list from state.json `art_source_prefs[platform][kind]`
     (None = never customised). A saved list is honoured exactly: a source that
     was switched off is never used, and unknown names / 'store' on a platform
-    whose plugin has no art for this type are dropped. Untouched, a platform whose
-    plugin supplies this art type uses the plugin's preferred order (`default`,
-    normally store -> SGDB -> Steam, so a re-scrape stops replacing the store's
-    own art with SGDB's); every other platform is None."""
+    whose plugin has no art for this type are dropped. Untouched, vertical and
+    horizontal art use ART_DEFAULT_ORDER on every platform (a plugin's own
+    `art_default_order` no longer applies to them: with the shape check in
+    _download_preferring_fit its art is only taken when it fits, which is what
+    those orders were guarding against). Icons are untouched: a platform whose
+    plugin supplies icons uses the plugin's preferred order (`default`, normally
+    store -> SGDB -> Steam), every other platform is None."""
     if saved is None:
-        if not has_store:
+        if kind in ('vertical', 'horizontal'):
+            saved = ART_DEFAULT_ORDER
+        elif not has_store:
             return None
-        saved = default or ('store', 'sgdb', 'steam')
+        else:
+            saved = default or ('store', 'sgdb', 'steam')
     return [s for s in saved if s in ART_SOURCES and (s != 'store' or has_store)]
+
+
+def _art_fits(path, kind):
+    """Whether the image at `path` fits the card for `kind` (the same 5% rule compute_art_edges uses)."""
+    target = ART_CARD_RATIO.get(kind)
+    try:
+        with Image.open(path) as im:
+            w, h = im.size
+    except Exception:
+        return False
+    return bool(target and w and h and abs(w / h - target) / target < ART_FIT_TOLERANCE)
+
+
+def _art_path(kind, appid):
+    return os.path.join({'vertical': VERTICAL_DIR, 'horizontal': HORIZONTAL_DIR, 'icon': ICONS_DIR}[kind],
+                        f'{int(appid)}.jpg')
+
+
+def _download_preferring_fit(kind, appid, order, attempt):
+    """The shape matters more than the source: try the sources in `order`, keep the first result that
+    fits the card, and only when none does, use the first result there was (so an odd-shaped cover
+    still beats no cover). `attempt(src)` saves a source's art at the game's file and returns its tag
+    or 'missing'. The first fitting result is already in place, so nothing is rewritten for it."""
+    path = _art_path(kind, appid)
+    fallback = None
+    for src in order:
+        tag = attempt(src)
+        if tag == 'missing':
+            continue
+        if _art_fits(path, kind):
+            return tag
+        if fallback is None:
+            try:
+                with open(path, 'rb') as f:
+                    fallback = (tag, f.read())
+            except OSError:
+                pass
+    if fallback:
+        # Later attempts overwrote the file; put the first non-fitting result back
+        if save_as_jpg(fallback[1], path):
+            return fallback[0]
+    return 'missing'
 
 
 def _download_from_store(kind, appid, plugin):
@@ -268,20 +321,31 @@ def _download_from_store(kind, appid, plugin):
 
 
 def _download_art(kind, appid, assets, source, sgdb_id, game_name, icon_hash=None):
-    """download_vertical/horizontal/icon: run the user's source order for the
-    game's platform when there is one, else the original auto chain. An
-    explicit `source` (the edit modal's own picker) always bypasses the order."""
+    """download_vertical/horizontal/icon: run the source order for the game's platform (the user's, else
+    the default), preferring art of the right shape unless that is switched off. An explicit `source`
+    (the edit modal's own picker) always bypasses the order."""
     impl = {'vertical': _download_vertical, 'horizontal': _download_horizontal}.get(kind)
 
     def run(src):
+        if src == 'steam' and int(appid) < 0 and kind in ('vertical', 'horizontal'):
+            # A non-Steam game's Steam art: its Steam copy (the duplicate link, else the match the
+            # metadata backfill saved), not a search by name. Falls through to the name search below.
+            try:
+                copy = steam_copy_of(appid)
+                if copy and download_from_steam(appid, copy['steam_appid'], kind, copy['icon_hash']) == 'steam':
+                    return 'steam'
+            except Exception as e:
+                log.warning(f"_download_art: Steam copy lookup failed for {appid}: {e}")
         if kind == 'icon':
             return _download_icon(appid, icon_hash, src, sgdb_id, game_name)
         return impl(appid, assets, src, sgdb_id, game_name)
 
     if source != 'auto':
         return run(source)
+    prefer_fit = False
     try:
         from config import load_state
+        state = load_state()
         platform, plugin = 'steam', None
         if int(appid) < 0:
             from database import get_db
@@ -296,16 +360,23 @@ def _download_art(kind, appid, assets, source, sgdb_id, game_name, icon_hash=Non
             has_store = kind in _plugins.plugin_art_kinds(plugin)
         else:
             has_store = False
-        saved = ((load_state().get('art_source_prefs') or {}).get(platform) or {}).get(kind)
+        saved = ((state.get('art_source_prefs') or {}).get(platform) or {}).get(kind)
         default = _plugins.plugin_art_default(plugin) if has_store else None
         order = art_source_order(kind, platform, has_store, saved, default)
+        prefer_fit = kind in ('vertical', 'horizontal') and bool(state.get('art_prefer_fit', True))
     except Exception as e:
         log.warning(f"_download_art: could not resolve source order for {appid}: {e}")
         order = None
     if order is None:
         return run('auto')
+
+    def attempt(src):
+        return _download_from_store(kind, appid, plugin) if src == 'store' else run(src)
+
+    if prefer_fit:
+        return _download_preferring_fit(kind, appid, order, attempt)
     for src in order:
-        result = _download_from_store(kind, appid, plugin) if src == 'store' else run(src)
+        result = attempt(src)
         if result != 'missing':
             return result
     return 'missing'

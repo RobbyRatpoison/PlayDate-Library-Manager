@@ -772,6 +772,14 @@
             <div class="hub-section-label">Artwork Sources</div>
             <div style="padding:8px 10px;">
                 <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">Choose where each library gets its cover art, and in what order the sources are tried: the store's own art (where the plugin provides it), SteamGridDB (needs an API key), or Steam. Applies the next time art is fetched or re-scraped.</div>
+                <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:0.85rem; color:var(--text-primary); margin-bottom:2px;">
+                    <input type="checkbox" id="art-prefer-fit-cb"
+                           {% if art_prefer_fit %}checked{% endif %}
+                           onchange="sendStateUpdate({art_prefer_fit: this.checked}, false)"
+                           style="width:auto; margin:0;" data-modal-row="59">
+                    Prefer art with the right shape over the source order
+                </label>
+                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:8px; padding-left:22px;">Tries the sources in order but takes the first image that fits the card (2:3 covers, 616x353 wide art). If none fits, the first image found is used. Turn off to always use the first source that has art.</div>
                 <div id="art-source-prefs"></div>
             </div>
         </div>

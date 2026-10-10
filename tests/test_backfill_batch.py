@@ -8,7 +8,7 @@ def _run(monkeypatch, results, **kw):
     seen_kw = []
     monkeypatch.setattr('metadata.backfill_metadata',
                         lambda appid, **_kw: (seen_kw.append(_kw), results.get(appid))[1])
-    monkeypatch.setattr(scrapers, 'update_game_data', lambda appid, **d: calls.append(appid))
+    monkeypatch.setattr('metadata.write_backfill', lambda appid, d: calls.append(appid))
     ev = kw.pop('cancel_event', threading.Event())
     out = scrapers._backfill_batch(list(results), ev, None, inter_delay=0, **kw)
     _run.last_kw = seen_kw
