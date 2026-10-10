@@ -192,6 +192,9 @@ Any SQL that orders game names must use `ORDER BY name COLLATE NOCASE` — SQLit
 ### Filesystem Watcher
 On ACF change, resets all Steam `installed` flags to 0 then bulk-sets found appids to 1. Filters out Proton/SteamLinuxRuntime/Steamworks entries by reading ACF content.
 
+### First-page warm-up (2026.10.4)
+The first visit to each page used to pay one-time costs (template compile, first queries, building the Library list): measured on 5,000 games, first Home 353 ms vs 84 ms for the second, first Library 308 vs 19. `main.py`'s `_run_plugin_on_startup` ends by compiling `index/library/pick.html` and calling the three views inside `test_request_context` (after the duplicate/tag-similarity writes, which move the Library cache key). **It must call the views directly, never request `/` through the app:** that response's `after_request` marks an update healthy (see Update Rollback). Delaying the other startup jobs was not needed: the log shows they all finish ~1.7 s after launch, before the first page loads.
+
 ### Cached Derived Stats (added v1.10.5)
 A whole-library stat too expensive per page load but cheap to recompute fully is cached as a real column and refreshed at the trigger points `database.refresh_duplicate_detection()` established: startup, after a Steam populate, after `bulk_rescrape_games()`, and after any single/bulk edit that could invalidate it, inline with no thread machinery. `database.recalculate_tag_similarity()` (`games.tag_similarity`, a Library/Home sort option) follows this exactly (~130ms for 30,000 games).
 
