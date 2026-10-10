@@ -21,6 +21,30 @@ _plugin_paths: dict = {}
 _plugin_manifests: dict = {}
 
 _plugin_update_cache = {}    # keyed by plugin_id: {update_available, latest_version, source, checked_at, error}
+_connection_cache = {}  # keyed by plugin id: {ok, checked_at}
+_CONNECTION_TTL = 300
+
+
+def verify_connection(plugin_id, check, ttl=_CONNECTION_TTL):
+    """Ask the service whether a plugin's stored login still works. `check` returns
+    True (accepted), False (rejected) or None (couldn't tell, e.g. offline).
+    Cached for `ttl` seconds so the plugin card doesn't hit the service on every
+    render; Only True is cached; None never reads as disconnected. Credentials are
+    never touched here."""
+    import time as _t
+    hit = _connection_cache.get(plugin_id)
+    if hit and _t.time() - hit['checked_at'] < ttl:
+        return hit['ok']
+    try:
+        ok = check()
+    except Exception as e:
+        log.debug(f'verify_connection {plugin_id}: {e}')
+        return None
+    if ok:  # only a success is cached, so a rejection is rechecked (and a reconnect shows at once)
+        _connection_cache[plugin_id] = {'ok': ok, 'checked_at': _t.time()}
+    return ok
+
+
 _launcher_status_cache = {}  # keyed by platform: {available, detail, checked_at}
 
 # Plugins whose plugin.json declares a min_core_version newer than this build --
