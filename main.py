@@ -1702,25 +1702,6 @@ if __name__ == '__main__':
             log.info(f"Tag similarity recalculated on startup: {n} games scored")
         except Exception as e:
             log.warning(f"Startup tag similarity recalculation failed: {e}")
-        # Last, after the startup writes above (they move the Library's cache key): do the one-time
-        # work the first visit to each page would otherwise pay while the window is already open
-        # (compiling the templates, first queries, building the Library list). Calls the views
-        # directly, not through the app: a real request for '/' would mark an update healthy
-        # (rollback) before any window has loaded. Measured on 5,000 games: first Home 353 -> 78 ms,
-        # first Library 308 -> 20 ms.
-        try:
-            _t0 = time.time()
-            for _tpl in ('index.html', 'library.html', 'pick.html'):
-                flask_app.jinja_env.get_template(_tpl)
-            with flask_app.test_request_context('/'):
-                for _ep in ('index.index', 'library.library', 'pick.pick'):
-                    try:
-                        flask_app.view_functions[_ep]()
-                    except Exception as e:
-                        log.info(f"Startup warm-up of {_ep} skipped: {e}")
-            log.info(f"First-page warm-up done in {int((time.time() - _t0) * 1000)} ms")
-        except Exception as e:
-            log.warning(f"Startup page warm-up failed: {e}")
 
     threading.Thread(target=_run_plugin_on_startup, daemon=True).start()
 
@@ -1769,9 +1750,32 @@ if __name__ == '__main__':
     threading.Thread(target=_run_playtime_sync, daemon=True).start()
     log.info("Playtime sync started in background.")
 
+    # Do the one-time work the first visit to each page would otherwise pay (compiling the
+    # templates, first queries, building the Library list) before the window asks for it. It must
+    # start as soon as Flask exists, not after the other startup jobs: the window now opens ~1.3 s
+    # after launch and a warm-up started behind them (2026.10.4-beta.12) still overlapped the first
+    # request. Calls the views directly, not through the app: a real request for '/' would mark an
+    # update healthy (rollback) before any window has loaded. Measured on 5,000 games: first Home
+    # 353 -> 78 ms, first Library 308 -> 20 ms.
+    def _run_page_warmup():
+        try:
+            _t0 = time.time()
+            for _tpl in ('index.html', 'library.html', 'pick.html'):
+                flask_app.jinja_env.get_template(_tpl)
+            with flask_app.test_request_context('/'):
+                for _ep in ('index.index', 'library.library', 'pick.pick'):
+                    try:
+                        flask_app.view_functions[_ep]()
+                    except Exception as e:
+                        log.info(f"Startup warm-up of {_ep} skipped: {e}")
+            log.info(f"First-page warm-up done in {int((time.time() - _t0) * 1000)} ms")
+        except Exception as e:
+            log.warning(f"Startup page warm-up failed: {e}")
+
     # 3. Start Flask in a background thread
     flask_thread = threading.Thread(target=_run_flask, args=(flask_app,), daemon=True)
     flask_thread.start()
+    threading.Thread(target=_run_page_warmup, daemon=True, name='page-warmup').start()
 
     # 3b. Run the playtime/last_played sync synchronously here (overlapped with
     # Flask's own much-faster startup above), not backgrounded like the rest of
