@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 import sqlite3
@@ -397,3 +398,31 @@ def reset_shelves():
     except Exception as e:
         log.exception("Failed to reset shelves")
         return api_error('Something went wrong on the server. Check playdate.log for details.', 500, exc=e)
+
+
+def _clean_timing(value, depth=0):
+    """Keep only plain numbers, short strings and small nested dicts from the page
+    timing report, so a malformed or oversized body can't flood the log."""
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        return value[:160]
+    if isinstance(value, dict) and depth < 2:
+        return {str(k)[:24]: _clean_timing(v, depth + 1) for k, v in list(value.items())[:24]}
+    return None
+
+
+@index_bp.route('/api/debug/page-timing', methods=['POST'])
+def page_timing():
+    """TEMPORARY: one line per Home page load (static/js/page_timing.js) to find out
+    why covers show up later in some installs. Remove with the script."""
+    data = request.get_json(silent=True, force=True)
+    if isinstance(data, dict):
+        clean = _clean_timing(data)
+        env = clean.pop('env', None)   # its own line: the log caps a message at 500 characters
+        log.info('page timing %s', json.dumps(clean, separators=(',', ':')))
+        if env:
+            log.info('page env %s', json.dumps(env, separators=(',', ':')))
+    return '', 204
