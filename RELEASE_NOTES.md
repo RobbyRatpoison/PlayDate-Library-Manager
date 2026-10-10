@@ -31,3 +31,4 @@
 - Fixed covers briefly showing as missing when a page loads.
 - Fixed a newer update not being offered right after a failed update was rolled back.
 - Fixed two Epic games with the same title looking identical.
+- Fixed bulk artwork scraping ignoring the chosen source for non-Steam games.

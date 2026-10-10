@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, wait as futures_wait
 log = logging.getLogger(__name__)
 from bs4 import BeautifulSoup
 from flask import Blueprint, jsonify, request
-from images import download_vertical, download_horizontal, download_icon, _get_steam_assets, _sgdb_search_game_id, VERTICAL_DIR, HORIZONTAL_DIR, ICONS_DIR
+from images import download_vertical, download_horizontal, download_icon, download_from_steam, steam_copy_of, _get_steam_assets, _sgdb_search_game_id, VERTICAL_DIR, HORIZONTAL_DIR, ICONS_DIR
 from datetime import datetime, timezone
 from config import load_config, get_active_account, api_error
 from database import batch_insert_placeholder_games, update_game_data, get_db, add_to_blacklist
@@ -2404,15 +2404,29 @@ def bulk_art_scrape_games(appids, types, source, cancel_event, progress_cb):
                 return
             try:
                 updates = {}
-                if appid < 0:
+                if appid < 0 and source == 'steam':
+                    # "Steam only" for a non-Steam game means its Steam copy: the one the library
+                    # linked it to as a duplicate (nobody is here to confirm a guessed match). No
+                    # copy, or nothing found, is a failure; other sources never leak in, and a
+                    # failed kind leaves the art and source it already has.
+                    copy = steam_copy_of(appid, linked_only=True)
+                    cols = {'vertical': 'vertical_art_source', 'horizontal': 'horizontal_art_source', 'icon': 'icon_source'}
+                    for kind in ('vertical', 'horizontal', 'icon'):
+                        if copy and kind in types and download_from_steam(appid, copy['steam_appid'], kind, copy['icon_hash']) == 'steam':
+                            updates[cols[kind]] = 'steam'
+                    if not updates:
+                        raise LookupError('no Steam copy with art for this game' if copy else 'no linked Steam copy')
+                elif appid < 0:
                     name    = name_map.get(appid, '')
                     sgdb_id = _sgdb_search_game_id(name) if name else None
+                    # 'sgdb' is honoured as a strict source; 'auto' follows the library's source order
+                    kw = {'source': 'sgdb'} if source == 'sgdb' else {}
                     if 'vertical' in types:
-                        updates['vertical_art_source']   = download_vertical(appid, sgdb_id=sgdb_id, game_name=name)
+                        updates['vertical_art_source']   = download_vertical(appid, sgdb_id=sgdb_id, game_name=name, **kw)
                     if 'horizontal' in types:
-                        updates['horizontal_art_source'] = download_horizontal(appid, sgdb_id=sgdb_id, game_name=name)
+                        updates['horizontal_art_source'] = download_horizontal(appid, sgdb_id=sgdb_id, game_name=name, **kw)
                     if 'icon' in types:
-                        updates['icon_source']           = download_icon(appid, '', sgdb_id=sgdb_id, game_name=name)
+                        updates['icon_source']           = download_icon(appid, '', sgdb_id=sgdb_id, game_name=name, **kw)
                 else:
                     assets = _get_steam_assets(appid) if source != 'sgdb' else {}
                     if 'vertical' in types:
@@ -2430,6 +2444,12 @@ def bulk_art_scrape_games(appids, types, source, cancel_event, progress_cb):
                     progress_cb('done', appid, total)
                 time.sleep(0.8)
 
+            except LookupError as e:
+                log.info(f"[bulk_art_scrape] {appid}: {e}")
+                with lock:
+                    counts['failed'] += 1
+                if progress_cb:
+                    progress_cb('failed', appid, total)
             except Exception as e:
                 log.error(f"[bulk_art_scrape] Error for {appid}: {e}")
                 with lock:
