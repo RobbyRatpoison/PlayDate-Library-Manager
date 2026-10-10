@@ -1,5 +1,6 @@
 import collections
 import hashlib
+import html
 import json
 import logging
 import os
@@ -707,9 +708,8 @@ def library_prewarm():
     return jsonify({'status': 'ok', 'url': url_for('library.library_games', k=key)})
 
 
-@library_bp.route('/library')
-def library():
-    state = load_state()
+def _library_page_ctx(state):
+    """Everything library.html is rendered with for this saved state."""
     q, key, result = _library_current(state)
     filter_tree = q['filter_tree']
     state['filter_tree'] = filter_tree  # template sees resolved tree
@@ -742,7 +742,7 @@ def library():
             expanded_saved[fname] = entry
     state = {**state, 'saved_filters': expanded_saved}
 
-    return render_template('library.html', games_count=result['count'],
+    return dict(games_count=result['count'],
                            games_url=url_for('library.library_games', k=key), state=state,
                            unique_tags=result['tags'], unique_groups=result['groups'],
                            sql_error=result['sql_error'], builtin_filters=BUILTIN_FILTERS,
@@ -752,6 +752,43 @@ def library():
                            group_by=state.get('group_by'),
                            outline_colors=outline_colors,
                            active_filter_name=q['active_filter_name'])
+
+
+@library_bp.route('/library')
+def library():
+    return render_template('library.html', **_library_page_ctx(load_state()))
+
+
+@library_bp.route('/api/library/view')
+def library_view():
+    """What a Library page that is already open needs to show a new filter / platform selection / sort
+    without reloading: the new game list's URL, the header, banner and CLEAR button exactly as the
+    page template renders them (so the label logic lives in one place), and the values the page
+    reads from globals. Cut out of the rendered page with a few anchored patterns."""
+    ctx = _library_page_ctx(load_state())
+    page = render_template('library.html', **ctx)
+
+    def grab(pattern):
+        m = re.search(pattern, page, re.S)
+        return m.group(0) if m else ''
+    state = ctx['state']
+    search = re.search(r'id="library-search".*?value="([^"]*)"', page, re.S)
+    return jsonify({
+        'games_url': ctx['games_url'], 'games_count': ctx['games_count'], 'total_games': ctx['total_games'],
+        'header_html': grab(r'<div class="library-header">.*?</div>'),
+        'banner_html': grab(r'<div id="filter-error-banner".*?</div>'),
+        'has_clear': 'class="clear-btn"' in page,
+        'has_empty_state': 'id="library-empty-state"' in page,
+        'empty_state_html': grab(r'<div id="library-empty-state".*?</div>'),
+        'search': html.unescape(search.group(1)) if search else '',
+        'sql_error': bool(ctx['sql_error']),
+        'outline_colors': ctx['outline_colors'],
+        'filter_tree': state.get('filter_tree') or None,
+        'active_filter_name': ctx['active_filter_name'],
+        'hidden_platforms': ctx['hidden_platforms'],
+        'sort': state.get('sort', 'name'), 'order': state.get('order', 'ASC'),
+        'group_by': state.get('group_by'),
+    })
 
 
 @library_bp.route('/update_game', methods=['POST'])

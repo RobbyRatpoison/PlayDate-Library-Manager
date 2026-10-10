@@ -473,6 +473,9 @@ function savePreference(payload) {
     }).catch(() => {});
 }
 
+// State keys whose change the Library can show without a reload (see pdRefilter in library.js)
+const _IN_PLACE_KEYS = new Set(['filter_tree', 'hidden_platforms', 'sort', 'order', 'group_by', 'hide_duplicates']);
+
 async function sendStateUpdate(payload, reload = true) {
     try {
         const response = await fetch('/api/update_state', {
@@ -481,7 +484,12 @@ async function sendStateUpdate(payload, reload = true) {
             body: JSON.stringify(payload)
         });
         if (response.ok) {
-            if (reload) window.location.reload();
+            if (reload) {
+                // A page that can show the new view in place (the Library, for filter / platform /
+                // sort / grouping changes) does so; anything else, or any doubt, reloads.
+                const inPlace = window.pdRefilter && Object.keys(payload).every(k => _IN_PLACE_KEYS.has(k));
+                if (!inPlace || !(await window.pdRefilter())) window.location.reload();
+            }
             return true;
         } else {
             let message = `Server error ${response.status}`;

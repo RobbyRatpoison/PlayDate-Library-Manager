@@ -9,7 +9,7 @@ function _libOnReady(fn) {
 
     // ── All game data in one JS array — no per-card script tags ──
     const GAMES = window.GAMES;
-    const OUTLINE_COLORS = window.OUTLINE_COLORS;
+    let OUTLINE_COLORS = window.OUTLINE_COLORS;
     let CURRENT_SORT = window.CURRENT_SORT;
     let CURRENT_ORDER = window.CURRENT_ORDER;
 
@@ -76,8 +76,8 @@ function _libOnReady(fn) {
     }
 
     // ── Current filter tree from server (may already contain a name condition) ──
-    const _serverFilterTree = window._serverFilterTree;
-    const _activeFilterName = window._activeFilterName;
+    let _serverFilterTree = window._serverFilterTree;
+    let _activeFilterName = window._activeFilterName;
 
     // Strip the search quick-filter (name LIKE) from the top level of the active tree,
     // unwrapping a single wrapped base group if that's all that remains.
@@ -581,6 +581,16 @@ function _libOnReady(fn) {
         return true;
     };
 
+    function _updateSortLabel(sort, order) {
+        const el = document.getElementById('sort-label');
+        if (!el) return;
+        const nonDefault = sort !== 'name' || order !== 'ASC';
+        el.style.display = nonDefault ? '' : 'none';
+        el.textContent = nonDefault
+            ? ' \u00b7 ' + ((window._SORT_LABELS || {})[sort] || sort) + (sort !== 'random' ? (order === 'ASC' ? ' \u2191' : ' \u2193') : '')
+            : '';
+    }
+
     // Reorder the open grid for a sort change (the saved state already holds the new sort/order).
     // Sorting never changes which games are listed, so the server only sends the new order of
     // appids. Resolves false when the caller should reload instead: list mode, a failed request, or
@@ -596,14 +606,76 @@ function _libOnReady(fn) {
         CURRENT_SORT = window.CURRENT_SORT = d.sort;
         CURRENT_ORDER = window.CURRENT_ORDER = d.order;
         if (groupBy !== undefined) { _groupBy = groupBy || null; window._groupBy = _groupBy; _updateGroupByHeaderLabel(); }
-        const el = document.getElementById('sort-label');
-        if (el) {
-            const nonDefault = d.sort !== 'name' || d.order !== 'ASC';
-            el.style.display = nonDefault ? '' : 'none';
-            el.textContent = nonDefault
-                ? ' \u00b7 ' + ((window._SORT_LABELS || {})[d.sort] || d.sort) + (d.sort !== 'random' ? (d.order === 'ASC' ? ' \u2191' : ' \u2193') : '')
-                : '';
-        }
+        _updateSortLabel(d.sort, d.order);
+        buildGrid();
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        return true;
+    };
+
+    // Show a new filter / platform selection without reloading: the server describes the new view
+    // (/api/library/view: header, banner, counts, the values the page keeps in globals) and the new
+    // game list comes from its own cacheable file. Resolves false, and the caller reloads, whenever
+    // anything is unusual: list mode, select mode, a PAGYWOSG filter before or after (its tooltip and
+    // qualification code is wired at load), a filter error, a failed request.
+    window.pdRefilter = async function() {
+        if (_artOrientation === 'list' || _selectMode || _serverFilterTree?.pagywosg) return false;
+        let v, rows;
+        try {
+            v = await (await fetch('/api/library/view', { credentials: 'same-origin' })).json();
+            if (v.sql_error || v.filter_tree?.pagywosg) return false;
+            const r = await fetch(v.games_url, { credentials: 'same-origin' });
+            if (!r.ok) return false;
+            const d = await r.json();
+            if (d.cols) {
+                rows = d.rows.map(row => { const o = {}; for (let j = 0; j < d.cols.length; j++) o[d.cols[j]] = row[j]; return o; });
+            } else rows = d.games || [];
+        } catch (e) { return false; }
+
+        GAMES.length = 0;
+        for (const g of rows) GAMES.push(g);
+        _GAME_MAP.clear();
+        for (const g of GAMES) _GAME_MAP.set(g.appid, g);
+        for (const k of Object.keys(OUTLINE_COLORS)) delete OUTLINE_COLORS[k];
+        Object.assign(OUTLINE_COLORS, v.outline_colors || {});
+
+        _serverFilterTree = window._serverFilterTree = v.filter_tree;
+        _BULK_FILTER_TREE = window._BULK_FILTER_TREE = v.filter_tree;
+        _activeFilterName = window._activeFilterName = v.active_filter_name;
+        BULK_GAME_COUNT = window.BULK_GAME_COUNT = v.games_count;
+        ALL_GAME_COUNT = window.ALL_GAME_COUNT = v.total_games;
+        _hiddenPlatforms.clear();
+        (v.hidden_platforms || []).forEach(p => _hiddenPlatforms.add(p));
+        CURRENT_SORT = window.CURRENT_SORT = v.sort;
+        CURRENT_ORDER = window.CURRENT_ORDER = v.order;
+
+        // Server-rendered pieces, taken as the template rendered them
+        const swap = (selector, html) => {
+            const el = document.querySelector(selector);
+            if (!el || !html) return;
+            const t = document.createElement('template');
+            t.innerHTML = html.trim();
+            if (t.content.firstElementChild) el.replaceWith(t.content.firstElementChild);
+        };
+        swap('.library-header', v.header_html);
+        swap('#filter-error-banner', v.banner_html);
+        const bar = document.querySelector('.search-nav-bar');
+        let clear = bar && bar.querySelector('.clear-btn');
+        if (bar && v.has_clear && !clear) {
+            clear = document.createElement('button');
+            clear.className = 'clear-btn';
+            clear.textContent = '\u2715 CLEAR';
+            clear.setAttribute('onclick', 'clearAndReload()');
+            const filters = [...bar.querySelectorAll('button')].find(b => /FILTERS/.test(b.textContent));
+            bar.insertBefore(clear, filters || null);
+        } else if (clear && !v.has_clear) clear.remove();
+        const search = document.getElementById('library-search');
+        if (search) search.value = v.search || '';
+        const empty = document.getElementById('library-empty-state');
+        if (empty) empty.remove();
+        if (v.has_empty_state && v.empty_state_html) document.getElementById('game-grid')?.insertAdjacentHTML('beforebegin', v.empty_state_html);
+
+        _groupBy = window._groupBy = v.group_by || null;
+        _updateGroupByHeaderLabel();
         buildGrid();
         window.scrollTo({ top: 0, behavior: 'instant' });
         return true;
@@ -976,10 +1048,10 @@ function onCardClick(e) {
 const LIST_COLUMNS    = new Set(['tags', 'groups', 'genres', 'categories']);
 const STATUS_OPTIONS  = ['Never Played', 'Unfinished', 'Beaten', 'Completed', "Won't Play"];
 const BULK_PILL_SUGGESTIONS = window.BULK_PILL_SUGGESTIONS;
-const _BULK_FILTER_TREE = window._BULK_FILTER_TREE;
-const BULK_GAME_COUNT = window.BULK_GAME_COUNT;
+let _BULK_FILTER_TREE = window._BULK_FILTER_TREE;
+let BULK_GAME_COUNT = window.BULK_GAME_COUNT;
 
-const ALL_GAME_COUNT = window.ALL_GAME_COUNT;
+let ALL_GAME_COUNT = window.ALL_GAME_COUNT;
 
 let _currentBulkTab     = 'edit';
 let _bulkOpPollInterval = null;
