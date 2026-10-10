@@ -654,7 +654,7 @@
 "></div>
 <script src="{{ url_for('static', filename='js/info_tip.js') }}?v={{ app_version }}"></script>
 <script>
-const _imgV = Date.now(); // cache-buster for JS-rendered cards (shuffle/refill), matching library.js
+const _imgV = window._ART_V || Date.now(); // cache-buster for JS-rendered cards (shuffle/refill), matching library.js
 
 async function _reloadLastPlayedShelves() {
     const targets = _shelves.filter(s => s.sort_col === 'last_played');

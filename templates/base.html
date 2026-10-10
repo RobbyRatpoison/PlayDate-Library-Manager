@@ -225,6 +225,7 @@
     </script>
     <script>
     window._PLAT_LABELS  = {{ platform_labels() | tojson }};
+    window._ART_V        = {{ art_version() }};   // cover cache-buster: changes only when a cover file does (images.art_version)
     window._ART_EDGES    = {{ art_edges('vertical') | tojson }};   // appid -> backdrop colours for off-ratio vertical covers
     window._PLAT_BADGE_DEFAULTS = {{ platform_badge_defaults() | tojson }};
     window._PLUGIN_API   = {{ plugin_js_api() | tojson }};

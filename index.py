@@ -1,10 +1,10 @@
 import logging
 import re
 import sqlite3
-import time
 from flask import Blueprint, jsonify, render_template, request
 from config import load_state, get_default_shelves, BUILTIN_FILTERS, api_error
 from database import get_db
+from images import art_version
 
 log = logging.getLogger(__name__)
 
@@ -265,7 +265,7 @@ def index():
         edit_mode=edit_mode,
         available_platforms=available_platforms,
         outline_colors=outline_colors,
-        cache_v=int(time.time()),
+        cache_v=art_version(),
     )
 
 

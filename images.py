@@ -183,6 +183,22 @@ def sync_art_edges():
         log.warning(f"Art edge colour backfill failed: {e}")
 
 
+def art_version():
+    """Cache-buster for cover URLs: the newest modification time (ms) of the cover
+    folders. A folder's mtime changes whenever a cover is added, replaced or
+    removed, so the value stays the same between art changes (the browser's
+    1-year cache then works) and moves on when any cover changes (a cover that
+    404'd before it existed is never served from a stale negative cache).
+    A page-load timestamp here made every cover re-download on every load."""
+    newest = 0
+    for kind in ('vertical', 'horizontal', 'icons'):
+        try:
+            newest = max(newest, os.stat(os.path.join(BASE_DIR, 'static', 'img', 'library', kind)).st_mtime_ns)
+        except OSError:
+            pass
+    return newest // 1_000_000
+
+
 def save_as_jpg(image_bytes, save_path):
     """
     Converts any image format (PNG, WEBP, etc.) to JPG and saves it.

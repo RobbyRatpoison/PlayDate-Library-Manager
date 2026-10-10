@@ -5,7 +5,7 @@
     const CURRENT_ORDER = window.CURRENT_ORDER;
 
     // ── Artwork orientation + card size (restored from state) ────────────────
-    const _imgV = Date.now(); // cache-buster: prevents stale 404s from browser negative cache
+    const _imgV = window._ART_V || Date.now(); // cache-buster: moves when a cover file does, so stale 404s are never reused but the cache still works
     const _imgVersions = new Map(); // appid (int) → per-game version after image change
     let _artOrientation = window._artOrientation;
     let _groupBy = window._groupBy;
