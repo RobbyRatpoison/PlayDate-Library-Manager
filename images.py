@@ -877,13 +877,13 @@ def clear_artwork():
     update_game_data(appid, **{src_col[orientation]: None})
     return jsonify({'status': 'success'})
 
-def steam_copy_of(appid, linked_only=False):
+def steam_copy_of(appid):
     """The Steam game whose art a non-Steam game can borrow: {steam_appid, name, icon_hash} or None.
     The duplicate link comes first (it is what hides this copy, so it is the same game by the
     library's own judgement); else the Steam AppID the metadata backfill resolved. The resolved one
     can be wrong (an expansion matched to its base game), which is why the caller always shows the
-    name before using it. `linked_only` (the bulk job, which has nobody to confirm) uses the duplicate
-    link alone."""
+    name before using it; the bulk job has nobody to ask, so it logs which Steam game each game
+    took its art from."""
     from database import get_db
     appid = int(appid)
     if appid > 0:
@@ -894,7 +894,7 @@ def steam_copy_of(appid, linked_only=False):
         if not row:
             return None
         candidates = []
-        for raw in ((row['duplicate_of'],) if linked_only else (row['duplicate_of'], row['steam_appid'])):
+        for raw in (row['duplicate_of'], row['steam_appid']):
             try:
                 if raw is not None and int(raw) > 0:
                     candidates.append(int(raw))

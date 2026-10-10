@@ -2405,17 +2405,18 @@ def bulk_art_scrape_games(appids, types, source, cancel_event, progress_cb):
             try:
                 updates = {}
                 if appid < 0 and source == 'steam':
-                    # "Steam only" for a non-Steam game means its Steam copy: the one the library
-                    # linked it to as a duplicate (nobody is here to confirm a guessed match). No
-                    # copy, or nothing found, is a failure; other sources never leak in, and a
-                    # failed kind leaves the art and source it already has.
-                    copy = steam_copy_of(appid, linked_only=True)
+                    # "Steam only" for a non-Steam game means its Steam copy: the duplicate link, else the
+                    # Steam match the metadata backfill saved. No copy, or nothing found, is a failure;
+                    # other sources never leak in, and a failed kind leaves the art and source it has.
+                    # The match is logged because nobody confirms it here (the editor's button does).
+                    copy = steam_copy_of(appid)
                     cols = {'vertical': 'vertical_art_source', 'horizontal': 'horizontal_art_source', 'icon': 'icon_source'}
                     for kind in ('vertical', 'horizontal', 'icon'):
                         if copy and kind in types and download_from_steam(appid, copy['steam_appid'], kind, copy['icon_hash']) == 'steam':
                             updates[cols[kind]] = 'steam'
                     if not updates:
-                        raise LookupError('no Steam copy with art for this game' if copy else 'no linked Steam copy')
+                        raise LookupError('no Steam copy with art for this game' if copy else 'no Steam copy known for this game')
+                    log.info(f"[bulk_art_scrape] {appid}: art taken from Steam game {copy['steam_appid']} ({copy['name'] or 'not in the library'})")
                 elif appid < 0:
                     name    = name_map.get(appid, '')
                     sgdb_id = _sgdb_search_game_id(name) if name else None

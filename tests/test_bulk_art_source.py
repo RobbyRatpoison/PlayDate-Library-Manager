@@ -1,5 +1,5 @@
-"""The bulk art job's source choice for non-Steam games: 'steam' means the game's linked Steam copy
-(and nothing else), 'sgdb' is passed through as a strict source, 'auto' keeps the library's order."""
+"""The bulk art job's source choice for non-Steam games: 'steam' means the game's Steam copy (duplicate
+link, else the backfill match; nothing else), 'sgdb' is passed through as a strict source, 'auto' keeps the library's order."""
 import sqlite3
 
 import pytest
@@ -62,11 +62,16 @@ def test_steam_uses_the_linked_copy_and_only_for_what_it_finds(job):
     assert (-1, 620, 'horizontal') in job['steam'] and not job['calls']   # no other source was asked
 
 
-def test_steam_fails_a_game_with_no_linked_copy_without_touching_it(job):
-    counts, seen = _run('steam', [-2, -3])
-    assert counts == {'done': 0, 'failed': 2}                      # -3 has a guessed match but no duplicate link
+def test_steam_falls_back_to_the_backfill_match_when_there_is_no_duplicate_link(job):
+    counts, _ = _run('steam', [-3], types=('horizontal',))
+    assert counts == {'done': 1, 'failed': 0} and job['steam'] == [(-3, 620, 'horizontal')]
+
+
+def test_steam_fails_a_game_with_no_steam_copy_without_touching_it(job):
+    counts, seen = _run('steam', [-2])
+    assert counts == {'done': 0, 'failed': 1}
     assert job['updates'] == {} and job['steam'] == [] and job['calls'] == []
-    assert ('failed', -2) in seen and ('failed', -3) in seen
+    assert ('failed', -2) in seen
 
 
 def test_steam_respects_the_chosen_types(job):
@@ -85,7 +90,10 @@ def test_auto_leaves_the_librarys_own_order_alone(job):
     assert job['calls'] == [('horizontal', -1, 'default')] and job['steam'] == []
 
 
-def test_linked_only_ignores_the_backfill_match(job):
-    assert images.steam_copy_of(-3)['steam_appid'] == 620             # the editor's button may use it, after confirming
-    assert images.steam_copy_of(-3, linked_only=True) is None         # the bulk job may not
-    assert images.steam_copy_of(-1, linked_only=True)['steam_appid'] == 620
+def test_the_duplicate_link_wins_over_the_backfill_match(job):
+    conn = database.get_db()
+    conn.execute("INSERT INTO games VALUES (730, 'Other', 'steam', NULL, NULL, '')")
+    conn.execute("UPDATE games SET steam_appid = 730 WHERE appid = -1")      # -1 is linked to 620 as a duplicate
+    conn.commit()
+    conn.close()
+    assert images.steam_copy_of(-1)['steam_appid'] == 620
