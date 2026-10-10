@@ -1,6 +1,7 @@
 import logging
 import math
 import re
+import os
 import sqlite3
 from datetime import datetime, timezone
 
@@ -35,6 +36,22 @@ def _db():
     """Returns the active account's database file path."""
     from config import get_active_db_path
     return get_active_db_path()
+
+
+def db_fingerprint():
+    """Cheap stamp of the active database's contents: its path plus the modification time and size
+    of the file and of its write-ahead log. Every write moves it (WAL mode appends to the -wal
+    file until a checkpoint folds it into the main file), so anything cached against it can be
+    trusted until it changes. Used by the Library's cacheable game list."""
+    path = _db()
+    stamp = [path]
+    for f in (path, path + '-wal'):
+        try:
+            st = os.stat(f)
+            stamp += [st.st_mtime_ns, st.st_size]
+        except OSError:
+            stamp += [0, 0]
+    return tuple(stamp)
 
 
 def _open_conn(db_file, timeout=30):

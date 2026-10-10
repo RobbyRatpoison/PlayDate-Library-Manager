@@ -1,6 +1,25 @@
 {% extends "base.html" %}
 
 
+{% block extra_css %}
+<script>
+// The game list is its own file, keyed by everything that decides it (query, database state, build),
+// so the browser can keep it between visits. Started here, in the head, so it downloads while the
+// rest of the page is parsed. Columns are sent once and the objects rebuilt here, with the same
+// (sorted) key order as before.
+window.GAMES_READY = fetch({{ games_url | tojson }}, { credentials: 'same-origin' })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function (d) {
+        if (!d.cols) { window.GAMES = d.games || []; return window.GAMES; }
+        var c = d.cols, r = d.rows, out = new Array(r.length);
+        for (var i = 0; i < r.length; i++) { var o = {}, row = r[i]; for (var j = 0; j < c.length; j++) o[c[j]] = row[j]; out[i] = o; }
+        window.GAMES = out;
+        return out;
+    });
+window.GAMES_READY.catch(function () { /* reported by the loader at the end of the page */ });
+</script>
+{% endblock %}
+
 {% block content %}
 
     <style>
@@ -770,7 +789,7 @@
 
     <div class="library-header">
         <p>Showing
-            {%- if _is_filtered %} {{ games|length }} of {{ total_games }}{% else %} {{ games|length }}{% endif %}
+            {%- if _is_filtered %} {{ games_count }} of {{ total_games }}{% else %} {{ games_count }}{% endif %}
             games
             {%- if ns.search_term is not none %} &middot; "{{ ns.search_term }}"{% endif %}
             {%- if ns.filter_label is not none %} &middot; {{ ns.filter_label }}{% endif %}
@@ -780,7 +799,7 @@
         </p>
     </div>
 
-    {% if games|length == 0 %}
+    {% if games_count == 0 %}
     <div id="library-empty-state" style="text-align:center; padding:60px 20px; opacity:0.8;">
         <p style="margin-bottom:16px;">No games to show.</p>
         {% if _has_plat_filter or _is_filtered %}
@@ -962,11 +981,6 @@
 
 {% block scripts %}
 <script>
-    {%- if games_cols %}
-    window.GAMES = (function (c, r) { var out = new Array(r.length); for (var i = 0; i < r.length; i++) { var o = {}, row = r[i]; for (var j = 0; j < c.length; j++) o[c[j]] = row[j]; out[i] = o; } return out; })({{ games_cols | tojson }}, {{ games_rows | tojson }});
-    {%- else %}
-    window.GAMES = {{ games | tojson }};
-    {%- endif %}
     window.OUTLINE_COLORS = {{ outline_colors | tojson }};
     window.CURRENT_SORT = {{ state.sort | tojson }};
     window.CURRENT_ORDER = {{ state.order | tojson }};
@@ -986,11 +1000,29 @@
         categories: {{ unique_categories | tojson }},
     };
     window._BULK_FILTER_TREE = {{ state.filter_tree | tojson if state.filter_tree else 'null' }};
-    window.BULK_GAME_COUNT = {{ games|length }};
+    window.BULK_GAME_COUNT = {{ games_count }};
     window.ALL_GAME_COUNT = {{ total_games }};
 </script>
 <script src="{{ url_for('static', filename='js/info_tip.js') }}?v={{ app_version }}"></script>
-<script src="{{ url_for('static', filename='js/library.js') }}?v={{ app_version }}"></script>
+<script>
+// library.js reads window.GAMES while it loads, so it is started once the game list (fetched from the
+// head of the page) has arrived. A script added this way still runs at global scope, like a plain tag.
+(function () {
+    function start() {
+        var s = document.createElement('script');
+        s.src = {{ (url_for('static', filename='js/library.js') ~ '?v=' ~ app_version) | tojson }};
+        document.body.appendChild(s);
+    }
+    window.GAMES_READY.then(function () {
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+        else start();
+    }, function (err) {
+        console.error('Library: could not load the game list', err);
+        var grid = document.getElementById('game-grid');
+        if (grid) grid.innerHTML = '<p style="padding:24px;color:var(--text-secondary);">Could not load your games. Reload the page to try again.</p>';
+    });
+})();
+</script>
 
 <!-- Bulk Delete Modal -->
 <div id="bulk-delete-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeBulkDeleteModal();">

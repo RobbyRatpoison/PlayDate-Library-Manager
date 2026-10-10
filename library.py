@@ -1,3 +1,5 @@
+import collections
+import hashlib
 import json
 import logging
 import os
@@ -7,7 +9,7 @@ import time
 from config import load_state, BASE_DIR, BUILTIN_FILTERS, resolve_outline_rule_where, api_error
 from database import get_db, add_to_blacklist, remove_from_blacklist, get_blacklist
 from utils import get_all_unique_groups, get_all_unique_tags, validate_user_path
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request, url_for
 
 log = logging.getLogger(__name__)
 
@@ -508,11 +510,9 @@ def columnar_games(games):
     return cols, [[g[c] for c in cols] for g in games]
 
 
-@library_bp.route('/library')
-def library():
-    db = get_db()
-    state = load_state()
-
+def _library_query(state):
+    """The query the Library runs for this saved state. Returns a dict: query, params, hidden_platforms,
+    filter_tree (the resolved tree) and active_filter_name."""
     sort_col = state.get('sort', 'name')
     sort_ord = state.get('order', 'ASC')
     if sort_ord not in ('ASC', 'DESC'):
@@ -533,11 +533,10 @@ def library():
     params = []
     where = "1=1"
 
-    from config import resolve_active_filter_tree, _expand_appid_list_refs
+    from config import resolve_active_filter_tree
     _ft_raw = state.get('filter_tree')
     active_filter_name = _ft_raw.get('saved_filter') if isinstance(_ft_raw, dict) and 'saved_filter' in _ft_raw else None
     filter_tree = resolve_active_filter_tree(state)
-    state['filter_tree'] = filter_tree  # template sees resolved tree
 
     if filter_tree:
         # Custom SQL override — user typed their own WHERE clause
@@ -572,57 +571,138 @@ def library():
         where, params = hide_duplicates_where(where, params)
 
     query = f"SELECT * FROM games WHERE {where} ORDER BY {sort_col} {sort_ord}".rstrip()
+    return {'query': query, 'params': params, 'sort_col': sort_col, 'sort_ord': sort_ord,
+            'hidden_platforms': hidden_platforms, 'filter_tree': filter_tree,
+            'active_filter_name': active_filter_name}
 
+
+# The Library's game list is served as its own file (/api/library/games?k=<key>) instead of being
+# written into the page, so the browser can keep it between visits: the page carries the CURRENT
+# key, which changes whenever anything that decides the list changes, and an unchanged key means
+# an unchanged answer. The key covers the exact query and its parameters (so filter, sort, hidden
+# platforms and duplicate hiding are all in it by construction), a stamp of the database file and
+# its write-ahead log (so every write to any game moves it), and the app build.
+_LIB_CACHE = collections.OrderedDict()
+_LIB_CACHE_MAX = 4
+_LIB_LOCK = threading.Lock()
+
+
+def _library_key(q, stamp):
+    from config import __build__
+    raw = json.dumps([q['query'], q['params'], list(stamp), __build__], default=str)
+    return hashlib.sha1(raw.encode()).hexdigest()[:20]
+
+
+def _library_result(q, key):
+    """Everything the Library page needs from the database for this query: the serialized game list
+    plus the counts and lists beside it. Cached by key; a result that came from the fallback after a
+    SQL error is never cached."""
+    with _LIB_LOCK:
+        hit = _LIB_CACHE.get(key)
+        if hit is not None:
+            _LIB_CACHE.move_to_end(key)
+            return hit
+
+    from flask import current_app
+    from database import ts_to_date
+    db = get_db()
     sql_error = None
     try:
-        rows = db.execute(query, params).fetchall()
-        games = [dict(row) for row in rows]
+        games = [dict(row) for row in db.execute(q['query'], q['params']).fetchall()]
     except Exception as e:
         sql_error = str(e)
         try:
-            rows = db.execute(f"SELECT * FROM games ORDER BY {sort_col} {sort_ord}".rstrip()).fetchall()
-            games = [dict(row) for row in rows]
+            games = [dict(row) for row in db.execute(
+                f"SELECT * FROM games ORDER BY {q['sort_col']} {q['sort_ord']}".rstrip()).fetchall()]
         except Exception:
             games = []
 
-    total_games  = db.execute("SELECT COUNT(*) FROM games").fetchone()[0]
+    total_games = db.execute("SELECT COUNT(*) FROM games").fetchone()[0]
     hidden_dupes = db.execute(
         "SELECT COUNT(*) FROM games WHERE duplicate_of IS NOT NULL AND duplicate_of != ''"
     ).fetchone()[0]
-    _plat_rows = db.execute("SELECT DISTINCT platform as p FROM games ORDER BY p").fetchall()
-
-    _grp_rows = db.execute("SELECT groups FROM games WHERE groups IS NOT NULL").fetchall()
-    _tag_rows = db.execute("SELECT tags   FROM games WHERE tags   IS NOT NULL").fetchall()
+    plat_rows = [r['p'] for r in db.execute("SELECT DISTINCT platform as p FROM games ORDER BY p").fetchall()]
+    grp_rows = db.execute("SELECT groups FROM games WHERE groups IS NOT NULL").fetchall()
+    tag_rows = db.execute("SELECT tags   FROM games WHERE tags   IS NOT NULL").fetchall()
     db.close()
 
-    groups = sorted({v.strip() for row in _grp_rows for v in (row['groups'] or '').split(',') if v.strip()}, key=str.casefold)
-    tags   = sorted({v.strip() for row in _tag_rows for v in (row['tags']   or '').split(',') if v.strip()}, key=str.casefold)
+    groups = sorted({v.strip() for row in grp_rows for v in (row['groups'] or '').split(',') if v.strip()}, key=str.casefold)
+    tags   = sorted({v.strip() for row in tag_rows for v in (row['tags']   or '').split(',') if v.strip()}, key=str.casefold)
+    appids = [g['appid'] for g in games]
 
-    _outlines_cfg = state.get('card_outlines', {})
-    outline_colors = (
-        _compute_outline_colors(games, state)
-        if _outlines_cfg.get('enabled', {}).get('library', True)
-        else {}
-    )
-
-    # Drop icon_hash — it's a raw Steam hash used only server-side during scraping,
-    # never referenced in browser JS, so no need to ship it to every page load.
-    from database import ts_to_date
+    # Drop icon_hash: a raw Steam hash used only server-side during scraping, never referenced in
+    # browser JS, so no need to ship it to every page load.
     for g in games:
         g.pop('icon_hash', None)
         for col in ('last_played', 'date_added', 'release_date'):
             if g.get(col):
                 g[col] = ts_to_date(g[col])
 
+    col = columnar_games(games)
+    payload = {'cols': col[0], 'rows': col[1]} if col else {'games': games}
+    body = current_app.json.dumps(payload, separators=(',', ':')).encode('utf-8')
+    result = {'key': key, 'body': body, 'appids': appids, 'count': len(appids), 'total_games': total_games,
+              'hidden_dupes': hidden_dupes, 'platforms': plat_rows, 'groups': groups, 'tags': tags,
+              'sql_error': sql_error}
+    if sql_error is None:
+        with _LIB_LOCK:
+            _LIB_CACHE[key] = result
+            while len(_LIB_CACHE) > _LIB_CACHE_MAX:
+                _LIB_CACHE.popitem(last=False)
+    return result
+
+
+def _library_current(state):
+    """(query dict, key, result) for the saved state. The database stamp is read BEFORE the query
+    runs: a write that lands in between then makes the next request miss, instead of a stale list
+    being filed under a key that already looks current."""
+    from database import db_fingerprint
+    q = _library_query(state)
+    stamp = db_fingerprint()
+    key = _library_key(q, stamp)
+    return q, key, _library_result(q, key)
+
+
+@library_bp.route('/api/library/games')
+def library_games():
+    """The Library's game list (columns + rows). Cacheable for a year when the requested key is the
+    current one, because the key changes with everything that decides the list; if the saved state
+    or the data moved since the page was built the fresh list is returned uncached."""
+    from flask import Response
+    q, key, result = _library_current(load_state())
+    resp = Response(result['body'], mimetype='application/json')
+    resp.headers['X-Library-Key'] = key
+    if request.args.get('k') == key and not result['sql_error']:
+        resp.headers['Cache-Control'] = 'private, max-age=31536000, immutable'
+    else:
+        resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
+@library_bp.route('/library')
+def library():
+    state = load_state()
+    q, key, result = _library_current(state)
+    filter_tree = q['filter_tree']
+    state['filter_tree'] = filter_tree  # template sees resolved tree
+
+    _outlines_cfg = state.get('card_outlines', {})
+    outline_colors = (
+        _compute_outline_colors([{'appid': a} for a in result['appids']], state)
+        if _outlines_cfg.get('enabled', {}).get('library', True)
+        else {}
+    )
+
     from plugins import platform_labels as _platform_labels
     _plat_order = list(_platform_labels().keys())
     available_platforms = sorted(
-        {r['p'] for r in _plat_rows},
+        result['platforms'],
         key=lambda p: _plat_order.index(p) if p in _plat_order else 99
     )
 
     # Expand appid_list_ref nodes in saved filters before sending to browser.
     # state.json stores refs for compactness; the JS filter tree builder only handles appid_list.
+    from config import _expand_appid_list_refs
     raw_saved = state.get('saved_filters', {})
     expanded_saved = {}
     for fname, entry in raw_saved.items():
@@ -634,17 +714,16 @@ def library():
             expanded_saved[fname] = entry
     state = {**state, 'saved_filters': expanded_saved}
 
-    _col = columnar_games(games)
-    return render_template('library.html', games=games, state=state,
-                           games_cols=_col[0] if _col else None, games_rows=_col[1] if _col else None,
-                           unique_tags=tags, unique_groups=groups,
-                           sql_error=sql_error, builtin_filters=BUILTIN_FILTERS,
-                           total_games=total_games, hidden_dupes=hidden_dupes,
+    return render_template('library.html', games_count=result['count'],
+                           games_url=url_for('library.library_games', k=key), state=state,
+                           unique_tags=result['tags'], unique_groups=result['groups'],
+                           sql_error=result['sql_error'], builtin_filters=BUILTIN_FILTERS,
+                           total_games=result['total_games'], hidden_dupes=result['hidden_dupes'],
                            available_platforms=available_platforms,
-                           hidden_platforms=hidden_platforms,
+                           hidden_platforms=q['hidden_platforms'],
                            group_by=state.get('group_by'),
                            outline_colors=outline_colors,
-                           active_filter_name=active_filter_name)
+                           active_filter_name=q['active_filter_name'])
 
 
 @library_bp.route('/update_game', methods=['POST'])

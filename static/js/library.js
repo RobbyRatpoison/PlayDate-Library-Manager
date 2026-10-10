@@ -1,3 +1,12 @@
+// library.js is started once the game list has arrived (see library.html), which can be after
+// DOMContentLoaded, so its start-up code cannot rely on that event. When the page is already loaded
+// the function runs right after this script has finished, the same point a DOMContentLoaded
+// listener would have run at (every top-level const is initialised by then).
+function _libOnReady(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else Promise.resolve().then(fn);
+}
+
     // ── All game data in one JS array — no per-card script tags ──
     const GAMES = window.GAMES;
     const OUTLINE_COLORS = window.OUTLINE_COLORS;
@@ -677,7 +686,7 @@
     }
 
     // Build on load — deferred so the browser can paint the page chrome first
-    document.addEventListener('DOMContentLoaded', function() {
+    _libOnReady(function() {
         // GAMES always covers the full active filter now (search is no longer
         // baked into the server-side SQL) — restore a previously-committed
         // search's narrowed view client-side once cards exist. buildGrid()/
@@ -1444,7 +1453,7 @@ async function runBulkDelete() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+_libOnReady(() => {
     initCustomSelect(document.getElementById('sort-dropdown'));
     initCustomSelect(document.getElementById('group-by-dropdown'));
     initCustomSelect(document.getElementById('bulk-column'));
@@ -2543,7 +2552,7 @@ function pickRandomGame() {
     }
 
     // Keep dp- pill suggestions in sync with edit- suggestions
-    document.addEventListener('DOMContentLoaded', function() {
+    _libOnReady(function() {
         if (typeof PILL_SUGGESTIONS !== 'undefined') {
             ['tags', 'genres', 'categories', 'groups'].forEach(k => {
                 PILL_SUGGESTIONS['dp-' + k] = PILL_SUGGESTIONS['edit-' + k] || [];
