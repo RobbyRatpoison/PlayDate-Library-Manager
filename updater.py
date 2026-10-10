@@ -241,16 +241,28 @@ UPDATE_CHECK_INTERVAL = 24 * 3600   # at most one real GitHub check per day
 UPDATE_WAKE_INTERVAL = 6 * 3600     # how often the running app re-tests that gate
 
 
+def _rolled_back_at():
+    """When the last failed update was rolled back (0 if none is on record)."""
+    try:
+        return float((rollback.read_notice(BASE_DIR) or {}).get('time') or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _maybe_update_check():
     """Real check only if the last good one is older than UPDATE_CHECK_INTERVAL;
-    otherwise load the saved result into memory (no network)."""
+    otherwise load the saved result into memory (no network). A saved check made
+    before a rollback never counts: it predates the failed update and still names
+    the version that failed, so trusting it would hide a fix for up to a day."""
     from config import load_state, __build__
     state = load_state()
     if not state.get('check_for_updates', True):
         return
     saved = state.get('update_check_cache') or {}
-    age = time.time() - float(saved.get('checked_at') or 0)
-    if saved.get('latest_version') and 0 <= age < UPDATE_CHECK_INTERVAL:
+    checked_at = float(saved.get('checked_at') or 0)
+    age = time.time() - checked_at
+    if saved.get('latest_version') and 0 <= age < UPDATE_CHECK_INTERVAL \
+            and checked_at >= _rolled_back_at():
         if not _update_cache or _update_cache.get('error'):
             _update_cache.update(saved)
             _update_cache['error'] = None
