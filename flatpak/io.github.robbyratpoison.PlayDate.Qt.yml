@@ -31,6 +31,13 @@ command: playdate
 
 cleanup-commands:
   - /app/cleanup-BaseApp.sh
+  # QtWebEngine ships a Chromium locale pack for 50+ languages (~44 MB of the
+  # ~393 MB app). They only translate Chromium's own UI strings, and PlayDate
+  # draws everything itself in English; QtWebEngine falls back to en-US when a
+  # locale pack is missing (checked with LANGUAGE=de/fr/ja against a locales
+  # dir holding only en-US and en-GB: starts, loads, reports the right
+  # navigator.language). Fewer files also means a faster, smaller bundle.
+  - find /app/translations/qtwebengine_locales -type f ! -name 'en-US.pak' ! -name 'en-GB.pak' -delete 2>/dev/null || true
 
 finish-args:
   # Identical to the GTK manifest's own reasoning -- see that file for the
