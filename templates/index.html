@@ -89,6 +89,10 @@
         flex-shrink: 0; height: 100%; aspect-ratio: 2/3;
         border-radius: 8px; cursor: pointer;
         position: relative; overflow: hidden;
+        /* An unlimited shelf can hold thousands of cards; let the browser skip laying out and
+           painting the ones off-screen. Card size comes from height + aspect-ratio, so scroll
+           width and positions are unchanged. Ignored by engines without content-visibility. */
+        content-visibility: auto; contain-intrinsic-size: auto 240px;
     }
     .shelf-capsule-inner {
         position: absolute; inset: 0; border-radius: 8px; overflow: hidden;
