@@ -3,7 +3,7 @@
 (function () {
     if (!window.PerformanceObserver || !navigator.sendBeacon) return;
     var long = { n: 0, total: 0, max: 0 }, lcp = 0, firstSrc = 0, firstCover = 0, lastCover = 0, covers = 0, painted = 0;
-    var isCover = function (el) { return el && el.tagName === 'IMG' && el.classList.contains('shelf-capsule'); };
+    var isCover = function (el) { return el && el.tagName === 'IMG' && (el.classList.contains('shelf-capsule') || (el.closest && !!el.closest('.game-card'))); };
     try {
         new PerformanceObserver(function (l) {
             l.getEntries().forEach(function (e) { long.n++; long.total += e.duration; long.max = Math.max(long.max, e.duration); });
@@ -44,6 +44,7 @@
             if (r.transferSize === 0 && r.decodedBodySize > 0) cached++;
             end = Math.max(end, r.responseEnd);
         });
+        var gf = (performance.getEntriesByType('resource').filter(function (r) { return r.name.indexOf('/api/library/games') !== -1; })[0]) || null;
         var body = {
             ttfb: ms(nav.responseStart), interactive: ms(nav.domInteractive), dcl: ms(nav.domContentLoadedEventEnd), load: ms(nav.loadEventEnd),
             fp: ms(fp['first-paint']), fcp: ms(fp['first-contentful-paint']), lcp: ms(lcp),
@@ -51,7 +52,7 @@
             res: { n: rs.length, cached: cached, waitMed: ms(med(wait)), serverMed: ms(med(server)), dlMed: ms(med(dl)), lastEnd: ms(end) },
             longTasks: { n: long.n, totalMs: ms(long.total), maxMs: ms(long.max) },
             html: nav.encodedBodySize || 0,
-            env: { gpu: gpu(), ua: navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 160), dpr: window.devicePixelRatio, w: innerWidth, h: innerHeight, cores: navigator.hardwareConcurrency || 0 }
+            env: { page: location.pathname.slice(0, 20), gTransfer: gf ? gf.transferSize : -1, gDecoded: gf ? gf.decodedBodySize : -1, gEnd: gf ? ms(gf.responseEnd) : -1, gpu: gpu(), ua: navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 160), dpr: window.devicePixelRatio, w: innerWidth, h: innerHeight, cores: navigator.hardwareConcurrency || 0 }
         };
         navigator.sendBeacon('/api/debug/page-timing', new Blob([JSON.stringify(body)], { type: 'application/json' }));
     }
