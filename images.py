@@ -877,6 +877,105 @@ def clear_artwork():
     update_game_data(appid, **{src_col[orientation]: None})
     return jsonify({'status': 'success'})
 
+def steam_copy_of(appid):
+    """The Steam game whose art a non-Steam game can borrow: {steam_appid, name, icon_hash} or None.
+    The duplicate link comes first (it is what hides this copy, so it is the same game by the
+    library's own judgement); else the Steam AppID the metadata backfill resolved. The resolved one
+    can be wrong (an expansion matched to its base game), which is why the caller always shows the
+    name before using it."""
+    from database import get_db
+    appid = int(appid)
+    if appid > 0:
+        return None
+    db = get_db()
+    try:
+        row = db.execute("SELECT duplicate_of, steam_appid FROM games WHERE appid = ?", (appid,)).fetchone()
+        if not row:
+            return None
+        candidates = []
+        for raw in (row['duplicate_of'], row['steam_appid']):
+            try:
+                if raw is not None and int(raw) > 0:
+                    candidates.append(int(raw))
+            except (TypeError, ValueError):
+                pass
+        for sid in candidates:
+            steam = db.execute("SELECT name, icon_hash FROM games WHERE appid = ? AND platform = 'steam'", (sid,)).fetchone()
+            if steam:
+                return {'steam_appid': sid, 'name': steam['name'], 'icon_hash': steam['icon_hash'] or ''}
+        if candidates:
+            return {'steam_appid': candidates[0], 'name': None, 'icon_hash': ''}
+        return None
+    finally:
+        db.close()
+
+
+def download_from_steam(appid, steam_appid, kind, icon_hash=''):
+    """Save Steam game `steam_appid`'s art of `kind` as game `appid`'s own (the files are named for
+    `appid`). Returns 'steam' on success, 'missing' otherwise."""
+    _ensure_dirs()
+    steam_appid = int(steam_appid)
+    save_path = os.path.join({'vertical': VERTICAL_DIR, 'horizontal': HORIZONTAL_DIR, 'icon': ICONS_DIR}[kind],
+                             f'{int(appid)}.jpg')
+    cdn = f'https://cdn.cloudflare.steamstatic.com/steam/apps/{steam_appid}'
+    if kind == 'icon':
+        if not icon_hash:
+            return 'missing'
+        base = f'https://media.steampowered.com/steamcommunity/public/images/apps/{steam_appid}'
+        urls = [f'{base}/{icon_hash}_2x.jpg', f'{base}/{icon_hash}.jpg']
+    else:
+        assets = _get_steam_assets(steam_appid)
+        if kind == 'vertical':
+            urls = [assets.get('library_capsule_2x'), assets.get('library_capsule'),
+                    f'{cdn}/library_600x900_2x.jpg', f'{cdn}/library_600x900.jpg']
+        else:
+            urls = [assets.get('header_image') or assets.get('main_capsule'), f'{cdn}/header.jpg']
+    for url in urls:
+        if not url:
+            continue
+        try:
+            res = requests.get(url, timeout=8)
+            if res.status_code == 200 and save_as_jpg(res.content, save_path):
+                return 'steam'
+        except Exception as e:
+            log.warning(f"download_from_steam: {kind} error for {appid} from {steam_appid}: {e}")
+    return 'missing'
+
+
+@images_bp.route('/api/artwork/steam-copy/<int:appid>')
+def artwork_steam_copy(appid):
+    """Which Steam game a non-Steam game could borrow art from (see steam_copy_of)."""
+    copy = steam_copy_of(appid)
+    if not copy:
+        return jsonify({'status': 'none'})
+    return jsonify({'status': 'ok', 'steam_appid': copy['steam_appid'], 'name': copy['name'],
+                    'has_icon': bool(copy['icon_hash'])})
+
+
+@images_bp.route('/api/artwork/from-steam', methods=['POST'])
+def artwork_from_steam():
+    from database import update_game_data
+    from datetime import datetime
+    data = request.json or {}
+    try:
+        appid = int(data.get('appid'))
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'message': 'Missing or invalid parameters'}), 400
+    kind = data.get('orientation')
+    copy = steam_copy_of(appid)
+    if kind not in ('vertical', 'horizontal', 'icon') or not copy:
+        return jsonify({'status': 'error', 'message': 'No Steam copy of this game to take art from.'}), 400
+    # The page confirmed a specific Steam game; refuse if the link changed since
+    if data.get('steam_appid') is not None and int(data['steam_appid']) != copy['steam_appid']:
+        return jsonify({'status': 'error', 'message': 'The linked Steam game changed. Close and reopen the editor.'}), 409
+    source = download_from_steam(appid, copy['steam_appid'], kind, copy['icon_hash'])
+    if source == 'missing':
+        return jsonify({'status': 'error', 'message': "Steam doesn't have that art for this game."}), 502
+    col = {'vertical': 'vertical_art_source', 'horizontal': 'horizontal_art_source', 'icon': 'icon_source'}[kind]
+    update_game_data(appid, **{col: source, 'art_fetched': datetime.now().strftime('%Y-%m-%d')})
+    return jsonify({'status': 'success', 'source': source})
+
+
 @images_bp.route('/api/artwork/rescrape', methods=['POST'])
 def rescrape_artwork():
     from database import update_game_data, get_db

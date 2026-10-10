@@ -4,6 +4,7 @@
 ### New
 
 - Added a Cover Shape filter for covers that don't fit the card.
+- Added a From Steam button for artwork on games that also exist on Steam.
 
 ### Improvements
 

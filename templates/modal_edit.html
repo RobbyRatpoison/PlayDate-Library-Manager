@@ -468,6 +468,7 @@
                         <div class="art-source-label">Source: <span id="art-source-vertical">—</span></div>
                         <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                             <button type="button" class="nav-btn art-action-btn" onclick="rescrapeArt('vertical')"       data-modal-row="21">Re-scrape</button>
+                            <button type="button" id="art-steam-btn-vertical" class="nav-btn art-action-btn" onclick="artFromSteam('vertical')" data-modal-row="21" style="display:none;">From Steam</button>
                             <button type="button" class="nav-btn art-action-btn" onclick="toggleArtCustomUrl('vertical')" data-modal-row="21">Custom URL</button>
                             {% if existing_sgdb_key %}<button type="button" class="nav-btn art-action-btn" onclick="openSgdbBrowser('vertical')" data-modal-row="21">Browse SGDB</button>{% endif %}
                             {% if not existing_sgdb_key %}<a id="sgdb-link-vertical" href="#" target="_blank" rel="noopener" style="font-size:0.75rem; color:var(--accent);" data-modal-row="21">Browse SGDB ↗</a>{% endif %}
@@ -491,6 +492,7 @@
                         <div class="art-source-label">Source: <span id="art-source-horizontal">—</span></div>
                         <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                             <button type="button" class="nav-btn art-action-btn" onclick="rescrapeArt('horizontal')"       data-modal-row="21">Re-scrape</button>
+                            <button type="button" id="art-steam-btn-horizontal" class="nav-btn art-action-btn" onclick="artFromSteam('horizontal')" data-modal-row="21" style="display:none;">From Steam</button>
                             <button type="button" class="nav-btn art-action-btn" onclick="toggleArtCustomUrl('horizontal')" data-modal-row="21">Custom URL</button>
                             {% if existing_sgdb_key %}<button type="button" class="nav-btn art-action-btn" onclick="openSgdbBrowser('horizontal')" data-modal-row="21">Browse SGDB</button>{% endif %}
                             {% if not existing_sgdb_key %}<a id="sgdb-link-horizontal" href="#" target="_blank" rel="noopener" style="font-size:0.75rem; color:var(--accent);" data-modal-row="21">Browse SGDB ↗</a>{% endif %}
@@ -514,6 +516,7 @@
                         <div class="art-source-label">Source: <span id="art-source-icon">—</span></div>
                         <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                             <button type="button" class="nav-btn art-action-btn" onclick="rescrapeArt('icon')"       data-modal-row="21">Re-scrape</button>
+                            <button type="button" id="art-steam-btn-icon" class="nav-btn art-action-btn" onclick="artFromSteam('icon')" data-modal-row="21" style="display:none;">From Steam</button>
                             <button type="button" class="nav-btn art-action-btn" onclick="toggleArtCustomUrl('icon')" data-modal-row="21">Custom URL</button>
                             {% if existing_sgdb_key %}<button type="button" class="nav-btn art-action-btn" onclick="openSgdbBrowser('icon')" data-modal-row="21">Browse SGDB</button>{% endif %}
                             {% if not existing_sgdb_key %}<a id="sgdb-link-icon" href="#" target="_blank" rel="noopener" style="font-size:0.75rem; color:var(--accent);" data-modal-row="21">Browse SGDB ↗</a>{% endif %}
@@ -854,6 +857,7 @@
         _loadArtPanel('horizontal', `/static/img/library/horizontal/${parseInt(game.appid)}.jpg?v=${Date.now()}`, game.horizontal_art_source);
         _loadArtPanel('icon',       `/static/img/library/icons/${parseInt(game.appid)}.jpg?v=${Date.now()}`,      game.icon_source);
         openArtTab('vertical');
+        _probeSteamCopy(game.appid);
 
         const storeLink  = document.getElementById('store-link');
         const appidLabel = document.getElementById('display-appid-label');
@@ -1186,6 +1190,47 @@ const achLink = document.getElementById('achievements-link');
         } catch {
             status.style.color = '#ff8080'; status.textContent = '✘ Network error.';
         }
+    }
+
+    // "From Steam": for a non-Steam game that has a Steam copy, borrow that copy's art. The Steam game
+    // is named before it is used, because the stored match can be wrong (an expansion matched to its
+    // base game).
+    let _steamCopy = null;
+    function _probeSteamCopy(appid) {
+        _steamCopy = null;
+        ['vertical', 'horizontal', 'icon'].forEach(t => { const b = document.getElementById('art-steam-btn-' + t); if (b) b.style.display = 'none'; });
+        if (parseInt(appid) >= 0) return;
+        fetch('/api/artwork/steam-copy/' + parseInt(appid)).then(r => r.json()).then(d => {
+            if (d.status !== 'ok' || String(document.getElementById('edit-appid').value) !== String(appid)) return;
+            _steamCopy = d;
+            ['vertical', 'horizontal'].concat(d.has_icon ? ['icon'] : []).forEach(t => {
+                const b = document.getElementById('art-steam-btn-' + t); if (b) b.style.display = '';
+            });
+        }).catch(() => {});
+    }
+
+    function artFromSteam(type) {
+        if (!_steamCopy) return;
+        const appid  = document.getElementById('edit-appid').value;
+        const status = document.getElementById(`art-status-${type}`);
+        const label  = _steamCopy.name || ('Steam app ' + _steamCopy.steam_appid);
+        confirm(`Use the ${type} art from the Steam game "${label}" for this game?`).then(ok => {
+            if (!ok) return;
+            status.style.color = '#aaa'; status.textContent = 'Fetching from Steam...';
+            fetch('/api/artwork/from-steam', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ appid, orientation: type, steam_appid: _steamCopy.steam_appid })
+            }).then(r => r.json()).then(data => {
+                if (data.status === 'success') {
+                    const dirMap = { vertical: 'vertical', horizontal: 'horizontal', icon: 'icons' };
+                    _loadArtPanel(type, `/static/img/library/${dirMap[type]}/${parseInt(appid)}.jpg?v=${Date.now()}`, data.source);
+                    _bustPageArtCache(appid, type);
+                    status.style.color = '#5c7e10'; status.textContent = '✔ Done!';
+                } else {
+                    status.style.color = '#ff8080'; status.textContent = '✘ ' + data.message;
+                }
+            }).catch(() => { status.style.color = '#ff8080'; status.textContent = '✘ Network error.'; });
+        });
     }
 
     async function rescrapeArt(type) {
