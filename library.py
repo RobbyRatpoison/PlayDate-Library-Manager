@@ -679,6 +679,19 @@ def library_games():
     return resp
 
 
+@library_bp.route('/api/library/prewarm', methods=['POST'])
+def library_prewarm():
+    """Build the Library's game list now and hand back its URL, so another page can fetch it in idle
+    time and the browser already holds it when the Library opens. Read-only. Skipped while a bulk job
+    runs, because its writes would change the key again before the Library is opened."""
+    if _bulk_op_state['running']:
+        return jsonify({'status': 'busy'})
+    q, key, result = _library_current(load_state())
+    if result['sql_error']:
+        return jsonify({'status': 'skipped'})
+    return jsonify({'status': 'ok', 'url': url_for('library.library_games', k=key)})
+
+
 @library_bp.route('/library')
 def library():
     state = load_state()

@@ -96,3 +96,24 @@ def test_a_failed_query_falls_back_and_is_never_cached(db):
         res = library._library_result(_q(where='no_such_column = 1'), 'bad')
     assert res['sql_error'] and res['count'] == 2                               # fell back to every game
     assert 'bad' not in library._LIB_CACHE
+
+
+def test_prewarm_returns_the_key_the_library_page_embeds_and_writes_nothing(db, monkeypatch):
+    app = Flask('t')
+    app.register_blueprint(library.library_bp)
+    monkeypatch.setattr(library, 'load_state', lambda: {})
+    monkeypatch.setattr(library, '_library_query', lambda state: _q())
+    before = database.db_fingerprint()
+    with app.test_request_context():
+        resp = library.library_prewarm()
+        url = resp.get_json()['url']
+        _, key, _ = library._library_current({})
+    assert resp.get_json()['status'] == 'ok' and url.endswith('k=' + key)
+    assert database.db_fingerprint() == before                                  # read-only
+
+
+def test_prewarm_waits_while_a_bulk_job_runs(db, monkeypatch):
+    app = Flask('t')
+    monkeypatch.setitem(library._bulk_op_state, 'running', True)
+    with app.test_request_context():
+        assert library.library_prewarm().get_json() == {'status': 'busy'}

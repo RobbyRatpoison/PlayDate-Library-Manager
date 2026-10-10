@@ -2672,5 +2672,23 @@ setInterval(async () => {
     window.addEventListener('scroll', hide, { passive: true, capture: true });
 })();
 </script>
+<script>
+/* Fill the browser's cache with the Library's game list while Home sits idle, so the first click on
+   Library behaves like a return visit. A stale answer is harmless: the Library page carries the key
+   that is current when it opens. */
+(function () {
+    var go = function () {
+        fetch('/api/library/prewarm', { method: 'POST', credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (d && d.status === 'ok') return fetch(d.url, { credentials: 'same-origin' }); })
+            .catch(function () {});
+    };
+    window.addEventListener('load', function () {
+        setTimeout(function () {
+            if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 5000 }); else go();
+        }, 3000);
+    });
+})();
+</script>
 <script src="/static/js/page_timing.js"></script>  {# TEMPORARY: home load timing -> playdate.log #}
 {% endblock %}
