@@ -617,7 +617,8 @@ function _libOnReady(fn) {
     // game list comes from its own cacheable file. Resolves false, and the caller reloads, whenever
     // anything is unusual: list mode, select mode, a PAGYWOSG filter before or after (its tooltip and
     // qualification code is wired at load), a filter error, a failed request.
-    window.pdRefilter = async function() {
+    window.pdRefilter = async function(opts) {
+        const keepY = opts && opts.keepScroll ? window.scrollY : null;
         if (_artOrientation === 'list' || _selectMode || _serverFilterTree?.pagywosg) return false;
         let v, rows;
         try {
@@ -677,9 +678,43 @@ function _libOnReady(fn) {
         _groupBy = window._groupBy = v.group_by || null;
         _updateGroupByHeaderLabel();
         buildGrid();
-        window.scrollTo({ top: 0, behavior: 'instant' });
+        window.scrollTo({ top: keepY ?? 0, behavior: 'instant' });
+        // The rebuilt grid only reaches its full height once the cards have been laid out; until then
+        // the document is short and the scroll position gets clamped, so set it again afterwards.
+        if (keepY) requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: keepY, behavior: 'instant' })));
         return true;
     };
+
+    // ── Install status: follow installs and uninstalls while the page is open ──
+    // The server is polled for the installed appids (any platform); when it disagrees with what the
+    // page holds, the view is refreshed in place (filters, grouping and sort may all depend on it)
+    // keeping the scroll position. When an in-place refresh isn't possible (list mode, select mode,
+    // PAGYWOSG) the flags are patched locally and the grid regrouped if it is grouped by install.
+    let _installPollBusy = false;
+    async function _pollInstalled() {
+        if (_installPollBusy || document.hidden) return;
+        _installPollBusy = true;
+        try {
+            const d = await (await fetch('/api/installed-appids', { credentials: 'same-origin' })).json();
+            const now = new Set(d.installed);
+            const changed = GAMES.filter(g => now.has(g.appid) !== !!g.installed);
+            if (!changed.length) return;
+            if (await window.pdRefilter({ keepScroll: true })) return;
+            changed.forEach(g => {
+                g.installed = now.has(g.appid) ? 1 : 0;
+                const el = document.getElementById('card-' + g.appid) || document.querySelector(`.list-row[data-appid="${g.appid}"]`);
+                if (el) el.dataset.installed = g.installed ? '1' : '0';
+            });
+            if (_groupBy === 'installed') {
+                const y = window.scrollY;
+                if (_artOrientation === 'list') buildListView(); else buildGrid();
+                window.scrollTo({ top: y, behavior: 'instant' });
+                requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'instant' })));
+            }
+        } catch (e) { /* offline or restarting: try again next time */ }
+        finally { _installPollBusy = false; }
+    }
+    setInterval(_pollInstalled, 5000);
 
     function _updateGroupByHeaderLabel() {
         const el = document.getElementById('group-by-label');

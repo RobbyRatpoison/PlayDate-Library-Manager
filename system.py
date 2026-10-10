@@ -280,6 +280,18 @@ def log_js_error():
         log.error(f'JS stack [{ctx}]: {stack}')
     return jsonify({'ok': True})
 
+@system_bp.route('/api/installed-appids')
+def installed_appids():
+    """Every installed game's appid, whatever its platform. Unlike /api/install-changed (one
+    consumer, Steam only) this is stateless, so any number of pages can poll it and compare."""
+    db = get_db()
+    rows = db.execute("SELECT appid FROM games WHERE installed = 1").fetchall()
+    db.close()
+    resp = jsonify({'installed': [r['appid'] for r in rows]})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
 @system_bp.route('/api/install-changed')
 def install_changed():
     if not consume_install_dirty():
