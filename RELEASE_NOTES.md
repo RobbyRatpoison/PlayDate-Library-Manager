@@ -1,6 +1,10 @@
 # Release Notes
 
 ## v2026.10.4
+### New
+
+- Added a Cover Shape filter for covers that don't fit the card.
+
 ### Improvements
 
 - GOG purchase dates now import straight from your account, with no userscript.
@@ -15,7 +19,6 @@
 - Sorting, grouping and filtering the Library no longer reloads the page.
 - The Library now updates when games are installed or uninstalled.
 - Edited games now move to their new place straight away.
-- Added a Cover Shape filter for covers that don't fit the card.
 - Automatic SteamGridDB art now picks the best fit and retries on failure.
 
 ### Fixes
