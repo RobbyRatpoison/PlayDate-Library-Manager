@@ -7,7 +7,7 @@
 - EA purchase dates now import straight from your account, with no userscript.
 - Plugins now check that your login still works instead of failing silently.
 - Humble logins now renew themselves so they don't lapse.
-- The SteamGridDB picker now lists the best-fitting images first and sets apart the ones that will show a backdrop.
+- The SteamGridDB picker now lists images closest to the right aspect ratio first and sets apart the ones that don't match.
 
 ### Fixes
 
