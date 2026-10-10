@@ -24,6 +24,7 @@
 - The artwork tab now opens on the view you're in.
 - Automatic SteamGridDB art now picks the best fit and retries on failure.
 - Artwork now prefers Steam art and the right shape, switchable in Settings.
+- Games from other libraries are now matched to Steam automatically.
 
 ### Fixes
 

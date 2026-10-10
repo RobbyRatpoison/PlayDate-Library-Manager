@@ -2974,13 +2974,16 @@ _METADATA_INCOMPLETE_WHERE = (
     " OR (tags IS NULL OR tags = ''))"
 )
 
-# The narrower gate for the *automatic* startup sweep: incomplete AND never
-# attempted (so it drains once and never re-hammers a game that legitimately
-# has nothing more to find). 'retry' is future-proofing -- nothing writes it
-# to the column today. Renaming a game resets meta_backfill_fetched to '0',
-# which puts it back in this set.
+# The narrower gate for the *automatic* startup sweep: never attempted AND either
+# incomplete, or a non-Steam game with no Steam match yet (so it drains once and
+# never re-hammers a game that legitimately has nothing more to find). The second
+# case matters on its own: a GOG game arrives with developer/genres/tags, so the
+# incomplete test never picked it, yet its Steam match is what gives it Steam art
+# (the default Artwork Sources order) and the Steam-only metadata. 'retry' is
+# future-proofing -- nothing writes it to the column today. Renaming a game
+# resets meta_backfill_fetched to '0', which puts it back in this set.
 _METADATA_PENDING_WHERE = (
-    f"{_METADATA_INCOMPLETE_WHERE} "
+    f"({_METADATA_INCOMPLETE_WHERE} OR (appid < 0 AND steam_appid IS NULL)) "
     "AND (meta_backfill_fetched IS NULL OR meta_backfill_fetched IN ('0', 'retry'))"
 )
 _METADATA_PENDING_SQL = f"SELECT appid FROM games WHERE {_METADATA_PENDING_WHERE} ORDER BY appid"
