@@ -249,11 +249,32 @@ def _strip_search_condition(node):
 
 DATE_COLUMNS = {'release_date', 'date_added', 'last_played'}
 
+def _cover_fit_sql(op, val):
+    """The 'Cover Shape' filter: whether the game's cover fits the card in the view the user is in.
+    The Library shows horizontal covers in horizontal view and vertical ones otherwise (list view
+    included), and a game can fit in one and not the other, so the column follows the saved
+    artwork_orientation. images.compute_art_edges stores '-' for a cover that fits, a direction
+    plus colours for one that doesn't, and NULL when there is no cover file."""
+    from config import load_state
+    edge = 'edge_horizontal' if load_state().get('artwork_orientation') == 'horizontal' else 'edge_vertical'
+    expr = {
+        'fits':  f"(COALESCE({edge}, 'x') = '-')",
+        'wrong': f"(COALESCE({edge}, '-') != '-')",
+        'none':  f"({edge} IS NULL)",
+    }.get(val)
+    if expr is None or op not in ('=', '!='):
+        return '1=1'
+    return expr if op == '=' else f"NOT {expr}"
+
+
 def build_condition_sql(cond, params):
     """Turn a single condition dict into a SQL fragment + append to params."""
     col = cond.get('column', '')
     op  = cond.get('operator', '=')
     val = cond.get('value', '')
+
+    if col == 'cover_fit':
+        return _cover_fit_sql(op, val)
 
     if col not in SAFE_COLUMNS:
         return '1=1'

@@ -504,6 +504,8 @@ const FM_FILTER_CONFIG = {
                                options: ['header','sgdb_grid_wide','custom','missing'] },
     'icon_source':           { label: 'Icon Source',           type: 'select', comparisons: {'=':'is','!=':'is not','IS NULL':'not set','IS NOT NULL':'is set'},
                                options: ['steam','sgdb_icon','custom','missing'] },
+    'cover_fit':             { label: 'Cover Shape (this view)', type: 'select', comparisons: {'=':'is','!=':'is not'},
+                               options: {'wrong':'Wrong shape for the card','fits':'Fits the card','none':'No cover'}, default: 'wrong' },
     'saved_filter':          { label: 'Saved Filter',          type: 'select', comparisons: {'=':'games in','!=':'games not in'},
                                optionsFor: v => _savedFilterOptions(v) },
     'platform':              { label: 'Library',               type: 'select', comparisons: {'=':'is','!=':'is not','IS NULL':'not set','IS NOT NULL':'is set'},

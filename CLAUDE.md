@@ -111,6 +111,7 @@ Recursive JSON tree compiled to SQL by `library.build_tree_sql()`.
 - **Comma-separated fields** (tags, groups, genres, categories): use `',' || column || ',' LIKE ?` to prevent partial matches
 - **Date operators**: `STRFTIME_MONTH/DAY/YEAR` compile to `strftime(...)` with zero-padded values
 - **SQL safety:** `is_safe_sql()` in `library.py` uses column/keyword/function whitelists, rejects all DML/DDL. Parameterized queries everywhere else.
+- **Cover Shape filter (`cover_fit`, 2026.10.4):** a regular condition field (`FM_FILTER_CONFIG` in `modal_filters.html`), not a preset and not a real column: `library._cover_fit_sql` turns `= / != fits|wrong|none` into SQL over `edge_horizontal` when the saved `artwork_orientation` is `horizontal`, else `edge_vertical` (list view counts as vertical), because a game can fit in one view and not the other (see Card Edge Backdrops for what the column holds). Because the SQL differs per view it is part of the Library data key, so switching view gives a fresh list. Home and Pick 6 compile it with the same saved view, though Home only shows vertical covers. It is not in `SAFE_COLUMNS`, so custom SQL can't use it. `tests/test_cover_fit_filter.py`.
 - **PAGYWOSG filters** save as full tree structures (not raw SQL) so they're editable. `populateModalFromTree` explicitly clears the custom SQL box when no `custom_sql` key is present, to prevent stale SQL bleed.
 - **Preserving PAGYWOSG keys:** `applyFilters()` copies `pagywosg`, `pagywosg_event`, `pagywosg_verified` from `_loadedSavedTree` onto the rebuilt tree.
 
