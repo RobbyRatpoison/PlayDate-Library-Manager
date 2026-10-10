@@ -1499,13 +1499,22 @@ const achLink = document.getElementById('achievements-link');
 
     // Fully replace the cached game entry with fresh data from the server,
     // then update the visible card elements.
+    const _VIEW_NEUTRAL = /^(edge_|short_description|icon_hash|meta_|cheevos_|hltb_fetched|protondb_fetched)/;
+
     function _patchGameCard(game) {
         const appid = String(game.appid);
 
         // Replace the entry in the GAMES array (library page) or _games (other pages)
         if (typeof GAMES !== 'undefined') {
             const idx = GAMES.findIndex(g => String(g.appid) === appid);
-            if (idx !== -1) Object.assign(GAMES[idx], game);
+            if (idx !== -1) {
+                const before = GAMES[idx];
+                // Fields that decide filter membership, sort position or grouping can move the game;
+                // art and cached store text can't, so an art-only edit refreshes nothing.
+                const moves = Object.keys(game).some(k => !_VIEW_NEUTRAL.test(k) && String(before[k] ?? '') !== String(game[k] ?? ''));
+                Object.assign(before, game);
+                if (moves && window.pdScheduleViewRefresh) window.pdScheduleViewRefresh();
+            }
         } else if (typeof _games !== 'undefined') {
             const idx = _games.findIndex(g => String(g.appid) === appid);
             if (idx !== -1) Object.assign(_games[idx], game);

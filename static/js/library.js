@@ -685,6 +685,19 @@ function _libOnReady(fn) {
         return true;
     };
 
+    // After a manual edit moved a game (status, tags, playtime, ...), rebuild the view from the server
+    // so the game lands where the current filter, sort and grouping put it. Waits until no dialog is
+    // open (the edit modal may still be showing) and merges bursts of edits into one refresh.
+    let _viewRefreshTimer = null;
+    window.pdScheduleViewRefresh = function() {
+        clearTimeout(_viewRefreshTimer);
+        _viewRefreshTimer = setTimeout(async function tick() {
+            const dialogOpen = [...document.querySelectorAll('.modal-overlay')].some(m => getComputedStyle(m).display !== 'none');
+            if (dialogOpen) { _viewRefreshTimer = setTimeout(tick, 500); return; }
+            await window.pdRefilter({ keepScroll: true });
+        }, 500);
+    };
+
     // ── Install status: follow installs and uninstalls while the page is open ──
     // The server is polled for the installed appids (any platform); when it disagrees with what the
     // page holds, the view is refreshed in place (filters, grouping and sort may all depend on it)
