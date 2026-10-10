@@ -451,19 +451,8 @@ def _download_vertical(appid, assets=None, source='auto', sgdb_id=None, game_nam
             endpoint = f'grids/game/{sgdb_id}' if sgdb_id else f'grids/steam/{appid}'
             data = _sgdb_get(endpoint, sgdb_key)
             if data and data.get('success') and data.get('data'):
-                for item in data['data']:
-                    if item.get('animated'):
-                        continue
-                    w, h = item.get('width', 0), item.get('height', 0)
-                    if w and h and w >= h:  # skip landscape/square grids
-                        continue
-                    try:
-                        img_res = requests.get(item['url'], timeout=5)
-                        if img_res.status_code == 200 and save_as_jpg(img_res.content, save_path):
-                            return 'sgdb_grid'
-                    except Exception as e:
-                        log.warning(f"download_vertical: SGDB grid download error for {appid}: {e}")
-                    break
+                if _sgdb_download_best(data, 'vertical', save_path, appid):
+                    return 'sgdb_grid'
 
     # 4. Steam CDN fallback for non-Steam games — find matching Steam appid by name
     # (this is the Steam source for a non-Steam game, so an SGDB-only call skips it)
@@ -537,16 +526,8 @@ def _download_horizontal(appid, assets=None, source='auto', sgdb_id=None, game_n
                         if sgdb_id else f'grids/steam/{appid}?dimensions=460x215,920x430')
             data = _sgdb_get(endpoint, sgdb_key)
             if data and data.get('success') and data.get('data'):
-                for item in data['data']:
-                    if item.get('animated'):
-                        continue
-                    try:
-                        img_res = requests.get(item['url'], timeout=5)
-                        if img_res.status_code == 200 and save_as_jpg(img_res.content, save_path):
-                            return 'sgdb_grid_wide'
-                    except Exception as e:
-                        log.warning(f"download_horizontal: SGDB wide grid download error for {appid}: {e}")
-                    break
+                if _sgdb_download_best(data, 'horizontal', save_path, appid):
+                    return 'sgdb_grid_wide'
 
     # 4. Steam CDN fallback for non-Steam games — find matching Steam appid by name
     # (this is the Steam source for a non-Steam game, so an SGDB-only call skips it)
@@ -593,16 +574,8 @@ def _download_icon(appid, icon_hash, source='auto', sgdb_id=None, game_name=None
             endpoint = f'icons/game/{sgdb_id}' if sgdb_id else f'icons/steam/{appid}'
             data = _sgdb_get(endpoint, sgdb_key)
             if data and data.get('success') and data.get('data'):
-                for item in data['data']:
-                    if item.get('animated'):
-                        continue
-                    try:
-                        img_res = requests.get(item['url'], timeout=5)
-                        if img_res.status_code == 200 and save_as_jpg(img_res.content, save_path):
-                            return 'sgdb_icon'
-                    except Exception as e:
-                        log.warning(f"download_icon: SGDB icon download error for {appid}: {e}")
-                    break
+                if _sgdb_download_best(data, 'icon', save_path, appid):
+                    return 'sgdb_icon'
 
     if source != 'sgdb' and icon_hash:
         # 2. Steam icon — try 2x first, fall back to standard
@@ -711,6 +684,31 @@ def _sgdb_options_from(data, artwork_type):
         opt['fits'] = artwork_type == 'icon' or distance(opt) < ART_FIT_TOLERANCE
     results.sort(key=lambda o: round(distance(o), 3))
     return results
+
+
+SGDB_DOWNLOAD_TRIES = 5   # how many of the best-fitting images one scrape tries before giving up
+
+
+def _sgdb_download_best(data, kind, save_path, appid):
+    """Save the best SteamGridDB image for `kind` (the same ordering the picker shows: closest to
+    the card's ratio first, SteamGridDB's own order among equals). Tries the next best when one
+    fails to download or isn't an image, up to SGDB_DOWNLOAD_TRIES. A vertical grid is never
+    landscape or square. True when an image was saved."""
+    tried = 0
+    for opt in _sgdb_options_from(data, kind):
+        w, h = opt['width'], opt['height']
+        if not opt['url'] or (kind == 'vertical' and w and h and w >= h):
+            continue
+        tried += 1
+        try:
+            res = requests.get(opt['url'], timeout=5)
+            if res.status_code == 200 and save_as_jpg(res.content, save_path):
+                return True
+        except Exception as e:
+            log.warning(f"download_{kind}: SGDB download error for {appid}: {e}")
+        if tried >= SGDB_DOWNLOAD_TRIES:
+            break
+    return False
 
 
 def fetch_sgdb_options(appid, artwork_type):
