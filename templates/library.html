@@ -962,7 +962,11 @@
 
 {% block scripts %}
 <script>
+    {%- if games_cols %}
+    window.GAMES = (function (c, r) { var out = new Array(r.length); for (var i = 0; i < r.length; i++) { var o = {}, row = r[i]; for (var j = 0; j < c.length; j++) o[c[j]] = row[j]; out[i] = o; } return out; })({{ games_cols | tojson }}, {{ games_rows | tojson }});
+    {%- else %}
     window.GAMES = {{ games | tojson }};
+    {%- endif %}
     window.OUTLINE_COLORS = {{ outline_colors | tojson }};
     window.CURRENT_SORT = {{ state.sort | tojson }};
     window.CURRENT_ORDER = {{ state.order | tojson }};

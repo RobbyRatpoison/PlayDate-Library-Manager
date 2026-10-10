@@ -492,6 +492,22 @@ def build_tree_sql(node, params, _stack=()):
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 
+def columnar_games(games):
+    """Split the Library page's game dicts into (columns, rows) so the 61 field names are sent
+    once instead of with every game: they were over half of a 5,000-game page (10 MB -> 5 MB,
+    DOM ready 776 -> 402 ms measured). The columns are sorted, which is the key order Flask's
+    `tojson` produced for each game before, so the page rebuilds identical objects. Returns None
+    when the rows don't all have the same keys (not expected: they come from one query), and
+    the page then gets the plain list as before."""
+    if not games:
+        return None
+    cols = sorted(games[0])
+    keys = set(cols)
+    if any(set(g) != keys for g in games):
+        return None
+    return cols, [[g[c] for c in cols] for g in games]
+
+
 @library_bp.route('/library')
 def library():
     db = get_db()
@@ -618,7 +634,9 @@ def library():
             expanded_saved[fname] = entry
     state = {**state, 'saved_filters': expanded_saved}
 
+    _col = columnar_games(games)
     return render_template('library.html', games=games, state=state,
+                           games_cols=_col[0] if _col else None, games_rows=_col[1] if _col else None,
                            unique_tags=tags, unique_groups=groups,
                            sql_error=sql_error, builtin_filters=BUILTIN_FILTERS,
                            total_games=total_games, hidden_dupes=hidden_dupes,
