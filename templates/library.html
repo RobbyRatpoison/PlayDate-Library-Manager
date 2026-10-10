@@ -1291,7 +1291,8 @@ window.GAMES_READY.catch(function () { /* reported by the loader at the end of t
                     release date from Steam (or PCGamingWiki for anything Steam is missing).
                     Runs automatically at startup for games never tried &mdash; this button
                     re-attempts too. Respects the scope selector; only games whose developer,
-                    genres or tags are still blank are processed, any library.
+                    genres or tags are still blank, or that other libraries haven't matched
+                    to a Steam game yet, are processed.
                 </p>
                 <button id="brs-start-metadata-btn" data-modal-row="2" onclick="startBulkOp('metadata')"
                     style="width:100%; padding:9px; font-size:0.85rem; font-weight:bold; background:var(--accent); color:#0e1621; border:none; border-radius:5px; cursor:pointer;">

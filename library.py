@@ -1568,23 +1568,23 @@ def bulk_op_start():
         db.close()
         appids = [r['appid'] for r in rows]
     elif op == 'metadata':
-        # Honour the scope selector, then narrow to games whose core metadata
-        # (developer / genres / tags) is genuinely still incomplete -- any
-        # platform, regardless of a prior backfill outcome. An explicit run
-        # re-attempts a game already stamped done / no_match (bulk_backfill_metadata
-        # passes rerun=True); it just won't bother with games that are already full.
-        from scrapers import _METADATA_INCOMPLETE_WHERE
+        # Honour the scope selector, then narrow to games that still have something to find: core
+        # metadata (developer / genres / tags) still blank, or a non-Steam game with no Steam match
+        # yet -- any platform, regardless of a prior backfill outcome. An explicit run re-attempts a
+        # game already stamped done / no_match (bulk_backfill_metadata passes rerun=True); it just
+        # won't bother with games that are full and matched.
+        from scrapers import _METADATA_MANUAL_WHERE
         db = get_db()
         if scope == 'all':
             rows = db.execute(
-                f"SELECT appid FROM games WHERE {_METADATA_INCOMPLETE_WHERE} ORDER BY appid"
+                f"SELECT appid FROM games WHERE {_METADATA_MANUAL_WHERE} ORDER BY appid"
             ).fetchall()
         else:
             ids = [int(a) for a in appids]
             if ids:
                 ph   = ','.join('?' * len(ids))
                 rows = db.execute(
-                    f"SELECT appid FROM games WHERE {_METADATA_INCOMPLETE_WHERE} "
+                    f"SELECT appid FROM games WHERE {_METADATA_MANUAL_WHERE} "
                     f"AND appid IN ({ph}) ORDER BY appid", ids
                 ).fetchall()
             else:

@@ -34,3 +34,19 @@ def test_incomplete_games_are_still_picked_up_whatever_their_platform():
 
 def test_a_complete_steam_game_is_not_picked_up():
     assert _picked([(10, 'steam game', *FULL, None, None)]) == []           # steam_appid is only for non-Steam rows
+
+
+def test_the_manual_bulk_gate_also_retries_games_already_tried():
+    c = sqlite3.connect(':memory:')
+    c.execute("""CREATE TABLE games (appid INTEGER, developers TEXT, genres TEXT, tags TEXT,
+                 steam_appid INTEGER, meta_backfill_fetched TEXT)""")
+    c.executemany("INSERT INTO games VALUES (?,?,?,?,?,?)", [
+        (-1, 'D', 'G', 'T', None, None),            # complete, unmatched, never tried
+        (-2, 'D', 'G', 'T', None, '2026-08-28'),    # complete, unmatched, tried before: an explicit run retries it
+        (-3, 'D', 'G', 'T', None, 'no_match'),
+        (-4, 'D', 'G', 'T', 620,  '2026-08-28'),    # complete and matched: nothing to find
+        (-5, '',  'G', 'T', 620,  '2026-08-28'),    # incomplete
+        (10, 'D', 'G', 'T', None, None),            # a Steam game that is complete
+    ])
+    got = sorted(r[0] for r in c.execute(f"SELECT appid FROM games WHERE {scrapers._METADATA_MANUAL_WHERE}"))
+    assert got == [-5, -3, -2, -1]

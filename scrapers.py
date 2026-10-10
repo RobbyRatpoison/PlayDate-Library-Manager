@@ -2974,6 +2974,12 @@ _METADATA_INCOMPLETE_WHERE = (
     " OR (tags IS NULL OR tags = ''))"
 )
 
+# The gate for the manual "Backfill Missing Metadata" bulk op: incomplete, or a
+# non-Steam game with no Steam match (a GOG game arrives with complete metadata, but
+# its Steam match is what gives it Steam art and the Steam-only fields). Outcome-
+# agnostic: an explicit run re-attempts games already stamped done / no_match.
+_METADATA_MANUAL_WHERE = f"({_METADATA_INCOMPLETE_WHERE} OR (appid < 0 AND steam_appid IS NULL))"
+
 # The narrower gate for the *automatic* startup sweep: never attempted AND either
 # incomplete, or a non-Steam game with no Steam match yet (so it drains once and
 # never re-hammers a game that legitimately has nothing more to find). The second
@@ -2983,7 +2989,7 @@ _METADATA_INCOMPLETE_WHERE = (
 # future-proofing -- nothing writes it to the column today. Renaming a game
 # resets meta_backfill_fetched to '0', which puts it back in this set.
 _METADATA_PENDING_WHERE = (
-    f"({_METADATA_INCOMPLETE_WHERE} OR (appid < 0 AND steam_appid IS NULL)) "
+    f"{_METADATA_MANUAL_WHERE} "
     "AND (meta_backfill_fetched IS NULL OR meta_backfill_fetched IN ('0', 'retry'))"
 )
 _METADATA_PENDING_SQL = f"SELECT appid FROM games WHERE {_METADATA_PENDING_WHERE} ORDER BY appid"
