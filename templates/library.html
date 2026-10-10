@@ -1240,6 +1240,7 @@ window.GAMES_READY.catch(function () { /* reported by the loader at the end of t
             <!-- Artwork subsection -->
             <div style="background:#0e1923; border:1px solid #2a475e; border-radius:6px; padding:12px 14px; margin-bottom:12px;">
                 <div style="font-size:0.82rem; font-weight:bold; color:#c2c8cc; margin-bottom:8px; letter-spacing:0.04em;">ARTWORK</div>
+                <p style="font-size:0.75rem; color:#8f98a0; margin:0 0 8px;">Replaces each game's existing artwork, including covers you set yourself.</p>
                 <div style="display:flex; gap:16px; margin-bottom:8px; flex-wrap:wrap;">
                     <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:0.85rem;">
                         <input type="checkbox" id="brs-type-vertical" checked style="width:auto; margin:0;"> Vertical
@@ -1417,5 +1418,4 @@ input[name="brs-scope"]:checked + span strong,
 input[name="bdi-scope"]:checked + span strong { color: var(--accent) !important; }
 </style>
 
-<script src="/static/js/page_timing.js"></script>  {# TEMPORARY: page load timing -> playdate.log #}
 {% endblock %}
