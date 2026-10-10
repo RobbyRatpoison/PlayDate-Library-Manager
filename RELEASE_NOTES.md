@@ -3,9 +3,9 @@
 ## v2026.10.4
 ### Improvements
 
-- GOG purchase dates now import straight from your account, with no userscript, including games that came in a bundle.
+- GOG purchase dates now import straight from your account, with no userscript.
 - EA purchase dates now import straight from your account, with no userscript.
-- Plugin cards now show Connect again when a service rejects your saved login.
+- Plugins now check that your login still works instead of failing silently.
 - Humble logins now renew themselves so they don't lapse.
 
 ### Fixes
