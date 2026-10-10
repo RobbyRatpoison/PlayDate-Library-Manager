@@ -425,7 +425,6 @@ def page_timing():
         env = clean.pop('env', None) or {}   # its own line: the log caps a message at 500 characters
         from config import __build__
         env['build'] = __build__
-        env['fade'] = os.environ.get('PLAYDATE_BODY_FADE', '') or 'default'   # TEMPORARY, see app.py body_fade_mode
         env['src'] = 'dev' if os.environ.get('PD_SRC_DIR') else 'installed'
         log.info('page timing %s', json.dumps(clean, separators=(',', ':')))
         log.info('page env %s', json.dumps(env, separators=(',', ':')))

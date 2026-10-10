@@ -8,6 +8,8 @@
 - Plugins now check that your login still works instead of failing silently.
 - Humble logins now renew themselves so they don't lapse.
 - The SteamGridDB picker now lists images closest to the right aspect ratio first and sets apart the ones that don't match.
+- Pages now appear about half a second sooner when you open them.
+- The Home page now loads much faster with very large libraries.
 
 ### Fixes
 
