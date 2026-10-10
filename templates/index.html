@@ -918,7 +918,11 @@ function _observeShelfImages(root) {
     }
     imgs.forEach(img => _shelfImgObserver.observe(img));
 }
-window.addEventListener('load', () => _observeShelfImages(document));
+// Start the covers as soon as the markup is parsed, not on window 'load': 'load' also
+// waits for the background image and fonts, and the boot overlay lifts on it too, so
+// waiting for it showed empty cards that only then began to fill in.
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => _observeShelfImages(document));
+else _observeShelfImages(document);
 
 // Edge hints (see the .shelf-scroll-hint CSS) -- shown/hidden based on
 // current scroll position vs. how far the grid can actually scroll. A grid
