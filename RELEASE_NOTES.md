@@ -1,5 +1,15 @@
 # Release Notes
 
+## v2026.10.5
+### New
+
+- Added a Show File button for artwork, to open the image in your file manager.
+- Added a Browse button for Custom URL, to pick a local image instead of typing its path.
+
+### Improvements
+
+- From Steam now applies the art without asking first.
+
 ## v2026.10.4
 ### New
 

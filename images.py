@@ -281,6 +281,31 @@ def _art_path(kind, appid):
                         f'{int(appid)}.jpg')
 
 
+def reveal_in_file_manager(path):
+    """Open the OS file manager with `path` selected (Linux: the FileManager1 D-Bus call, run on the
+    host under Flatpak; the containing folder when no file manager answers it)."""
+    import pathlib
+    import platform
+    import subprocess
+    from runners.sandbox import host_run, host_popen
+    os_name = platform.system()
+    if os_name == 'Windows':
+        subprocess.Popen(['explorer', '/select,', os.path.normpath(path)])
+    elif os_name == 'Darwin':
+        subprocess.Popen(['open', '-R', path])
+    else:
+        try:
+            r = host_run(['dbus-send', '--session', '--print-reply', '--dest=org.freedesktop.FileManager1',
+                          '/org/freedesktop/FileManager1', 'org.freedesktop.FileManager1.ShowItems',
+                          f'array:string:{pathlib.Path(path).as_uri()}', 'string:'],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+            if r.returncode == 0:
+                return
+        except Exception as e:
+            log.info(f'ShowItems failed, opening the folder instead: {e}')
+        host_popen(['xdg-open', os.path.dirname(path)])
+
+
 def _download_preferring_fit(kind, appid, order, attempt):
     """The shape matters more than the source: try the sources in `order`, keep the first result that
     fits the card, and only when none does, use the first result there was (so an odd-shaped cover
@@ -852,6 +877,26 @@ def fetch_sgdb_options_by_id(sgdb_id, artwork_type):
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
+
+@images_bp.route('/api/artwork/reveal', methods=['POST'])
+def reveal_artwork():
+    """Show a game's stored art file in the OS file manager (so it can be edited elsewhere)."""
+    data = request.json or {}
+    kind = data.get('orientation', 'vertical')
+    try:
+        appid = int(data.get('appid'))
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "message": "Invalid appid"}), 400
+    if kind not in ('vertical', 'horizontal', 'icon'):
+        return jsonify({"status": "error", "message": "Invalid orientation"}), 400
+    path = _art_path(kind, appid)
+    if not os.path.isfile(path):
+        return jsonify({"status": "error", "message": "This game has no image to show."}), 404
+    try:
+        reveal_in_file_manager(path)
+        return jsonify({"status": "success", "path": path})
+    except Exception as e:
+        return api_error('Could not open the file manager. Check playdate.log for details.', 500, exc=e)
 
 @images_bp.route('/api/download-artwork/<int:appid>', methods=['POST'])
 def download_artwork(appid):

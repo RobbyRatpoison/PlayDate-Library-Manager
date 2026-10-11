@@ -470,6 +470,7 @@
                             <button type="button" class="nav-btn art-action-btn" onclick="rescrapeArt('vertical')"       data-modal-row="21">Re-scrape</button>
                             <button type="button" id="art-steam-btn-vertical" class="nav-btn art-action-btn" onclick="artFromSteam('vertical')" data-modal-row="21" style="display:none;">From Steam</button>
                             <button type="button" class="nav-btn art-action-btn" onclick="openArtCrop('vertical')" data-modal-row="21">Crop</button>
+                            <button type="button" class="nav-btn art-action-btn" onclick="revealArt('vertical')" data-modal-row="21">Show File</button>
                             <button type="button" class="nav-btn art-action-btn" onclick="toggleArtCustomUrl('vertical')" data-modal-row="21">Custom URL</button>
                             {% if existing_sgdb_key %}<button type="button" class="nav-btn art-action-btn" onclick="openSgdbBrowser('vertical')" data-modal-row="21">Browse SGDB</button>{% endif %}
                             {% if not existing_sgdb_key %}<a id="sgdb-link-vertical" href="#" target="_blank" rel="noopener" style="font-size:0.75rem; color:var(--accent);" data-modal-row="21">Browse SGDB ↗</a>{% endif %}
@@ -477,7 +478,10 @@
                         </div>
                         <div id="art-url-row-vertical" style="display:none; flex-direction:column; gap:6px;">
                             <input type="text" id="art-url-vertical" placeholder="Paste an image URL or local file path..." style="width:100%; box-sizing:border-box;" data-modal-row="22">
-                            <button type="button" class="nav-btn art-action-btn" onclick="saveArtCustomUrl('vertical')" data-modal-row="22" style="width:100%;">Save</button>
+                            <div style="display:flex; gap:6px;">
+                                <button type="button" class="nav-btn art-action-btn art-browse-btn" onclick="browseArtFile('vertical')" data-modal-row="22" style="display:none;">Browse...</button>
+                                <button type="button" class="nav-btn art-action-btn" onclick="saveArtCustomUrl('vertical')" data-modal-row="22" style="flex:1;">Save</button>
+                            </div>
                         </div>
                         <div id="art-status-vertical" class="art-status"></div>
                     </div>
@@ -495,6 +499,7 @@
                             <button type="button" class="nav-btn art-action-btn" onclick="rescrapeArt('horizontal')"       data-modal-row="21">Re-scrape</button>
                             <button type="button" id="art-steam-btn-horizontal" class="nav-btn art-action-btn" onclick="artFromSteam('horizontal')" data-modal-row="21" style="display:none;">From Steam</button>
                             <button type="button" class="nav-btn art-action-btn" onclick="openArtCrop('horizontal')" data-modal-row="21">Crop</button>
+                            <button type="button" class="nav-btn art-action-btn" onclick="revealArt('horizontal')" data-modal-row="21">Show File</button>
                             <button type="button" class="nav-btn art-action-btn" onclick="toggleArtCustomUrl('horizontal')" data-modal-row="21">Custom URL</button>
                             {% if existing_sgdb_key %}<button type="button" class="nav-btn art-action-btn" onclick="openSgdbBrowser('horizontal')" data-modal-row="21">Browse SGDB</button>{% endif %}
                             {% if not existing_sgdb_key %}<a id="sgdb-link-horizontal" href="#" target="_blank" rel="noopener" style="font-size:0.75rem; color:var(--accent);" data-modal-row="21">Browse SGDB ↗</a>{% endif %}
@@ -502,7 +507,10 @@
                         </div>
                         <div id="art-url-row-horizontal" style="display:none; flex-direction:column; gap:6px;">
                             <input type="text" id="art-url-horizontal" placeholder="Paste an image URL or local file path..." style="width:100%; box-sizing:border-box;" data-modal-row="22">
-                            <button type="button" class="nav-btn art-action-btn" onclick="saveArtCustomUrl('horizontal')" data-modal-row="22" style="width:100%;">Save</button>
+                            <div style="display:flex; gap:6px;">
+                                <button type="button" class="nav-btn art-action-btn art-browse-btn" onclick="browseArtFile('horizontal')" data-modal-row="22" style="display:none;">Browse...</button>
+                                <button type="button" class="nav-btn art-action-btn" onclick="saveArtCustomUrl('horizontal')" data-modal-row="22" style="flex:1;">Save</button>
+                            </div>
                         </div>
                         <div id="art-status-horizontal" class="art-status"></div>
                     </div>
@@ -520,6 +528,7 @@
                             <button type="button" class="nav-btn art-action-btn" onclick="rescrapeArt('icon')"       data-modal-row="21">Re-scrape</button>
                             <button type="button" id="art-steam-btn-icon" class="nav-btn art-action-btn" onclick="artFromSteam('icon')" data-modal-row="21" style="display:none;">From Steam</button>
                             <button type="button" class="nav-btn art-action-btn" onclick="openArtCrop('icon')" data-modal-row="21">Crop</button>
+                            <button type="button" class="nav-btn art-action-btn" onclick="revealArt('icon')" data-modal-row="21">Show File</button>
                             <button type="button" class="nav-btn art-action-btn" onclick="toggleArtCustomUrl('icon')" data-modal-row="21">Custom URL</button>
                             {% if existing_sgdb_key %}<button type="button" class="nav-btn art-action-btn" onclick="openSgdbBrowser('icon')" data-modal-row="21">Browse SGDB</button>{% endif %}
                             {% if not existing_sgdb_key %}<a id="sgdb-link-icon" href="#" target="_blank" rel="noopener" style="font-size:0.75rem; color:var(--accent);" data-modal-row="21">Browse SGDB ↗</a>{% endif %}
@@ -527,7 +536,10 @@
                         </div>
                         <div id="art-url-row-icon" style="display:none; flex-direction:column; gap:6px;">
                             <input type="text" id="art-url-icon" placeholder="Paste an image URL or local file path..." style="width:100%; box-sizing:border-box;" data-modal-row="22">
-                            <button type="button" class="nav-btn art-action-btn" onclick="saveArtCustomUrl('icon')" data-modal-row="22" style="width:100%;">Save</button>
+                            <div style="display:flex; gap:6px;">
+                                <button type="button" class="nav-btn art-action-btn art-browse-btn" onclick="browseArtFile('icon')" data-modal-row="22" style="display:none;">Browse...</button>
+                                <button type="button" class="nav-btn art-action-btn" onclick="saveArtCustomUrl('icon')" data-modal-row="22" style="flex:1;">Save</button>
+                            </div>
                         </div>
                         <div id="art-status-icon" class="art-status"></div>
                     </div>
@@ -1166,10 +1178,42 @@ const achLink = document.getElementById('achievements-link');
         });
     }
 
+    async function revealArt(type) {
+        const appid  = document.getElementById('edit-appid').value;
+        const status = document.getElementById(`art-status-${type}`);
+        try {
+            const res  = await fetch('/api/artwork/reveal', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ appid, orientation: type })
+            });
+            const data = await res.json();
+            if (data.status === 'success') { status.textContent = ''; return; }
+            status.style.color = '#ff8080'; status.textContent = '\u2718 ' + data.message;
+        } catch {
+            status.style.color = '#ff8080'; status.textContent = '\u2718 Network error.';
+        }
+    }
+
+    // Pick a local image with the native dialog instead of typing its path (desktop window only).
+    async function browseArtFile(type) {
+        if (_fileDlgBusy) return;
+        if (!(window.pywebview && window.pywebview.api && window.pywebview.api.pick_open_path)) return;
+        _fileDlgBusy = true;
+        let path;
+        try {
+            path = await window.pywebview.api.pick_open_path(['Image Files (*.png;*.jpg;*.jpeg;*.webp;*.bmp)']);
+        } finally {
+            setTimeout(() => { _fileDlgBusy = false; }, 300);
+        }
+        if (path) document.getElementById(`art-url-${type}`).value = path;
+    }
+
     function toggleArtCustomUrl(type) {
         const row = document.getElementById(`art-url-row-${type}`);
         const visible = row.style.display !== 'none';
         row.style.display = visible ? 'none' : 'flex';
+        const browse = row.querySelector('.art-browse-btn');
+        if (browse) browse.style.display = (window.pywebview && window.pywebview.api && window.pywebview.api.pick_open_path) ? '' : 'none';
         if (!visible) document.getElementById(`art-url-${type}`).focus();
     }
 
