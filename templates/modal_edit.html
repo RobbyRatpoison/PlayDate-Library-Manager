@@ -1591,6 +1591,20 @@ const achLink = document.getElementById('achievements-link');
     // fields are still blank (any platform -- for a Steam game it re-fetches the
     // store page and falls back to PCGW). Only touches the fields the server
     // reports it filled, so in-progress edits to other fields survive.
+    // A fill can give a non-Steam game its first Steam match: the From Steam buttons may now apply, and
+    // the server may have re-fetched art that didn't fit (metadata.write_backfill). Reload both.
+    function _refreshArtAfterFill(appid) {
+        _probeSteamCopy(appid);
+        fetch('/api/game/' + parseInt(appid)).then(r => r.json()).then(d => {
+            if (d.status !== 'success' || String(document.getElementById('edit-appid').value) !== String(appid)) return;
+            const g = d.game, id = parseInt(appid), v = Date.now();
+            _loadArtPanel('vertical',   `/static/img/library/vertical/${id}.jpg?v=${v}`,   g.vertical_art_source);
+            _loadArtPanel('horizontal', `/static/img/library/horizontal/${id}.jpg?v=${v}`, g.horizontal_art_source);
+            _loadArtPanel('icon',       `/static/img/library/icons/${id}.jpg?v=${v}`,      g.icon_source);
+            ['vertical', 'horizontal', 'icon'].forEach(t => _bustPageArtCache(appid, t));
+        }).catch(() => {});
+    }
+
     async function fillMetadataFromSteam(force) {
         const appid = document.getElementById('edit-appid').value;
         const btn = document.getElementById('meta-fill-btn');
@@ -1627,6 +1641,7 @@ const achLink = document.getElementById('achievements-link');
                 positive_reviews:    () => safeSet('edit-positive-reviews', g.positive_reviews),
             };
             (data.filled || []).forEach(f => setters[f] && setters[f]());
+            if (parseInt(appid) < 0 && data.outcome !== 'no_match') _refreshArtAfterFill(appid);
 
             if (data.outcome === 'no_match') {
                 btn.textContent = 'No match found';

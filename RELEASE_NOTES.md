@@ -9,6 +9,7 @@
 ### Improvements
 
 - From Steam now applies the art without asking first.
+- The From Steam button now appears right after Fill Missing Data finds a match.
 
 ## v2026.10.4
 ### New
