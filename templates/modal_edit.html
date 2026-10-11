@@ -1335,23 +1335,20 @@ const achLink = document.getElementById('achievements-link');
         const appid  = document.getElementById('edit-appid').value;
         const status = document.getElementById(`art-status-${type}`);
         const label  = _steamCopy.name || ('Steam app ' + _steamCopy.steam_appid);
-        confirm(`Use the ${type} art from the Steam game "${label}" for this game?`).then(ok => {
-            if (!ok) return;
-            status.style.color = '#aaa'; status.textContent = 'Fetching from Steam...';
-            fetch('/api/artwork/from-steam', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ appid, orientation: type, steam_appid: _steamCopy.steam_appid })
-            }).then(r => r.json()).then(data => {
-                if (data.status === 'success') {
-                    const dirMap = { vertical: 'vertical', horizontal: 'horizontal', icon: 'icons' };
-                    _loadArtPanel(type, `/static/img/library/${dirMap[type]}/${parseInt(appid)}.jpg?v=${Date.now()}`, data.source);
-                    _bustPageArtCache(appid, type);
-                    status.style.color = '#5c7e10'; status.textContent = '✔ Done!';
-                } else {
-                    status.style.color = '#ff8080'; status.textContent = '✘ ' + data.message;
-                }
-            }).catch(() => { status.style.color = '#ff8080'; status.textContent = '✘ Network error.'; });
-        });
+        status.style.color = '#aaa'; status.textContent = 'Fetching from Steam...';
+        fetch('/api/artwork/from-steam', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ appid, orientation: type, steam_appid: _steamCopy.steam_appid })
+        }).then(r => r.json()).then(data => {
+            if (data.status === 'success') {
+                const dirMap = { vertical: 'vertical', horizontal: 'horizontal', icon: 'icons' };
+                _loadArtPanel(type, `/static/img/library/${dirMap[type]}/${parseInt(appid)}.jpg?v=${Date.now()}`, data.source);
+                _bustPageArtCache(appid, type);
+                status.style.color = '#5c7e10'; status.textContent = `✔ Done! From "${label}"`;
+            } else {
+                status.style.color = '#ff8080'; status.textContent = '✘ ' + data.message;
+            }
+        }).catch(() => { status.style.color = '#ff8080'; status.textContent = '✘ Network error.'; });
     }
 
     async function rescrapeArt(type) {
