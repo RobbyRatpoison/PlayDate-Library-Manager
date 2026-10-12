@@ -48,3 +48,30 @@ def test_too_big_a_width_is_reduced_to_what_fits_the_height():
 def test_the_result_has_the_cards_ratio(kind, target):
     out = images.crop_to_ratio(_img(1200, 1600), 0.1, 0.1, 0.6, kind)
     assert abs(_ratio(out) - target) < 0.01
+
+
+def _noisy_png():
+    import io, random
+    from PIL import Image
+    rnd = random.Random(1)
+    im = Image.new('RGB', (64, 64))
+    im.putdata([(rnd.randrange(256), rnd.randrange(256), rnd.randrange(256)) for _ in range(64 * 64)])
+    buf = io.BytesIO()
+    im.save(buf, 'PNG')
+    return buf.getvalue()
+
+
+def test_save_as_jpg_defaults_to_95_and_the_crop_setting_is_lossless_chroma(tmp_path, monkeypatch):
+    import images
+    from PIL import JpegImagePlugin, Image
+    monkeypatch.setattr(images, '_safe_img_path', lambda p: p)
+    monkeypatch.setattr(images, '_store_art_edges', lambda *a, **k: None)
+    data = _noisy_png()
+    a, b = str(tmp_path / 'a.jpg'), str(tmp_path / 'b.jpg')
+    assert images.save_as_jpg(data, a)
+    assert images.save_as_jpg(data, b, quality=100)
+    with Image.open(a) as ia, Image.open(b) as ib:
+        assert JpegImagePlugin.get_sampling(ia) != 0     # normal art keeps the usual subsampling
+        assert JpegImagePlugin.get_sampling(ib) == 0     # 4:4:4 at quality 100
+    import os
+    assert os.path.getsize(b) > os.path.getsize(a)

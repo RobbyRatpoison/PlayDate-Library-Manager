@@ -199,10 +199,12 @@ def art_version():
     return newest // 1_000_000
 
 
-def save_as_jpg(image_bytes, save_path):
+def save_as_jpg(image_bytes, save_path, quality=95):
     """
     Converts any image format (PNG, WEBP, etc.) to JPG and saves it.
     Creates parent directories if needed. Returns True on success, False on failure.
+    `quality` 100 also turns chroma subsampling off, so nothing is thrown away beyond the one
+    unavoidable JPEG step (the crop uses it: an edit the user made on purpose, re-encoded once).
     """
     save_path = _safe_img_path(save_path)
     if save_path is None:
@@ -214,7 +216,10 @@ def save_as_jpg(image_bytes, save_path):
         img = Image.open(io.BytesIO(image_bytes))
         if img.mode in ('RGBA', 'P', 'LA'):
             img = img.convert('RGB')
-        img.save(tmp_path, 'JPEG', quality=95)
+        if quality >= 100:
+            img.save(tmp_path, 'JPEG', quality=100, subsampling=0)
+        else:
+            img.save(tmp_path, 'JPEG', quality=quality)
         os.replace(tmp_path, save_path)
         _store_art_edges(save_path, img)
         return True
@@ -1140,7 +1145,7 @@ def crop_artwork():
             cropped = crop_to_ratio(im.convert('RGB'), x, y, w, kind)
         buf = io.BytesIO()
         cropped.save(buf, 'PNG')          # lossless hand-off; save_as_jpg does the one JPEG encode
-        if not save_as_jpg(buf.getvalue(), path):
+        if not save_as_jpg(buf.getvalue(), path, quality=100):
             return jsonify({'status': 'error', 'message': 'Could not save the cropped image.'}), 500
     except Exception as e:
         log.warning(f"crop_artwork: {kind} for {appid}: {e}")
