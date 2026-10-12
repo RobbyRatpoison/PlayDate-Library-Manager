@@ -525,13 +525,13 @@ def backfill_metadata(appid, *, force=False, rerun=False):
         if row['release_date'] is None and pcgw_box.get('release_date'):
             out['release_date'] = pcgw_box['release_date']
 
-    # Last tier: the platform's own store page (itch.io implements this). Only
+    # Last tier: the platform's own store page (itch.io and Nintendo eShop implement this). Only
     # when there's no Steam page -- Steam tags/genres are always richer. Gap-
     # fills whatever's still missing, including after a PCGW-only match (PCGW
     # never carries tags). itch exclusives have no other source at all.
     if not steam_appid:
         page = _store_page_metadata(row['platform'], row['platform_slug'])
-        for field in ('genres', 'categories', 'tags'):
+        for field in ('genres', 'categories', 'tags', 'developers', 'publishers'):
             if field not in out and _gap(field) and page.get(field):
                 out[field] = page[field]
         if 'release_date' not in out and row['release_date'] is None and page.get('release_date'):
