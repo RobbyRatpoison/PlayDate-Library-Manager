@@ -2724,6 +2724,61 @@
     function _handleLB() { _pageNav(-1); }
     function _handleRB() { _pageNav(1); }
 
+    // The right stick scrolls the page without touching the focus ring, so after a long scroll the
+    // focused card can be pages away. On release, if the focused element is off-screen, move focus to
+    // the visible card nearest it horizontally on the first fully visible row (Library) or to the first
+    // visible shelf (Home). Focus is applied without scrolling, so the page stays where the user put it.
+    function _refocusAfterScroll() {
+        if (!_state.active || _state.zone !== 'content') return;
+        if (PAGE !== 'home' && PAGE !== 'library') return;
+        if (document.body.classList.contains('edit-mode')) return;
+        if (PAGE === 'library' && typeof _artOrientation !== 'undefined' && _artOrientation === 'list') return;
+        const navEl  = document.querySelector('.nav-header');
+        const top    = navEl ? navEl.getBoundingClientRect().bottom : 0;
+        const bottom = window.innerHeight;
+        const onScreen = r => Math.min(r.bottom, bottom) - Math.max(r.top, top) >= Math.min(r.height, bottom - top) * 0.5;
+        const cur = document.querySelector('.gamepad-focus');
+        const curRect = cur ? cur.getBoundingClientRect() : null;
+        if (curRect && onScreen(curRect)) return;
+        const cx = curRect ? curRect.left + curRect.width / 2 : 0;
+
+        if (PAGE === 'library') {
+            const items = _libraryNavItems();
+            const n = items.length;
+            if (!n) return;
+            // Tops only increase down the DOM, so binary search for the first item at or below the nav.
+            let lo = 0, hi = n;
+            while (lo < hi) {
+                const mid = (lo + hi) >> 1;
+                if (items[mid].getBoundingClientRect().top >= top - 1) hi = mid; else lo = mid + 1;
+            }
+            let i = Math.min(lo, n - 1);
+            while (i < n - 1 && _isGroupHeader(items[i])) i++;
+            while (i > 0 && _isGroupHeader(items[i])) i--;
+            if (_isGroupHeader(items[i])) return;
+            const rowTop = items[i].getBoundingClientRect().top;
+            let best = i, bestDist = Infinity;
+            for (let j = i; j < n && !_isGroupHeader(items[j]); j++) {
+                const r = items[j].getBoundingClientRect();
+                if (Math.abs(r.top - rowTop) >= 10) break;
+                const d = Math.abs(r.left + r.width / 2 - cx);
+                if (d < bestDist) { bestDist = d; best = j; }
+            }
+            _state.row = best;
+            _state.focusedAppid = parseInt(items[best].dataset.appid) || null;
+            _applyFocus(items[best]);
+        } else {
+            const rows = _homeRows();
+            if (!rows.length) return;
+            let r = rows.findIndex(x => { const b = x.el.getBoundingClientRect(); return b.top >= top - 1 && b.top < bottom; });
+            if (r < 0) r = rows.findIndex(x => onScreen(x.el.getBoundingClientRect()));
+            if (r < 0) r = rows.length - 1;
+            _state.row = r;
+            _state.col = Math.min(_state.savedCol, rows[r].items.length - 1);
+            _applyFocus(rows[r].items[_state.col]);
+        }
+    }
+
     // ── Button/axis dispatch ──────────────────────────────────────────────────
 
     // Map button index → handler (standard Xbox / standard-mapping layout)
@@ -3025,7 +3080,10 @@
                 window._scrollPreviewHide();
             }
         } else {
-            if (_gp.rStickHeldSince && typeof window._scrollPreviewHide === 'function') window._scrollPreviewHide();
+            if (_gp.rStickHeldSince) {
+                if (typeof window._scrollPreviewHide === 'function') window._scrollPreviewHide();
+                _refocusAfterScroll();
+            }
             _gp.rStickHeldSince = 0;
         }
 

@@ -13,3 +13,4 @@
 ### Fixes
 
 - Fixed LB/RB sometimes switching two pages at once.
+- Fixed gamepad focus staying behind after scrolling with the right stick.
