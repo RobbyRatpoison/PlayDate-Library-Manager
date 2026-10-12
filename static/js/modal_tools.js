@@ -5330,7 +5330,9 @@ function _showPluginStatus(msg, type) {
     statusEl.textContent = msg;
 }
 
-async function _doGithubInstall(url) {
+// deferNotice: the caller shows the restart notice itself once every install has been attempted
+// (Update All). Returns true when the plugin was installed.
+async function _doGithubInstall(url, deferNotice = false) {
     _showPluginStatus('Fetching release from GitHub...', 'loading');
     try {
         const r = await fetch('/api/plugins/install-from-github', {
@@ -5341,13 +5343,15 @@ async function _doGithubInstall(url) {
         const d = await r.json();
         if (d.status === 'success') {
             _showPluginStatus(`${escHtml(d.name)} (${escHtml(d.tag)}) installed. Restart to load it.`, 'success');
-            _showPluginRestartNotice();
+            if (!deferNotice) _showPluginRestartNotice();
+            return true;
         } else {
             _showPluginStatus(d.message || 'Install failed.', 'error');
         }
     } catch(e) {
         _showPluginStatus('Install failed.', 'error');
     }
+    return false;
 }
 
 async function _installPluginFromGithub() {
@@ -5395,10 +5399,18 @@ async function _updateAllPlugins() {
     if (!pending.length) return;
     const btn = document.getElementById('plugin-update-all-btn');
     if (btn) { btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none'; btn.textContent = 'Updating…'; }
+    let installed = 0;
     for (let i = 0; i < pending.length; i++) {
         _markPluginUpdating(pending[i].id);
-        await _doGithubInstall(pending[i].source.replace('github:', ''));
+        if (await _doGithubInstall(pending[i].source.replace('github:', ''), true)) installed++;
         if (i < pending.length - 1) await new Promise(r => setTimeout(r, _PLUGIN_UPDATE_GAP_MS));
+    }
+    // The restart button only appears once every update has been attempted.
+    if (installed) {
+        const failed = pending.length - installed;
+        _showPluginStatus(`${installed} plugin update${installed !== 1 ? 's' : ''} installed`
+            + (failed ? `, ${failed} failed` : '') + '. Restart to load them.', failed ? 'error' : 'success');
+        _showPluginRestartNotice();
     }
     if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; }
     await _renderPluginsList();
