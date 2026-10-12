@@ -1999,8 +1999,7 @@ function clearAllFilters() {
     clearSimpleRows();
     resetAdvancedTree();
     document.getElementById('fm-custom-sql-input').value = '';
-    _fmHiddenPlatforms = new Set(typeof _hiddenPlatforms !== 'undefined' ? _hiddenPlatforms : []);
-    _fmSyncPlatformButtons();
+    // The library toggles are not filter rows: CLEAR ALL leaves whatever is set in the dialog alone.
 }
 
 // _savedFilters may already be declared by the host page (e.g. index.html)
@@ -2018,12 +2017,7 @@ async function applyBuiltinFilter(key) {
     // "All Games" (where=1=1) means no filter — commit empty tree and close
     if (preset.where === '1=1') {
         const emptyTree = { type: 'group', logic: 'AND', items: [] };
-        // clearAllFilters() puts the library toggles back to what the page has; keep (and save) the
-        // ones changed in this dialog.
-        const keepHidden = new Set(_fmHiddenPlatforms);
         clearAllFilters();
-        _fmHiddenPlatforms = keepHidden;
-        _fmSyncPlatformButtons();
         updateActivePills(emptyTree);
         await sendStateUpdate({ filter_tree: emptyTree, hidden_platforms: [..._fmHiddenPlatforms] });
         closeFilterModal();

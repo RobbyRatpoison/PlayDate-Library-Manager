@@ -19,4 +19,4 @@
 - Fixed the bulk date import still sending GOG and EA games to the userscript.
 - Fixed Check for Updates missing plugin updates released in the last day.
 - Fixed Update All plugins offering a restart before every update had been tried.
-- Fixed the All Games quick filter discarding library toggles changed in the filter window.
+- Fixed CLEAR ALL and the All Games filter discarding library toggles changed in the filter window.
