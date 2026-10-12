@@ -2699,17 +2699,30 @@
         }
     }
 
-    function _handleLB() {
-        if (_state.zone === 'modal') return;
+    // LB/RB switch pages, and the new page's poll loop sees a still-held bumper as a fresh press, so a
+    // slightly long press (or switch bounce) skipped two pages. A page change arms a lock that holds
+    // until both bumpers have been seen released, plus a short debounce within a page.
+    const PAGE_NAV_DEBOUNCE_MS = 100;
+    let _pageNavLock = false, _lastPageNav = 0;
+    try {
+        const t = parseInt(safeSession.getItem('pd_page_nav_at') || '0', 10);
+        _pageNavLock = !!t && Date.now() - t < 5000;
+    } catch (e) {}
+
+    function _pageNav(step) {
+        if (_state.zone === 'modal' || _pageNavLock) return;
+        const now = performance.now();
+        if (now - _lastPageNav < PAGE_NAV_DEBOUNCE_MS) return;
         const idx = _currentPageIdx();
-        if (idx > 0) window.location.href = PAGE_URLS[idx - 1];
+        const to = idx + step;
+        if (to < 0 || to > PAGE_URLS.length - 1) return;
+        _lastPageNav = now;
+        try { safeSession.setItem('pd_page_nav_at', String(Date.now())); } catch (e) {}
+        window.location.href = PAGE_URLS[to];
     }
 
-    function _handleRB() {
-        if (_state.zone === 'modal') return;
-        const idx = _currentPageIdx();
-        if (idx < PAGE_URLS.length - 1) window.location.href = PAGE_URLS[idx + 1];
-    }
+    function _handleLB() { _pageNav(-1); }
+    function _handleRB() { _pageNav(1); }
 
     // ── Button/axis dispatch ──────────────────────────────────────────────────
 
@@ -2933,6 +2946,11 @@
                 if (typeof gpdHideLive === 'function') gpdHideLive();
             }
             return;
+        }
+
+        if (_pageNavLock) {
+            const held = [_rawFor('lb'), _rawFor('rb')].some(i => i != null && gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.5));
+            if (!held) _pageNavLock = false;
         }
 
         gp.buttons.forEach((btn, i) => {

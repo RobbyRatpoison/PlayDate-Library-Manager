@@ -9,3 +9,7 @@
 ### Improvements
 
 - The From Steam button now appears right after Fill Missing Data finds a match.
+
+### Fixes
+
+- Fixed LB/RB sometimes switching two pages at once.
