@@ -8,7 +8,7 @@
 
 ### Improvements
 
-- The From Steam button now appears right after Fill Missing Data finds a match.
+- The From Steam button now always shows and finds the game on Steam itself.
 
 ### Fixes
 

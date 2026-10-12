@@ -98,3 +98,16 @@ def test_icon_needs_the_steam_games_icon_hash(monkeypatch, tmp_path):
 def test_everything_failing_reports_missing(monkeypatch, tmp_path):
     src, _, _ = _run(monkeypatch, tmp_path, 'horizontal', {}, failing=('steamstatic',))
     assert src == 'missing'
+
+
+def test_lookup_uses_a_sure_match_and_names_an_owned_steam_game(db, monkeypatch):
+    import metadata
+    monkeypatch.setattr(metadata, 'resolve_steam_appid', lambda name: (620, 'confirmed'))
+    assert images._look_up_steam_copy(-4) == {'steam_appid': 620, 'name': 'Portal 2', 'icon_hash': 'abc123'}
+
+
+@pytest.mark.parametrize('result', [(620, 'maybe'), (None, 'none'), (620, 'retry')])
+def test_lookup_ignores_an_unsure_or_missing_match(db, monkeypatch, result):
+    import metadata
+    monkeypatch.setattr(metadata, 'resolve_steam_appid', lambda name: result)
+    assert images._look_up_steam_copy(-4) is None

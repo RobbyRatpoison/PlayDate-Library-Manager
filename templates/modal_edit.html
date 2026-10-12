@@ -1357,37 +1357,38 @@ const achLink = document.getElementById('achievements-link');
         }).catch(() => { status.style.color = '#ff8080'; status.textContent = '✘ Network error.'; });
     }
 
-    // "From Steam": for a non-Steam game that has a Steam copy, borrow that copy's art. The Steam game
-    // is named before it is used, because the stored match can be wrong (an expansion matched to its
-    // base game).
+    // "From Steam": for a non-Steam game, borrow a Steam copy's art. With a stored match the Steam game
+    // is named in the status line afterwards, because the match can be wrong (an expansion matched to
+    // its base game). Without one the server looks the game up on Steam when the button is pressed, so
+    // a game that reached Steam later, or was added before matching existed, still works.
     let _steamCopy = null;
     function _probeSteamCopy(appid) {
         _steamCopy = null;
-        ['vertical', 'horizontal', 'icon'].forEach(t => { const b = document.getElementById('art-steam-btn-' + t); if (b) b.style.display = 'none'; });
-        if (parseInt(appid) >= 0) return;
+        const show = parseInt(appid) < 0;
+        ['vertical', 'horizontal', 'icon'].forEach(t => { const b = document.getElementById('art-steam-btn-' + t); if (b) b.style.display = show ? '' : 'none'; });
+        if (!show) return;
         fetch('/api/artwork/steam-copy/' + parseInt(appid)).then(r => r.json()).then(d => {
             if (d.status !== 'ok' || String(document.getElementById('edit-appid').value) !== String(appid)) return;
             _steamCopy = d;
-            ['vertical', 'horizontal'].concat(d.has_icon ? ['icon'] : []).forEach(t => {
-                const b = document.getElementById('art-steam-btn-' + t); if (b) b.style.display = '';
-            });
+            if (!d.has_icon) { const b = document.getElementById('art-steam-btn-icon'); if (b) b.style.display = 'none'; }
         }).catch(() => {});
     }
 
     function artFromSteam(type) {
-        if (!_steamCopy) return;
         const appid  = document.getElementById('edit-appid').value;
         const status = document.getElementById(`art-status-${type}`);
-        const label  = _steamCopy.name || ('Steam app ' + _steamCopy.steam_appid);
-        status.style.color = '#aaa'; status.textContent = 'Fetching from Steam...';
+        status.style.color = '#aaa'; status.textContent = _steamCopy ? 'Fetching from Steam...' : 'Looking for it on Steam...';
+        const body = { appid, orientation: type };
+        if (_steamCopy) body.steam_appid = _steamCopy.steam_appid;
         fetch('/api/artwork/from-steam', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ appid, orientation: type, steam_appid: _steamCopy.steam_appid })
+            body: JSON.stringify(body)
         }).then(r => r.json()).then(data => {
             if (data.status === 'success') {
                 const dirMap = { vertical: 'vertical', horizontal: 'horizontal', icon: 'icons' };
                 _loadArtPanel(type, `/static/img/library/${dirMap[type]}/${parseInt(appid)}.jpg?v=${Date.now()}`, data.source);
                 _bustPageArtCache(appid, type);
+                const label = data.name || ('Steam app ' + data.steam_appid);
                 status.style.color = '#5c7e10'; status.textContent = `✔ Done! From "${label}"`;
             } else {
                 status.style.color = '#ff8080'; status.textContent = '✘ ' + data.message;
