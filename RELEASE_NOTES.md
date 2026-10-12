@@ -9,8 +9,10 @@
 ### Improvements
 
 - The From Steam button now always shows and finds the game on Steam itself.
+- Sync GOG Data in the edit window now also fetches the purchase date.
 
 ### Fixes
 
 - Fixed LB/RB sometimes switching two pages at once.
 - Fixed gamepad focus staying behind after scrolling with the right stick.
+- Fixed GOG's Import Purchase Dates button opening the userscript page instead of importing.

@@ -1554,6 +1554,7 @@ const achLink = document.getElementById('achievements-link');
                 safeSet('edit-metacritic', game.metacritic_score);
                 safeSet('edit-short-desc', game.short_description);
                 safeSet('edit-last-played', game.last_played);
+                if (game.date_added) safeSet('edit-date-added', game.date_added);
                 setPlaytime(game.playtime_forever);
                 safeSet('edit-unlocked-ach', game.unlocked_achievements);
                 safeSet('edit-total-ach', game.total_achievements);
