@@ -9,7 +9,7 @@
 ### Improvements
 
 - The From Steam button now always shows and finds the game on Steam itself.
-- Sync GOG Data in the edit window now also fetches the purchase date.
+- Sync GOG Data and Sync EA Library in the edit window now also fetch the purchase date.
 
 ### Fixes
 
