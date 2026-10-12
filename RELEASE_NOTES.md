@@ -16,3 +16,4 @@
 - Fixed LB/RB sometimes switching two pages at once.
 - Fixed gamepad focus staying behind after scrolling with the right stick.
 - Fixed GOG's Import Purchase Dates button opening the userscript page instead of importing.
+- Fixed the bulk date import still sending GOG games to the userscript.
