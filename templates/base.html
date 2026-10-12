@@ -1028,7 +1028,7 @@
                 // otherwise a plugin-only update would still report "up to date".
                 let pu = { standalone: false, gated: false, names: [] };
                 if (typeof _checkPluginUpdates === 'function') {
-                    try { pu = (await _checkPluginUpdates()) || pu; } catch (e) {}
+                    try { pu = (await _checkPluginUpdates(true)) || pu; } catch (e) {}
                 }
                 if (data.error) {
                     label.textContent = 'Check for Updates';

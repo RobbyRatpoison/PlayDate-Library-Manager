@@ -5405,9 +5405,9 @@ async function _updateAllPlugins() {
     _checkPluginUpdates();
 }
 
-async function _checkPluginUpdates() {
+async function _checkPluginUpdates(force = false) {
     try {
-        const r = await fetch('/api/plugins/check-updates');
+        const r = await fetch('/api/plugins/check-updates' + (force ? '?force=1' : ''));
         const updates = await r.json();
         let anyStandalone = false;  // installable on its own right now
         let anyGated = false;       // update exists but needs a newer core first

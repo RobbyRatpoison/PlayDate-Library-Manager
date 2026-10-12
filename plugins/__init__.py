@@ -861,6 +861,11 @@ def check_plugin_updates():
     import concurrent.futures
 
     TTL = 24 * 3600   # one GitHub check per plugin per day, persisted across restarts
+    # The manual "Check for Updates" passes ?force=1 to skip that wait; a plugin checked in the
+    # last minute is still reused so repeated clicks don't spend GitHub's 60 requests per hour.
+    from flask import request as _request
+    if _request.args.get('force') == '1':
+        TTL = 60
     from config import load_state, save_state
     _st = load_state()
     if not _plugin_update_cache:
