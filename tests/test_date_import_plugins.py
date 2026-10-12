@@ -377,3 +377,34 @@ def test_edit_modal_refreshes_date_added_after_a_plugin_sync():
     body = src[src.index('async function fetchMetadata()'):]
     body = body[:body.index('async function', 10)] if 'async function' in body[10:] else body
     assert "safeSet('edit-date-added', game.date_added)" in body
+
+
+# ── Platforms with no date source ──────────────────────────────────────────────
+
+class _NoSource:
+    name = 'NoSource'
+
+
+def test_start_reports_games_no_plugin_can_supply_dates_for(lib_db, monkeypatch):
+    lib_db.add(-1, 'A', 'direct'); lib_db.add(-2, 'B', 'nosource'); lib_db.add(-3, 'C', 'nosource')
+    lib_db.add(-4, 'D', 'custom')                                  # a platform with no plugin at all
+    out, state = _run_bulk(monkeypatch, {'direct': _Direct(), 'nosource': _NoSource()}, [-1, -2, -3, -4])
+    assert out['unsupported'] == {'nosource': 2, 'custom': 1}
+    assert out['total'] == 1                                        # only the direct game is queued
+
+
+def test_start_with_only_unsupported_games_queues_nothing(lib_db, monkeypatch):
+    lib_db.add(-2, 'B', 'nosource')
+    out, _ = _run_bulk(monkeypatch, {'nosource': _NoSource()}, [-2])
+    assert out['total'] == 0 and out['date_import_urls'] == [] and out['unsupported'] == {'nosource': 1}
+
+
+def test_plugin_js_api_says_where_each_platforms_dates_come_from(monkeypatch):
+    import plugins as plugins_pkg
+
+    def fake(platform, base):
+        return type('P', (base,), {'platform': platform, 'name': platform, 'js_api': lambda self: {}})()
+    monkeypatch.setattr(plugins_pkg, '_plugins', {
+        'u': fake('u', _UrlOnly), 'a': fake('a', _Direct), 'n': fake('n', _NoSource)})
+    api = plugins_pkg.plugin_js_api()
+    assert (api['u']['date_import'], api['a']['date_import'], api['n']['date_import']) == ('userscript', 'api', None)

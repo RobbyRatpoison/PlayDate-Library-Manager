@@ -147,9 +147,14 @@ def bulk_date_import_start():
     seen_urls        = set()
     date_import_urls = []
     api_by_platform  = {}  # plat -> [row, …] for plugins with fetch_purchase_dates
+    unsupported      = {}  # plat -> games skipped because nothing can supply their dates
     for r in rows:
         plat   = r['platform'] or 'steam'
         plugin = _plugins.get_for_platform(plat)
+        if plat != 'steam' and not (plugin and (hasattr(plugin, 'date_import_url')
+                                                or hasattr(plugin, 'fetch_purchase_dates'))):
+            unsupported[plat] = unsupported.get(plat, 0) + 1
+            continue
         if not plugin:
             continue
         if hasattr(plugin, 'date_import_url'):
@@ -195,6 +200,7 @@ def bulk_date_import_start():
         'first_name':       queue[0]['name']  if queue else None,
         'total':            len(queue) + api_total,
         'date_import_urls': date_import_urls,
+        'unsupported':      unsupported,
     })
 
 @date_import_bp.route('/api/bulk-date-import/submit', methods=['POST', 'OPTIONS'])

@@ -1674,9 +1674,40 @@ function closeBulkDateImportModal() {
     closeBulkEditModal();
 }
 
+// What the date import needs for the games in scope, from each platform's date source (see
+// plugins.plugin_js_api): Steam and userscript plugins need the Tampermonkey script, API plugins
+// read your account directly, the rest have no source and are skipped.
+function _bdiUpdateNote(scope) {
+    const el = document.getElementById('bdi-note');
+    if (!el) return;
+    const byId = new Map(GAMES.map(g => [g.appid, g]));
+    const games = scope === 'selected' ? Array.from(_selectedIds).map(id => byId.get(id)).filter(Boolean) : GAMES;
+    const plats = new Set(games.map(g => g.platform || 'steam'));
+    const label = p => (window._PLAT_LABELS && window._PLAT_LABELS[p]) || p;
+    const names = list => list.map(label).join(', ');
+    const script = [], api = [], none = [];
+    plats.forEach(p => {
+        if (p === 'steam') return;
+        const src = window._PLUGIN_API && window._PLUGIN_API[p] ? window._PLUGIN_API[p].date_import : null;
+        (src === 'userscript' ? script : src === 'api' ? api : none).push(p);
+    });
+    const link = '<a href="https://raw.githubusercontent.com/RobbyRatpoison/PlayDate-Library-Manager/main/steam_date_import.user.js" target="_blank" style="color:#c2c8cc;">PlayDate Companion</a>';
+    const lines = [];
+    if (plats.has('steam') || script.length) {
+        lines.push(`Requires the ${link} Tampermonkey script. `
+            + (plats.has('steam') ? 'A Steam help page will open in your browser and fetch dates in the background. ' : '')
+            + (script.length ? `${escHtml(names(script))}: an orders page opens in your browser. ` : ''));
+    }
+    if (api.length) lines.push(`${escHtml(names(api))}: dates are read directly from your account.`);
+    if (none.length) lines.push(`${escHtml(names(none))}: no date source, these games are skipped.`);
+    if (!lines.length) lines.push('No games in this selection.');
+    el.innerHTML = lines.join('<br>');
+}
+
 function onBulkDateImportScopeChange() {
     const scope = document.querySelector('input[name="bdi-scope"]:checked')?.value;
     if (!scope) return;
+    _bdiUpdateNote(scope);
     if (scope === 'selected' && _selectedIds.size === 0) {
         document.getElementById('bdi-scope-filtered').checked = true;
         closeBulkEditModal();
@@ -1749,9 +1780,15 @@ async function startBulkDateImport() {
     }
 
     const _dateUrls = data.date_import_urls || [];
+    const _lab = p => (window._PLAT_LABELS && window._PLAT_LABELS[p]) || p;
+    const _skipped = Object.entries(data.unsupported || {});
+    const _skippedText = _skipped.map(([p, n]) => `${n} ${_lab(p)} game${n !== 1 ? 's' : ''}`).join(', ');
+    window._bdiSkippedNote = _skipped.length ? `Skipped ${_skippedText}: no date source.` : '';
     if (data.total === 0 && !_dateUrls.length) {
-        status.className = 'bulk-status-success';
-        status.textContent = 'No games to process.';
+        status.className = _skipped.length ? 'bulk-status-error' : 'bulk-status-success';
+        status.textContent = _skipped.length
+            ? `Nothing to import: ${_skipped.map(([p]) => _lab(p)).join(', ')} can't supply purchase dates.`
+            : 'No games to process.';
         startBtn.disabled = false;
         return;
     }
@@ -1780,6 +1817,7 @@ async function startBulkDateImport() {
         const _labels = _dateUrls.map(u => u.label).join(', ');
         status.textContent = _labels
             ? `${_labels} orders page opened — check that tab for results.`
+              + (window._bdiSkippedNote ? ' ' + window._bdiSkippedNote : '')
             : 'No games to process.';
         startBtn.disabled = false;
         return;
@@ -1858,7 +1896,8 @@ function _pollBulkDateImport() {
                 const status = document.getElementById('bdi-status');
                 status.className = errs.length ? 'bulk-status-error' : 'bulk-status-success';
                 status.textContent = `Done — ${d.done} date${d.done !== 1 ? 's' : ''} imported, ${d.failed} not found.`
-                    + (errs.length ? ' ' + errs.join(' ') : '');
+                    + (errs.length ? ' ' + errs.join(' ') : '')
+                    + (window._bdiSkippedNote ? ' ' + window._bdiSkippedNote : '');
             }
         } catch (e) { /* ignore poll errors */ }
     }, 1000);

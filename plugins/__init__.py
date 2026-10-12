@@ -647,8 +647,16 @@ def plugin_js_api() -> dict:
     """Return JS API descriptors for all plugins that provide them."""
     # art_store: the art types this plugin can supply from its own store (see
     # plugin_art_kinds), offered as a "Store" source in Artwork Sources.
+    # date_import: where the bulk date import gets this platform's purchase dates -- 'userscript'
+    # (a date_import_url page), 'api' (fetch_purchase_dates) or None (no source). The page uses it
+    # to say what a selection needs.
+    def _date_source(p):
+        if hasattr(p, 'date_import_url'):
+            return 'userscript'
+        return 'api' if hasattr(p, 'fetch_purchase_dates') else None
     return {p.platform: {**p.js_api(), 'art_store': list(plugin_art_kinds(p)),
-                         'art_default': list(plugin_art_default(p))}
+                         'art_default': list(plugin_art_default(p)),
+                         'date_import': _date_source(p)}
             for p in _plugins.values() if hasattr(p, 'js_api')}
 
 

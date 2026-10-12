@@ -10,6 +10,7 @@
 
 - The From Steam button now always shows and finds the game on Steam itself.
 - Syncing one game now also fetches its purchase date, for most stores.
+- The bulk date import now says which games have no date source.
 
 ### Fixes
 
