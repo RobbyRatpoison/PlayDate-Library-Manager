@@ -3,6 +3,7 @@
 ## v2026.10.5
 ### New
 
+- PlayDate Companion can now import PlayStation purchase dates.
 - Added a Show File button for artwork, to open the image in your file manager.
 - Added a Browse button for Custom URL, to pick a local image instead of typing its path.
 

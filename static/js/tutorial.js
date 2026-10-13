@@ -277,7 +277,7 @@ const TUTORIAL_SECTIONS = [
             {
                 title: 'Purchase dates',
                 body: `<p>Steam, and some other stores such as GOG and EA, don't expose accurate purchase or activation dates through their APIs. PlayDate can pull them from your account's own order history pages instead, using PlayDate Companion, a browser userscript (needs the Tampermonkey extension). Install it from <a href="https://github.com/RobbyRatpoison/PlayDate-Library-Manager/raw/refs/heads/main/steam_date_import.user.js" target="_blank">GitHub</a>.</p>
-                       <p>Libraries whose plugin can read purchase dates directly don't need the script.</p>
+                       <p>Libraries whose plugin can read purchase dates directly don't need the script. PlayStation's dates come from the plugin's <strong>Import Purchase Dates</strong> button, which uses the script too.</p>
                        <p>Click the ↗ next to <strong>Date Added</strong> in a game's edit panel to import one game's date, or use the ${tutOpen('page-library', 'Library page')}'s Bulk Ops → <strong>Date Importer</strong> tab to fetch dates for many games at once.</p>`,
             },
             {

@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         PlayDate Companion
 // @namespace    playdate
-// @version      3.2
-// @description  Imports Steam activation dates, GOG/EA purchase dates, and SteamGifts wins into PlayDate
+// @version      3.3
+// @description  Imports Steam activation dates, GOG/EA/PlayStation purchase dates, and SteamGifts wins into PlayDate
 // @icon         https://raw.githubusercontent.com/RobbyRatpoison/PlayDate-Library-Manager/main/static/img/favicon.png
 // @match        https://help.steampowered.com/*
 // @match        https://www.gog.com/en/account/settings/orders*
 // @match        https://myaccount.ea.com/am/ui/payment-wallet/order-history*
+// @match        https://store.playstation.com/*
 // @match        https://www.steamgifts.com/giveaways/won*
 // @match        https://www.steamgifts.com/user/*/giveaways/won*
 // @updateURL    https://raw.githubusercontent.com/RobbyRatpoison/PlayDate-Library-Manager/main/steam_date_import.user.js
@@ -41,10 +42,101 @@
         }
     })();
 
+    // PlayStation helpers are declared here, above the dispatch below: the dispatch calls runPlayStation()
+    // before execution reaches anything declared further down, and a `const` there would not exist yet.
+    // PS-BEGIN (pure helpers; tests/test_userscript_psn.py runs this block in node)
+    const PSN_ENDPOINT = 'https://web.np.playstation.com/api/graphql/v1//op';
+    // Persisted-query hashes of transactionHistoryRetrieve, newest first. Sony rotates them now and then;
+    // the first that the gateway recognises is used.
+    const PSN_HASHES = [
+        '496f6f30273e14e92498da51447f773b1c9e30c3cfefb8739627c31673d08751',
+        'f04fe7c7d8498bee5cd0615400eceb07d77eab097d118475ac9fa0c8446b3a42',
+    ];
+    function psnHistoryUrl(hash, endDate, limit) {
+        const variables = encodeURIComponent(JSON.stringify({
+            startDate: '1994-12-03T00:00:00.000Z', endDate, limit }));
+        const extensions = encodeURIComponent(JSON.stringify({ persistedQuery: { version: 1, sha256Hash: hash } }));
+        return PSN_ENDPOINT + '?operationName=transactionHistoryRetrieve&variables=' + variables +
+               '&extensions=' + extensions;
+    }
+    // The product purchases in one page of transactions: [{id, date, name, sku}]. Wallet top-ups, refunds
+    // and subscription charges have no products and are skipped; so is anything missing a date or an id.
+    function psnPurchases(transactions) {
+        const out = [];
+        for (const t of (transactions || [])) {
+            const lines = (t && t.purchaseDetails && t.purchaseDetails.productPurchases) || [];
+            for (const p of lines) {
+                if (!t.date || !p || !p.skuId) continue;
+                out.push({ id: String(t.id || '') + ':' + String(p.orderItemId || p.skuId),
+                           date: t.date, name: p.productName || '', sku: p.skuId });
+            }
+        }
+        return out;
+    }
+    // Append `rows` to `all`, skipping any already seen (the cursor can repeat a row on a shared boundary).
+    function psnAddUnique(all, seen, rows) {
+        let added = 0;
+        for (const r of rows) { if (!seen.has(r.id)) { seen.add(r.id); all.push(r); added++; } }
+        return added;
+    }
+    // What a GraphQL reply holds: {block} when it has usable transactions (even alongside partial errors,
+    // such as a delisted product with no name), else {error}.
+    function psnReadReply(json) {
+        const block = json && json.data && json.data.transactionHistoryRetrieve;
+        if (block && Array.isArray(block.transactions)) return { block };
+        const errs = json && Array.isArray(json.errors)
+            ? json.errors.map(e => (e && (e.message || (e.extensions && e.extensions.code))) || 'error').join('; ') : '';
+        return { error: errs || 'unexpected reply' };
+    }
+    // Walk the history page by page. `getPage(hash, endDate, limit)` resolves to the parsed JSON reply.
+    // Resolves {rows, pages}; throws an Error with Sony's reason when nothing at all could be read.
+    async function psnCollect(getPage, now, onPage) {
+        const all = [], seen = new Set();
+        let hashIx = 0, limit = 50, endDate = now, pages = 0, lastError = '';
+        for (let guard = 0; guard < 400; guard++) {
+            const r = psnReadReply(await getPage(PSN_HASHES[hashIx], endDate, limit));
+            if (!r.block) {
+                lastError = r.error;
+                if (all.length) break;                                   // keep what was read
+                if (/persisted ?query/i.test(r.error) && hashIx + 1 < PSN_HASHES.length) { hashIx++; continue; }
+                if (limit > 15) { limit = 15; continue; }                // some gateways cap the page size
+                throw new Error(r.error);
+            }
+            pages++;
+            psnAddUnique(all, seen, psnPurchases(r.block.transactions));
+            if (onPage) onPage(all.length, pages);
+            if (!r.block.hasMore || !r.block.nextEndDate) break;
+            endDate = r.block.nextEndDate;
+        }
+        return { rows: all, pages, warning: lastError };
+    }
+    // PS-END
+
     // EA activates by path only — the auth redirect strips ?ref=playdate
     if (window.location.hostname === 'myaccount.ea.com' &&
         window.location.pathname.includes('/payment-wallet/order-history')) {
         runEA();
+        return;
+    }
+
+    // PlayStation purchase dates — armed by PlayDate's "Import Purchase Dates" button, which opens the store's
+    // transaction page with ?ref=playdate. Signing in bounces through another site and back, which drops the
+    // query string, so the flag is also kept in sessionStorage (per tab) until the import has run. Any other
+    // visit to the store does nothing.
+    if (window.location.hostname === 'store.playstation.com') {
+        // The store strips the query from the address bar once it has handled it, so also read the URL this
+        // page was first loaded with.
+        const wasOpenedByPlayDate = (url) => { try { return new URL(url).searchParams.get('ref') === 'playdate'; } catch (e) { return false; } };
+        let armed = wasOpenedByPlayDate(window.location.href);
+        try {
+            const nav = performance.getEntriesByType('navigation')[0];
+            if (nav && wasOpenedByPlayDate(nav.name)) armed = true;
+        } catch (e) { /* no navigation timing: the other two signals remain */ }
+        try {
+            if (armed) sessionStorage.setItem('pd_psn_import', '1');
+            armed = sessionStorage.getItem('pd_psn_import') === '1';
+        } catch (e) { /* no sessionStorage: the query string alone has to do */ }
+        if (armed) runPlayStation();
         return;
     }
 
@@ -481,6 +573,102 @@
             }
         } catch (e) {
             setError('Could not reach PlayDate. Make sure it is running.');
+        }
+    }
+
+    // =========================================================================
+    // PlayStation — read the account's transaction history in this signed-in
+    // browser (Sony's web checkout authenticates it with the session cookie; the
+    // app token PlayDate's plugin holds can't) and send the purchases to PlayDate
+    // =========================================================================
+
+    async function runPlayStation() {
+        const overlay = document.createElement('div');
+        Object.assign(overlay.style, {
+            position: 'fixed', inset: '0', background: 'rgba(10,15,25,0.93)', display: 'flex',
+            flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: '2147483647',
+            color: '#c7d5e0', fontFamily: "'Segoe UI', sans-serif", gap: '12px',
+        });
+        overlay.innerHTML = `
+            <div style="font-size:1.05rem;font-weight:600;color:#66c0f4;letter-spacing:0.02em;">
+                PlayDate — Importing PlayStation Dates
+            </div>
+            <div id="pd-psn-status" style="font-size:0.85rem;color:#8f98a0;max-width:460px;text-align:center;">
+                Reading your transaction history…
+            </div>
+            <button id="pd-psn-close" style="display:none;margin-top:6px;padding:6px 16px;border-radius:5px;border:1px solid #66c0f4;background:transparent;color:#66c0f4;cursor:pointer;">Close</button>`;
+        document.body.appendChild(overlay);
+        const status = document.getElementById('pd-psn-status');
+        const finish = (msg, ok) => {
+            status.textContent = msg;
+            status.style.color = ok ? '#66c0f4' : '#ff4d4d';
+            const b = document.getElementById('pd-psn-close');
+            b.style.display = 'inline-block';
+            b.onclick = () => overlay.remove();
+            try { sessionStorage.removeItem('pd_psn_import'); } catch (e) { /* nothing to clear */ }
+        };
+
+        // The checkout page's own headers; the call is cookie-authenticated, so it must be sent with credentials.
+        const getPage = async (hash, endDate, limit) => {
+            const rid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random();
+            const res = await fetch(psnHistoryUrl(hash, endDate, limit), {
+                credentials: 'include',
+                headers: {
+                    'content-type': 'application/json',
+                    'apollographql-client-name': '@sie-ppr-web-checkout/app',
+                    'apollographql-client-version': '2.184.0',
+                    'x-psn-storefront-type': 'checkout:store',
+                    'x-psn-app-ver': '@sie-ppr-web-checkout/app/v2.184.0',
+                    'x-psn-request-id': rid,
+                },
+            });
+            let json = null;
+            try { json = await res.json(); } catch (e) { /* not JSON: reported below */ }
+            if (!json) throw new Error('Sony answered HTTP ' + res.status + ' without data. Are you signed in to PlayStation?');
+            await new Promise(r => setTimeout(r, 120));                 // be gentle between pages
+            return json;
+        };
+
+        // Which account is this browser signed in to? (PlayDate refuses another account's purchases.)
+        let onlineId = '';
+        try {
+            const r = await fetch('https://io.playstation.com/user/details', { credentials: 'include', headers: { accept: 'application/json' } });
+            const j = await r.json();
+            onlineId = (j && typeof j.handle === 'string') ? j.handle.replace(/"/g, '') : '';
+        } catch (e) { /* optional check */ }
+
+        let result;
+        try {
+            result = await psnCollect(getPage, new Date().toISOString(), (n, pages) => {
+                status.textContent = 'Read ' + n + ' purchase' + (n === 1 ? '' : 's') + ' (page ' + pages + ')…';
+            });
+        } catch (e) {
+            finish('Could not read your PlayStation history: ' + (e && e.message ? e.message : e), false);
+            return;
+        }
+        if (!result.rows.length) { finish('No purchases were found on this account.', false); return; }
+
+        status.textContent = 'Sending ' + result.rows.length + ' purchases to PlayDate…';
+        try {
+            await pdReady;
+            const res = await new Promise((resolve, reject) => {
+                GM_xmlhttpRequest({
+                    method: 'POST', url: PD_BASE + '/api/playstation/purchase-dates',
+                    headers: { 'Content-Type': 'application/json' },
+                    data: JSON.stringify({ online_id: onlineId, purchases: result.rows.map(r => ({ date: r.date, name: r.name, sku: r.sku })) }),
+                    onload: resolve, onerror: reject, ontimeout: reject,
+                });
+            });
+            let data = {};
+            try { data = JSON.parse(res.responseText); } catch (e) { /* handled below */ }
+            if (data.status === 'success') {
+                finish('Done: ' + data.updated + ' date' + (data.updated === 1 ? '' : 's') + ' set, ' + data.matched +
+                       ' of your PlayStation games matched a purchase. You can close this tab.', true);
+            } else {
+                finish('PlayDate: ' + (data.message || 'something went wrong'), false);
+            }
+        } catch (e) {
+            finish('Could not reach PlayDate. Make sure it is running.', false);
         }
     }
 
