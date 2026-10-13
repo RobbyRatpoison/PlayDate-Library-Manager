@@ -37,7 +37,7 @@ The resolved Steam AppID is cached in `games.steam_appid`;
 YYYY-MM-DD = done, 'no_match', 'unconfirmed').
 
 `meta_backfill_fetched` gates only the automatic startup sweep — any explicit
-user action (the "Backfill Missing Metadata" bulk op, a bulk re-scrape, the
+user action (the "Fill Missing Data" bulk op, a bulk re-scrape, the
 edit modal's "Fill from Steam", or renaming a game) re-attempts regardless,
 gated purely on whether core fields are still empty. Renaming a game clears
 its `meta_backfill_fetched` and stale `steam_appid` so the next sweep

@@ -174,10 +174,10 @@
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.9375rem; margin-bottom: 0.75rem;">
             <h2 style="margin: 0; color: #ffffff;">Edit Game Details</h2>
             <div style="display: flex; gap: 0.625rem; align-items: center;">
-                <button type="button" onclick="fetchMetadata()" id="meta-btn" class="nav-btn" data-modal-row="0" style="height: auto; padding: 0.5rem 1rem; border: 1px solid var(--accent);">
+                <button type="button" onclick="fetchMetadata()" id="meta-btn" class="nav-btn" data-modal-row="0" style="height: auto; padding: 0.5rem 1rem; border: 1px solid var(--accent);" title="Re-fetches this game from its own platform and replaces the stored values, including edits you made to those fields. To only fill what is empty, use Fill Missing Data.">
                     Sync Data
                 </button>
-                <button type="button" onclick="fillMetadataFromSteam()" id="meta-fill-btn" class="nav-btn" data-modal-row="0" style="display:none; height: auto; padding: 0.5rem 1rem; border: 1px solid var(--border);" title="Look up this game on Steam and PCGamingWiki and fill in any missing tags, review score, genres, developer/publisher and release date.">
+                <button type="button" onclick="fillMetadataFromSteam()" id="meta-fill-btn" class="nav-btn" data-modal-row="0" style="display:none; height: auto; padding: 0.5rem 1rem; border: 1px solid var(--border);" title="Look up this game on Steam and PCGamingWiki and fill in any missing tags, review score, genres, developer/publisher and release date. Never overwrites a value that is already there.">
                     Fill Missing Data
                 </button>
                 <button type="button" onclick="openInstallDir()" id="install-dir-btn" class="nav-btn" data-modal-row="0" style="height: auto; padding: 0.5rem 1rem; border: 1px solid var(--border);">

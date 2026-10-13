@@ -200,8 +200,8 @@ const TUTORIAL_SECTIONS = [
             },
             {
                 title: 'Syncing data',
-                body: `<p><strong>Sync Steam Data</strong> re-fetches a single game's store data, reviews, and tags. On non-Steam games the button uses that platform's own label.</p>
-                       <p><strong>Fill Missing Data</strong> only fills fields that are currently empty (tags, review score, genres, developer, release date), by matching the game to a Steam page or PCGamingWiki. Your own edits and plugin data are never overwritten.</p>`,
+                body: `<p><strong>Sync Steam Data</strong> re-fetches a single game's store data, reviews, and tags from its own source and replaces what is stored, including edits you made to those fields. On non-Steam games the button uses that platform's own label and re-reads that platform's catalog.</p>
+                       <p><strong>Fill Missing Data</strong> only fills fields that are currently empty (tags, review score, genres, developer, release date), by matching the game to a Steam page or PCGamingWiki. Your own edits and plugin data are never overwritten. In Bulk Ops, the <strong>Re-scrape</strong> tab's <strong>Fill Missing Data</strong> does the same for every game in scope.</p>`,
             },
             {
                 title: 'Duplicate games',

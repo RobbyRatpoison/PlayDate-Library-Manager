@@ -2974,7 +2974,7 @@ _METADATA_INCOMPLETE_WHERE = (
     " OR (tags IS NULL OR tags = ''))"
 )
 
-# The gate for the manual "Backfill Missing Metadata" bulk op: incomplete, or a
+# The gate for the manual "Fill Missing Data" bulk op: incomplete, or a
 # non-Steam game with no Steam match (a GOG game arrives with complete metadata, but
 # its Steam match is what gives it Steam art and the Steam-only fields). Outcome-
 # agnostic: an explicit run re-attempts games already stamped done / no_match.
@@ -3157,7 +3157,7 @@ def sync_metadata_backfill():
 
 
 def bulk_backfill_metadata(appids, cancel_event, progress_cb):
-    """Manual 'Backfill Missing Metadata' bulk op. Full pending list, no
+    """Manual 'Fill Missing Data' bulk op. Full pending list, no
     per-session cap. Metadata only -- no art / achievement refetch. rerun=True:
     the caller has already narrowed `appids` to games still missing core fields,
     so re-attempt them regardless of a prior done / no_match stamp.
