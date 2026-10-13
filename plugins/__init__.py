@@ -111,6 +111,12 @@ OFFICIAL_PLUGINS = [
      'platform_status': {'windows': 'untested', 'linux': 'broken', 'mac': 'broken'},
      'notes': {'linux': 'Account connect and library sync (full owned-title history) work, but install/launch/uninstall are Windows-only -- native UWP titles have no Wine equivalent. Microsoft exposes no current-ownership signal, so every Game Pass title you\'ve ever played is included on sync.',
                'mac': 'Install/launch/uninstall are Windows-only -- native UWP titles do not run on macOS. Account connect and library sync work.'}},
+    {'id': 'nintendo', 'name': 'Nintendo eShop', 'source': 'RobbyRatpoison/playdate-plugin-nintendo',
+     'platform_status': {'windows': 'untested', 'linux': 'working', 'mac': 'untested'},
+     'notes': {'linux': 'Library sync only (no install or launch): the digital Switch and Switch 2 games in your Nintendo account\'s Virtual Game Cards list. Sign in with the login window or by pasting your cookie. Metadata comes from Steam, PCGamingWiki and Nintendo\'s store. Nintendo gives no purchase dates. Confirmed on a 43-game library.'}},
+    {'id': 'playstation', 'name': 'PlayStation', 'source': 'RobbyRatpoison/playdate-plugin-playstation',
+     'platform_status': {'windows': 'untested', 'linux': 'working', 'mac': 'untested'},
+     'notes': {'linux': 'Library sync only (no install or launch): your PS4, PS5 and PS Plus games, with playtime and last played. Demos and DLC are skipped. Sign in by pasting a code (an NPSSO) from your browser. Purchase dates come from the PlayDate Companion userscript (Import Purchase Dates). Confirmed on an account with one game, so a large library is untested.'}},
 ]
 
 

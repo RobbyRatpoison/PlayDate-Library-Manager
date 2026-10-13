@@ -130,6 +130,14 @@ class TestPluginRegistries:
             assert entry.get('name')
             assert entry.get('source')
 
+    def test_every_entry_has_a_bundled_badge(self):
+        # core ships a badge for every official plugin's platform (the plugin id is its platform key)
+        import os
+        for entry in plugins.OFFICIAL_PLUGINS:
+            path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                'static', 'img', 'platform', entry['id'] + '.png')
+            assert os.path.isfile(path), f"{entry['id']} has no static/img/platform/{entry['id']}.png"
+
     def test_ids_are_unique(self):
         ids = [e['id'] for e in plugins.OFFICIAL_PLUGINS]
         assert len(ids) == len(set(ids))

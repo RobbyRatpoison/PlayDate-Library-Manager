@@ -354,7 +354,7 @@ const TUTORIAL_SECTIONS = [
         steps: [
             {
                 title: 'Beyond Steam',
-                body: `<p>Steam is built into PlayDate directly. Everything else comes from plugins, which are optional and installed on demand. PlayDate has official plugins for GOG, Epic Games, EA App, Ubisoft Connect, Humble Bundle, itch.io, Amazon Games, Battle.net, IndieGala, Rockstar Games, Legacy Games, and Xbox / Game Pass.</p>`,
+                body: `<p>Steam is built into PlayDate directly. Everything else comes from plugins, which are optional and installed on demand. PlayDate has official plugins for GOG, Epic Games, EA App, Ubisoft Connect, Humble Bundle, itch.io, Amazon Games, Battle.net, IndieGala, Rockstar Games, Legacy Games, Xbox / Game Pass, PlayStation, and Nintendo eShop.</p>`,
             },
             {
                 title: 'Installing and managing plugins',
