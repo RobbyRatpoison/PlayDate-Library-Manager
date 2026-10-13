@@ -161,3 +161,26 @@ def submit_log():
         return jsonify({"status": "success"})
     finally:
         _submit_lock.release()
+
+
+def _log_file_path():
+    """The file the app is really logging to (the Flatpak and frozen layouts differ), else BASE_DIR's."""
+    for h in logging.getLogger().handlers:
+        fn = getattr(h, 'baseFilename', None)
+        if fn:
+            return fn
+    return os.path.join(BASE_DIR, 'playdate.log')
+
+
+@diagnostics_bp.route('/api/open-log', methods=['POST'])
+def open_log():
+    """Show playdate.log in the OS file manager (every "see playdate.log" message links here)."""
+    path = _log_file_path()
+    if not os.path.isfile(path):
+        return jsonify({"status": "error", "message": "There is no log file yet."}), 404
+    try:
+        from images import reveal_in_file_manager
+        reveal_in_file_manager(path)
+        return jsonify({"status": "success", "path": path})
+    except Exception as e:
+        return api_error('Could not open the file manager. The log is at ' + path, 500, exc=e)

@@ -5,46 +5,113 @@ runners/proton.py — Detect and launch Proton for Windows GOG games.
 import glob
 import logging
 import os
+import re
 
 from runners.sandbox import host_popen
 
 log = logging.getLogger(__name__)
 
-# Glob patterns for finding Proton installs.  Checked in order; first found wins
-# for _get_default, but all are returned by find_proton_versions().
-_PROTON_GLOBS = [
-    # GE-Proton in both common Steam locations (prefer GE for better compatibility)
-    '~/.local/share/Steam/compatibilitytools.d/GE-Proton*/proton',
-    '~/.steam/steam/compatibilitytools.d/GE-Proton*/proton',
-    # Official Proton
-    '~/.steam/steam/steamapps/common/Proton */proton',
-    '~/.local/share/Steam/steamapps/common/Proton */proton',
+# Folders that hold community Proton builds (GE-Proton, Proton-CachyOS, Proton-EM, UMU-Proton, ...),
+# one directory per build with a `proton` script inside. Steam installed natively, through Flatpak,
+# through Snap, or by the distro (CachyOS/Arch ship proton-cachyos under /usr/share/steam).
+_COMPAT_TOOL_DIRS = [
+    '~/.local/share/Steam/compatibilitytools.d',
+    '~/.steam/steam/compatibilitytools.d',
+    '~/.steam/root/compatibilitytools.d',
+    '~/.var/app/com.valvesoftware.Steam/.local/share/Steam/compatibilitytools.d',
+    '~/.var/app/com.valvesoftware.Steam/data/Steam/compatibilitytools.d',
+    '~/snap/steam/common/.local/share/Steam/compatibilitytools.d',
+    '/usr/share/steam/compatibilitytools.d',
+    '/usr/local/share/steam/compatibilitytools.d',
 ]
+
+# Steam roots, whose steamapps/common/Proton */ holds the official builds (also in extra libraries).
+_STEAM_ROOTS = [
+    '~/.local/share/Steam',
+    '~/.steam/steam',
+    '~/.var/app/com.valvesoftware.Steam/.local/share/Steam',
+    '~/.var/app/com.valvesoftware.Steam/data/Steam',
+    '~/snap/steam/common/.local/share/Steam',
+]
+
+
+def _host_listing(patterns):
+    """Matches for shell glob `patterns` on the host. Under Flatpak the sandbox can't see other apps'
+    data (~/.var/app/...) or a distro's /usr, so ask the host."""
+    from runners.sandbox import IN_FLATPAK, host_run
+    import subprocess
+    if not IN_FLATPAK:
+        return None
+    script = 'for p in "$@"; do for f in $p; do [ -e "$f" ] && echo "$f"; done; done'
+    try:
+        r = host_run(['sh', '-c', script, 'sh'] + patterns, stdout=subprocess.PIPE,
+                     stderr=subprocess.DEVNULL, timeout=10)
+        return [l for l in r.stdout.decode('utf-8', errors='replace').splitlines() if l.strip()]
+    except Exception as e:
+        log.info(f'Host Proton search failed: {e}')
+        return None
+
+
+def _steam_library_roots():
+    """Every extra Steam library folder named in a libraryfolders.vdf we can read."""
+    roots = []
+    for root in _STEAM_ROOTS:
+        vdf = os.path.join(os.path.expanduser(root), 'config', 'libraryfolders.vdf')
+        try:
+            with open(vdf, encoding='utf-8', errors='ignore') as f:
+                for m in re.finditer(r'"path"\s+"([^"]+)"', f.read()):
+                    roots.append(m.group(1).replace('\\\\', '\\'))
+        except OSError:
+            pass
+    return roots
+
+
+def _candidate_patterns():
+    pats = []
+    for d in _COMPAT_TOOL_DIRS:
+        pats.append(os.path.join(os.path.expanduser(d), '*', 'proton'))
+    for root in [os.path.expanduser(r) for r in _STEAM_ROOTS] + _steam_library_roots():
+        pats.append(os.path.join(root, 'steamapps', 'common', 'Proton*', 'proton'))
+    return pats
+
+
+def _rank(path):
+    """GE-Proton first (broadest compatibility), then other community builds, then official Proton."""
+    name = os.path.basename(os.path.dirname(path)).lower()
+    if name.startswith('ge-proton'):
+        return 0
+    if os.sep + 'compatibilitytools.d' + os.sep in path:
+        return 1
+    return 2
 
 
 def find_proton_versions():
     """
     Return all installed Proton versions as a list of dicts:
         [{'name': str, 'path': str}]
-    Sorted newest-first within each category (GE-Proton before official).
+    GE-Proton first, then other community builds, then official Proton; newest name first within each.
     """
+    pats = _candidate_patterns()
+    paths = _host_listing(pats)
+    if paths is None:
+        paths = [p for pat in pats for p in glob.glob(pat)]
     seen  = set()   # resolved real paths to avoid symlink duplicates
     found = []
-    for pattern in _PROTON_GLOBS:
-        for path in sorted(glob.glob(os.path.expanduser(pattern)), reverse=True):
-            real = os.path.realpath(path)
-            if real in seen:
-                continue
-            seen.add(real)
-            name = os.path.basename(os.path.dirname(path))
-            found.append({'name': name, 'path': path})
+    for path in sorted(set(paths)):
+        real = os.path.realpath(path)
+        if real in seen:
+            continue
+        seen.add(real)
+        found.append({'name': os.path.basename(os.path.dirname(path)), 'path': path})
+    # newest name first inside each rank (names carry the version)
+    found.sort(key=lambda v: (_rank(v['path']), [-ord(c) for c in v['name'].lower()]))
     return found
 
 
 def get_default_proton():
     """
     Return the best available Proton dict, or None if nothing is installed.
-    Prefers GE-Proton (first in _PROTON_GLOBS) for broader compatibility.
+    Prefers GE-Proton for broader compatibility.
     """
     versions = find_proton_versions()
     return versions[0] if versions else None

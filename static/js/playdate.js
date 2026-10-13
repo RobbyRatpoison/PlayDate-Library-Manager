@@ -1283,3 +1283,64 @@ async function pickExecutableForGame(platform, appid, candidates) {
     });
 }
 
+
+
+// Every "see playdate.log" message, whoever wrote it (core or a plugin), becomes a link that shows
+// the log file in the OS file manager.
+(function () {
+    var NAME = 'playdate.log';
+    var SKIP = {SCRIPT: 1, STYLE: 1, TEXTAREA: 1, INPUT: 1, A: 1, CODE: 0, PRE: 1};
+    function linkify(root) {
+        if (!root || !document.createTreeWalker) return;
+        var base = root.nodeType === 3 ? root.parentNode : root;
+        if (!base || base.nodeType !== 1) return;
+        var nodes = [], w;
+        if (root.nodeType === 3) { nodes.push(root); }
+        else {
+            w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+            while (w.nextNode()) nodes.push(w.currentNode);
+        }
+        nodes.forEach(function (n) {
+            if (n.nodeValue.indexOf(NAME) < 0) return;
+            for (var p = n.parentNode; p && p.nodeType === 1; p = p.parentNode) {
+                if (SKIP[p.tagName] || (p.classList && p.classList.contains('pd-log-link'))) return;
+                if (p.isContentEditable) return;
+            }
+            var parts = n.nodeValue.split(NAME), frag = document.createDocumentFragment();
+            parts.forEach(function (t, i) {
+                if (i) {
+                    var a = document.createElement('a');
+                    a.className = 'pd-log-link';
+                    a.href = '#';
+                    a.setAttribute('data-modal-row', '');
+                    a.title = 'Show the log file in your file manager';
+                    a.textContent = NAME;
+                    a.style.cssText = 'color:inherit;text-decoration:underline;cursor:pointer';
+                    frag.appendChild(a);
+                }
+                if (t) frag.appendChild(document.createTextNode(t));
+            });
+            n.parentNode.replaceChild(frag, n);
+        });
+    }
+    document.addEventListener('click', function (e) {
+        var a = e.target.closest && e.target.closest('a.pd-log-link');
+        if (!a) return;
+        e.preventDefault();
+        e.stopPropagation();
+        fetch('/api/open-log', {method: 'POST'}).then(function (r) { return r.json(); }).then(function (d) {
+            if (d && d.status !== 'success' && typeof showLaunchToast === 'function')
+                showLaunchToast(d.message || 'Could not open the log.');
+        }).catch(function () {});
+    }, true);
+    function start() {
+        linkify(document.body);
+        new MutationObserver(function (muts) {
+            muts.forEach(function (m) {
+                if (m.type === 'characterData') linkify(m.target);
+                else m.addedNodes.forEach(function (n) { if (n.nodeType === 1 || n.nodeType === 3) linkify(n); });
+            });
+        }).observe(document.body, {childList: true, subtree: true, characterData: true});
+    }
+    if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+})();
