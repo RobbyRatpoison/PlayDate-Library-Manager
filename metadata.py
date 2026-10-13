@@ -329,6 +329,62 @@ def _steam_search_candidates(name, session):
         return []
 
 
+_EDITION_TAIL_RE = re.compile(
+    r'\s+(?:hd\s+)?(?:remaster(?:ed)?|definitive edition|complete edition|deluxe edition|special edition|'
+    r'enhanced edition|anniversary edition|game of the year edition|goty edition)\s*$', re.I)
+_SUBTITLE_SPLIT_RE = re.compile(r'\s+[-\u2013\u2014:]\s+|:\s+')
+_SIM_EDITION_BASE = 0.85   # an edition-stripped title that equals a Steam name: a maybe, never auto-confirmed
+
+
+def _steam_search_variants(name):
+    """Extra Steam search terms to try when the full title finds nothing acceptable: the title before a
+    subtitle ("AIRHEART - Tales of broken Wings" -> "AIRHEART": Steam's search is picky about the dash) and
+    the title without a trailing edition word ("The Way Remastered" -> "The Way"). [(term, kind)], kind
+    'subtitle' (only widens the candidate pool) or 'edition' (may match its base game as a maybe)."""
+    clean = _clean_query(name)
+    out = []
+    base = _SUBTITLE_SPLIT_RE.split(clean, maxsplit=1)[0].strip()
+    if base and base.lower() != clean.lower():
+        out.append((base, 'subtitle'))
+    stripped = _EDITION_TAIL_RE.sub('', clean).strip()
+    if stripped and stripped.lower() != clean.lower():
+        out.append((stripped, 'edition'))
+    return out
+
+
+def _judge_candidates(name, candidates, box, pcgw_down, base=None):
+    """The Steam-search verdict for `candidates` against `name`: (appid, confidence, box), or None when
+    nothing is close enough. `base` = the edition-stripped search term, whose exact match counts as a maybe."""
+    if not candidates:
+        return None
+    # An exact normalised-name match wins outright, wherever Steam ranked it
+    # (its search often buries the real game under sequels/DLC/soundtracks).
+    want = _norm(name)
+    exact = next((c for c in candidates if _norm(c['name']) == want), None)
+    if exact:
+        log.info('Steam search: %r -> exact %r (%s)', name, exact['name'], exact['id'])
+        return exact['id'], 'confirmed', box
+
+    def score_of(c):
+        sc = _similar(name, c['name'])
+        if base and _norm(c['name']) == _norm(base):
+            sc = max(sc, _SIM_EDITION_BASE)
+        return sc
+    best = max(candidates, key=score_of)
+    score = score_of(best)
+    log.info('Steam search: %r -> %r (%s) score %.2f', name, best['name'], best['id'], score)
+    if score >= _SIM_CONFIRMED:
+        return best['id'], 'confirmed', box
+    if not pcgw_down and score >= _SIM_MAYBE:
+        # A PCGW page carrying real metadata beats a weak, differently-named
+        # Steam guess (delisted classics: "Syndicate (1993)" -> "Pizza
+        # Syndicate"): take the PCGW data, drop the maybe.
+        if box and any(box.get(k) for k in _USEFUL_BOX_KEYS):
+            return None, 'none', box
+        return best['id'], 'maybe', box
+    return None
+
+
 def _resolve(name):
     """(steam_appid | None, confidence, pcgw_box | None).
 
@@ -341,6 +397,9 @@ def _resolve(name):
 
     pcgw_box carries whatever PCGamingWiki had (dev/pub/genres/modes/release),
     used to gap-fill a game that has a PCGW page but no Steam counterpart.
+
+    When the full title finds nothing acceptable on Steam, a title without its subtitle and one without a
+    trailing edition word are tried too (see _steam_search_variants).
     """
     if not name or not name.strip():
         return None, 'none', None
@@ -353,27 +412,14 @@ def _resolve(name):
     if box and box.get('steam_appid'):
         return box['steam_appid'], 'pcgw', box
 
-    candidates = _steam_search_candidates(name, session)
-    if candidates:
-        # An exact normalised-name match wins outright, wherever Steam ranked it
-        # (its search often buries the real game under sequels/DLC/soundtracks).
-        want = _norm(name)
-        exact = next((c for c in candidates if _norm(c['name']) == want), None)
-        if exact:
-            log.info('Steam search: %r -> exact %r (%s)', name, exact['name'], exact['id'])
-            return exact['id'], 'confirmed', box
-        best = max(candidates, key=lambda c: _similar(name, c['name']))
-        score = _similar(name, best['name'])
-        log.info('Steam search: %r -> %r (%s) score %.2f', name, best['name'], best['id'], score)
-        if score >= _SIM_CONFIRMED:
-            return best['id'], 'confirmed', box
-        if not pcgw_down and score >= _SIM_MAYBE:
-            # A PCGW page carrying real metadata beats a weak, differently-named
-            # Steam guess (delisted classics: "Syndicate (1993)" -> "Pizza
-            # Syndicate"): take the PCGW data, drop the maybe.
-            if box and any(box.get(k) for k in _USEFUL_BOX_KEYS):
-                return None, 'none', box
-            return best['id'], 'maybe', box
+    verdict = _judge_candidates(name, _steam_search_candidates(name, session), box, pcgw_down)
+    if verdict:
+        return verdict
+    for term, kind in _steam_search_variants(name):
+        verdict = _judge_candidates(name, _steam_search_candidates(term, session), box, pcgw_down,
+                                    base=term if kind == 'edition' else None)
+        if verdict:
+            return verdict
 
     if pcgw_down and not box:
         return None, 'retry', None

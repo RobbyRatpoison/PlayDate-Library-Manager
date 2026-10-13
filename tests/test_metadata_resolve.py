@@ -174,3 +174,65 @@ def test_near_miss_title_passes_similarity_gate():
     # PCGW's search finds nothing for the first form (see _search_queries), but
     # once a page is found the pair must clear the gate.
     assert _similar('Hood Outlaws and Legends', 'Hood: Outlaws & Legends') >= _SIM_PCGW
+
+
+# -- subtitle / edition variants (the Steam search is picky about "Name - Subtitle", and a remaster's
+# -- Steam page is usually the base game's) ---------------------------------------------------------
+
+import metadata
+
+
+@pytest.mark.parametrize("name,expected", [
+    ("AIRHEART - Tales of broken Wings", [("AIRHEART", "subtitle")]),
+    ("The Way Remastered",               [("The Way", "edition")]),
+    ("Fallout: Brotherhood of Steel",    [("Fallout", "subtitle")]),
+    ("Resident Evil 4 HD Remaster",      [("Resident Evil 4", "edition")]),
+    ("Hades",                            []),
+    ("Mass Effect Legendary Edition",    []),    # 'Legendary' is a distinct product, not stripped
+])
+def test_steam_search_variants(name, expected):
+    assert metadata._steam_search_variants(name) == expected
+
+
+def _stub(monkeypatch, steam):
+    """Stub the network: no PCGamingWiki page, Steam search answers from the dict {term: [(id, name)]}."""
+    asked = []
+    monkeypatch.setattr(metadata, '_mw_session', lambda: object())
+    monkeypatch.setattr(metadata, '_pcgw_infobox', lambda name, session: None)
+
+    def search(term, session):
+        asked.append(term)
+        return [{'id': i, 'name': n} for i, n in steam.get(term, [])]
+    monkeypatch.setattr(metadata, '_steam_search_candidates', search)
+    return asked
+
+
+def test_a_subtitle_the_search_cannot_handle_is_found_by_the_base_title(monkeypatch):
+    asked = _stub(monkeypatch, {"AIRHEART": [(540220, "AIRHEART - The Original Soundtrack"),
+                                             (531180, "AIRHEART - Tales of broken Wings")]})
+    assert metadata._resolve("AIRHEART - Tales of broken Wings")[:2] == (531180, 'confirmed')
+    assert asked == ["AIRHEART - Tales of broken Wings", "AIRHEART"]
+
+
+def test_a_remaster_matches_its_base_game_only_as_a_maybe(monkeypatch):
+    _stub(monkeypatch, {"The Way Remastered": [(590210, "Rocksmith 2014 Edition - Remastered - Go All the Way")],
+                        "The Way": [(311010, "The Way")]})
+    assert metadata._resolve("The Way Remastered")[:2] == (311010, 'maybe')
+
+
+def test_a_subtitle_never_matches_the_franchise_parent(monkeypatch):
+    # "Fallout" is only a wider search term here; it is judged against the full name, so the first game
+    # in the series is not taken for a spin-off
+    _stub(monkeypatch, {"Fallout": [(38400, "Fallout")]})
+    assert metadata._resolve("Fallout: Brotherhood of Steel")[:2] == (None, 'none')
+
+
+def test_variants_are_not_tried_when_the_full_title_is_found(monkeypatch):
+    asked = _stub(monkeypatch, {"Hollow Knight: Silksong": [(1030300, "Hollow Knight: Silksong")]})
+    assert metadata._resolve("Hollow Knight: Silksong")[:2] == (1030300, 'confirmed')
+    assert asked == ["Hollow Knight: Silksong"]
+
+
+def test_nothing_anywhere_is_none(monkeypatch):
+    _stub(monkeypatch, {})
+    assert metadata._resolve("Cadence of Hyrule - Crypt of the NecroDancer")[:2] == (None, 'none')
