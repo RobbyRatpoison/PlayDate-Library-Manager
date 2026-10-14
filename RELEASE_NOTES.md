@@ -2,7 +2,7 @@
 
 ## v2026.10.6
 ### New
-- Added an Open Data Folder button to the Advanced menu.
+- Added an Open Data Folder button to Settings -> Advanced.
 
 ### Improvements
 - "playdate.log" in any message is now a link that shows the log file.
