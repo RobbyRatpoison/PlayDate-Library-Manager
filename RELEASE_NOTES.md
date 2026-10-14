@@ -2,6 +2,9 @@
 
 ## v2026.10.6
 
+### New
+- Added an Open Data Folder button to the System menu.
+
 ### Improvements
 - "playdate.log" in any message is now a link that shows the log file. (suggested by woutercools)
 

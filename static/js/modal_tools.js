@@ -55,6 +55,13 @@ function setBackupTab(tab) {
     document.getElementById('restore-tab-btn').style.color       = isBackup ? 'var(--text-secondary)' : 'var(--on-accent)';
 }
 
+function openDataFolder() {
+    fetch('/api/open-data-dir', {method: 'POST'}).then(r => r.json()).then(d => {
+        if (d && d.status !== 'success' && typeof showLaunchToast === 'function')
+            showLaunchToast(d.message || 'Could not open the data folder.');
+    }).catch(() => {});
+}
+
 function openSendLogModal() {
     document.getElementById('send-log-modal').style.display = 'flex';
 }

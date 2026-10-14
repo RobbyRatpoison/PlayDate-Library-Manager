@@ -455,6 +455,7 @@ const TUTORIAL_SECTIONS = [
                          <li><strong>Beta updates</strong> - opt in to test builds before they're released to everyone. They can be rough, so it's off by default.</li>
                          <li><strong>Renderer</strong> (Linux only) - switch to an alternate renderer that smooths choppy scrolling on some NVIDIA setups. See ${tutGo('linux-deck', 'Smoother scrolling on NVIDIA', 'Smoother scrolling on NVIDIA')}.</li>
                          <li><strong>Send Log to Developer</strong> - sends PlayDate's log and diagnostic details about your setup when something breaks. Your API keys are never included.</li>
+                         <li><strong>Open Data Folder</strong> - shows the folder holding your library, settings and log file in your file manager.</li>
                        </ul>`,
             },
         ],
