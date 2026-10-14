@@ -1,7 +1,6 @@
 # Release Notes
 
 ## v2026.10.6
-
 ### New
 - Added an Open Data Folder button to the System menu.
 
