@@ -188,18 +188,12 @@ def open_log():
 
 @diagnostics_bp.route('/api/open-data-dir', methods=['POST'])
 def open_data_dir():
-    """Show the folder holding games.db, config.json, state.json and the log in the OS file manager."""
+    """Open the folder holding games.db, config.json, state.json and the log in the OS file manager."""
     try:
-        from images import reveal_in_file_manager
-        for name in ('config.json', 'games.db', 'state.json'):
-            path = os.path.join(BASE_DIR, name)
-            if os.path.isfile(path):
-                reveal_in_file_manager(path)
-                break
-        else:
-            from runners.sandbox import host_popen
-            host_popen(['xdg-open', BASE_DIR] if platform.system() == 'Linux'
-                       else (['open', BASE_DIR] if platform.system() == 'Darwin' else ['explorer', BASE_DIR]))
+        from runners.sandbox import host_popen
+        system = platform.system()
+        host_popen(['explorer', BASE_DIR] if system == 'Windows'
+                   else ['open', BASE_DIR] if system == 'Darwin' else ['xdg-open', BASE_DIR])
         return jsonify({"status": "success", "path": BASE_DIR})
     except Exception as e:
         return api_error('Could not open the file manager. The data folder is ' + BASE_DIR, 500, exc=e)
