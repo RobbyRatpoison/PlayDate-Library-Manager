@@ -166,7 +166,7 @@ People who've helped make PlayDate better - bug reports, feature suggestions, te
 - Suggested an option to show the info tooltip on the Home page - led to the Home page tooltip setting
 - Reported inconsistent naming (Platform, Sources, Library) for the same thing across the filter window and card tooltip - led to "Library" being used consistently
 - Reported Proton not being found - led to Proton being found in more places (other builds, Flatpak/Snap Steam, extra Steam libraries)
-- Suggested making "see playdate.log" a link that opens the log file - led to every mention of the log being a link
+- Reported not being able to find the log file - led to every mention of playdate.log being a link, and the Open Data Folder button
 - Reported spacing around the cover in the info tooltip (empty gap beside the cover) - led to the cover filling the tooltip's width
 - Suggested toggling the info tooltip separately for Library, Home and Pick 6 - led to the per-page tooltip settings and the Pick 6 tooltip
 - Suggested choosing what each mouse button does on a game card (tooltip, context menu, launch, store page, edit) - led to the Mouse Actions settings and the gamepad shortcuts

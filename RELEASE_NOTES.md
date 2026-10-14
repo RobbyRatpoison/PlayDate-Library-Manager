@@ -6,7 +6,7 @@
 - Added an Open Data Folder button to the System menu.
 
 ### Improvements
-- "playdate.log" in any message is now a link that shows the log file. (suggested by woutercools)
+- "playdate.log" in any message is now a link that shows the log file.
 
 ### Fixes
 - Fixed Proton not being found for many Steam and Proton setups. (reported by woutercools)
