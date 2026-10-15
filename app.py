@@ -548,6 +548,7 @@ def create_app(template_folder=None, static_folder=None):
     app.jinja_env.globals['art_version'] = art_version
 
     app.jinja_env.globals['plugin_js_api']     = _plugins.plugin_js_api
+    app.jinja_env.globals['official_plugin_names'] = _plugins.official_plugin_names
     app.jinja_env.globals['plugin_home_widgets']    = _plugins.home_widgets
     app.jinja_env.globals['plugin_widget_fragment'] = _plugins.widget_fragment
     app.jinja_env.globals['pagywosg_op_table'] = pagywosg.js_op_table

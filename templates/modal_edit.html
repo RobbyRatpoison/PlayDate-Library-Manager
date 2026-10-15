@@ -880,7 +880,10 @@
         const storeLink  = document.getElementById('store-link');
         const appidLabel = document.getElementById('display-appid-label');
         const _api       = window._PLUGIN_API?.[game.platform];
-        if (appidLabel) appidLabel.textContent = _api?.appid_label || 'AppID:';
+        // A game whose plugin was uninstalled keeps its rows: name the store anyway ("Nintendo eShop ID:").
+        const _storeName = game.platform && game.platform !== 'steam'
+            ? (window._PLAT_LABELS?.[game.platform] || window._OFFICIAL_NAMES?.[game.platform] || game.platform) : '';
+        if (appidLabel) appidLabel.textContent = _api?.appid_label || (_storeName ? `${_storeName} ID:` : 'AppID:');
         if (storeLink) {
             const pluginStoreUrl = _api?.store_url && game.platform_slug
                 ? _api.store_url.replace('{slug}', game.platform_slug) : null;

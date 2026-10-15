@@ -711,6 +711,13 @@ def platform_badge_defaults() -> dict:
     return out
 
 
+def official_plugin_names() -> dict:
+    """{platform: display name} for every official plugin, installed or not, so a game whose
+    plugin was uninstalled (its rows stay) can still say which store it came from.
+    platform_labels() deliberately lists loaded plugins only: it drives the platform filters."""
+    return {p['id']: p['name'] for p in OFFICIAL_PLUGINS}
+
+
 def platform_labels() -> dict:
     """Return display labels for all known platforms (core + plugins + emulation)."""
     from known_emulators import PLATFORM_NAMES

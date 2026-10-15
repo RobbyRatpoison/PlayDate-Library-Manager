@@ -222,6 +222,7 @@
     </script>
     <script>
     window._PLAT_LABELS  = {{ platform_labels() | tojson }};
+    window._OFFICIAL_NAMES = {{ official_plugin_names() | tojson }};   // names for games whose plugin is not installed
     window._ART_V        = {{ art_version() }};   // cover cache-buster: changes only when a cover file does (images.art_version)
     window._ART_EDGES    = {{ art_edges('vertical') | tojson }};   // appid -> backdrop colours for off-ratio vertical covers
     window._PLAT_BADGE_DEFAULTS = {{ platform_badge_defaults() | tojson }};
