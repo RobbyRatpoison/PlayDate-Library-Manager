@@ -1684,7 +1684,7 @@ window._TUNE_INIT = {{ {
         </div>
         <!-- Scrollable body -->
         <div style="overflow-y:auto; flex:1; min-height:0; padding:8px 1.875rem 1.875rem; margin-top:-8px;">
-        <p style="color:var(--text-secondary); font-size:0.88rem; margin:0 0 16px;">Import <strong>date added</strong>, <strong>last played</strong> and <strong>time played</strong> from a Playnite backup ZIP. Games are matched by Steam AppID — only games already in your PlayDate library will be updated. Choose a backup to see what it contains.</p>
+        <p style="color:var(--text-secondary); font-size:0.88rem; margin:0 0 16px;">Import <strong>date added</strong>, <strong>last played</strong> and <strong>time played</strong> from a Playnite backup ZIP. Steam games are matched by AppID, other libraries (GOG, Amazon, Epic, Xbox and so on) by the store's own game ID, falling back to the exact title — only games already in your PlayDate library will be updated. Choose a backup to see what it contains.</p>
         <button class="nav-btn" data-modal-row="0" onclick="runPlayniteImport()">Choose Playnite Backup (.zip)</button>
         <div id="playnite-status" class="tool-status" style="margin-top:12px;"></div>
         <div id="playnite-options" style="display:none; margin-top:14px; border-top:1px solid var(--border); padding-top:12px;">

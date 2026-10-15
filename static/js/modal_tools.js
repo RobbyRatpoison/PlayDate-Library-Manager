@@ -164,7 +164,10 @@ async function runPlayniteImport() {
         }
 
         if (data.status === 'ready') {
-            status.textContent = 'Backup scanned.';
+            const plats = Object.entries(data.platforms || {}).map(([k, n]) =>
+                `${(window._PLAT_LABELS && window._PLAT_LABELS[k]) || k} ${n}`).join(', ');
+            status.textContent = `Backup scanned. Matched ${plats || 'no games'}`
+                + (data.unmatched ? `; ${data.unmatched} not in your library.` : '.');
             status.className = 'tool-status success';
             for (const f of ['date_added', 'last_played', 'playtime']) {
                 const n = data.found[f] || 0;
