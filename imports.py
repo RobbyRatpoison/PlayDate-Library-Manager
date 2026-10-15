@@ -6,6 +6,7 @@ import struct
 import sqlite3
 import tempfile
 import threading
+import uuid
 import zipfile
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
@@ -286,6 +287,7 @@ def execute_import(data):
 
 
 _PLAYNITE_WINDOW = 8192
+_PLAYNITE_FIELDS = ('date_added', 'last_played', 'playtime')
 
 
 def _read_playnite_games_db(zip_path):
@@ -327,6 +329,11 @@ def _playnite_gameids(data):
 
 
 def parse_playnite_fields(zip_path):
+    data = _read_playnite_games_db(zip_path)
+    return _parse_playnite_fields_scan(data) if data else {}
+
+
+def _parse_playnite_fields_scan(data):
     """
     Extracts Last Played and Time Played (plus Date Added) for Steam games from a
     Playnite backup ZIP. Returns
@@ -343,9 +350,6 @@ def parse_playnite_fields(zip_path):
     0x10 also accepted) are inferred from Playnite's data model, not yet checked
     against a real backup (see tests/test_parse_playnite_dates.py).
     """
-    data = _read_playnite_games_db(zip_path)
-    if not data:
-        return {}
     gameids = _playnite_gameids(data)
     if not gameids:
         return {}
@@ -390,6 +394,277 @@ def parse_playnite_fields(zip_path):
                 value = datetime.fromtimestamp(value, tz=timezone.utc).strftime('%Y-%m-%d')
             results.setdefault(appid, {}).setdefault(field, value)
     return results
+
+
+STEAM_PLUGIN_ID = 'cb91dfc9-b977-43bf-8e70-55f46e410fab'
+_NO_PLUGIN = '00000000-0000-0000-0000-000000000000'
+# Playnite's own library plugins (ids from their source, Guid.Parse in each *Library.cs) ->
+# PlayDate platform. What each stores as GameId, checked against public libraries or the
+# plugin source: Steam appid; GOG product id (= platform_id); Epic appName (= platform_appname);
+# Amazon product id; Xbox package family name (= platform_appname); itch.io game id;
+# Humble machine name; Battle.net product code; Rockstar titleId; Ubisoft uplay id (the
+# numeric launch id; PlayDate keeps the spaceId GUID when there is one, so those games fall
+# to the title match); EA offerId (Origin.OFR.50.xxxx, equal to PlayDate's platform_id only
+# when both sides saw the same offer).
+KNOWN_PLAYNITE_PLUGINS = {
+    STEAM_PLUGIN_ID: 'steam',
+    'aebe8b7c-6dc3-4a66-af31-e7375c6b5e9e': 'gog',
+    '00000002-dbd1-46c6-b5d0-b1ba559d10e4': 'epic_games',
+    '402674cd-4af6-4886-b6ec-0e695bfa0688': 'amazon_games',
+    '7e4fbb5e-2ae3-48d4-8ba0-6b30e7a4e287': 'xbox',
+    'c2f038e5-8b92-4877-91f1-da9094155fc5': 'ubisoft',
+    '85dd7072-2f20-4e76-a007-41035e390724': 'ea_app',
+    '00000001-ebb2-4eec-abcb-7c89937a42bb': 'itch_io',
+    '96e8c4bc-ec5c-4c8b-87e7-18ee5a690626': 'humble',
+    'e3c26a3d-d695-4cb7-a769-5ff7612c7edd': 'battle_net',
+    '88409022-088a-4de8-805a-fdbac291f00a': 'rockstar',
+}
+
+
+def _playnite_strings(data, key, max_len=300):
+    """[(byte_position, value)] for every BSON string field `key`."""
+    out = []
+    for m in re.finditer(b'\x02' + re.escape(key) + b'\x00', data):
+        pos = m.end()
+        if pos + 4 > len(data):
+            continue
+        slen = struct.unpack_from('<i', data, pos)[0]
+        if 1 <= slen <= max_len:
+            out.append((m.start(), data[pos + 4:pos + 4 + slen - 1].decode('utf-8', errors='replace')))
+    return out
+
+
+_LITEDB4_PAGE = 4096
+_LITEDB4_HEADER = 25
+_NO_PAGE = 0xFFFFFFFF
+
+
+def _litedb4_documents(data):
+    """Whole BSON documents of every collection in a LiteDB v4 file (the format Playnite
+    writes: file version 7, 4096-byte pages), [] for any other format.
+
+    Page: pageId u32, type u8 (4 = data, 5 = extend), prev u32, next u32, itemCount u16,
+    freeBytes u16, 8 reserved = 25 bytes. A data page holds itemCount blocks of
+    [index u16, extendPageId u32, size u16, bytes]; a document too big for a page keeps its
+    bytes in a chain of extend pages instead (each: itemCount bytes of content, linked by
+    nextPageId) and its block's own bytes are empty."""
+    if len(data) < _LITEDB4_PAGE * 2 or data[25:52] != b'** This is a LiteDB file **' or data[52] != 7:
+        return []
+    page, hdr = _LITEDB4_PAGE, _LITEDB4_HEADER
+    npages = len(data) // page
+    extends = {}
+    for pid in range(npages):
+        base = pid * page
+        if data[base + 4] == 5:
+            nxt, count = struct.unpack_from('<IH', data, base + 9)
+            if count <= page - hdr:
+                extends[pid] = (nxt, data[base + hdr:base + hdr + count])
+    docs = []
+    for pid in range(npages):
+        base = pid * page
+        if data[base + 4] != 4:
+            continue
+        count = struct.unpack_from('<H', data, base + 13)[0]
+        off = base + hdr
+        for _ in range(count):
+            if off + 8 > base + page:
+                break
+            _idx, ext, size = struct.unpack_from('<HIH', data, off)
+            off += 8
+            if ext != _NO_PAGE:
+                parts, seen = [], set()
+                while ext in extends and ext not in seen:
+                    seen.add(ext)
+                    nxt, chunk = extends[ext]
+                    parts.append(chunk)
+                    ext = nxt
+                docs.append(b''.join(parts))
+            else:
+                docs.append(data[off:off + size])
+            off += size
+    return docs
+
+
+def _bson_fields(doc, want):
+    """{key: value} for the top-level fields of one BSON document named in `want`:
+    strings, bools, ints, datetimes (ms since epoch), binary (bytes). Other types are
+    skipped; a malformed document yields whatever was read before the problem."""
+    out = {}
+    if len(doc) < 5:
+        return out
+    end = min(struct.unpack_from('<i', doc, 0)[0], len(doc))
+    pos = 4
+    sizes = {0x01: 8, 0x07: 12, 0x08: 1, 0x09: 8, 0x0A: 0, 0x10: 4, 0x12: 8, 0x13: 16, 0xFF: 0, 0x7F: 0}
+    while pos < end - 1:
+        t = doc[pos]
+        k_end = doc.find(b'\x00', pos + 1)
+        if k_end < 0:
+            break
+        key = doc[pos + 1:k_end].decode('utf-8', errors='replace')
+        pos = k_end + 1
+        if t == 0x02:
+            n = struct.unpack_from('<i', doc, pos)[0]
+            if n < 1 or pos + 4 + n > len(doc):
+                break
+            if key in want:
+                out[key] = doc[pos + 4:pos + 3 + n].decode('utf-8', errors='replace')
+            pos += 4 + n
+        elif t in (0x03, 0x04):
+            n = struct.unpack_from('<i', doc, pos)[0]
+            if n < 5:
+                break
+            pos += n
+        elif t == 0x05:
+            n = struct.unpack_from('<i', doc, pos)[0]
+            if n < 0 or pos + 5 + n > len(doc):
+                break
+            if key in want:
+                out[key] = doc[pos + 5:pos + 5 + n]
+            pos += 5 + n
+        elif t in sizes:
+            if key in want:
+                if t == 0x08:
+                    out[key] = bool(doc[pos])
+                elif t in (0x09, 0x12):
+                    out[key] = struct.unpack_from('<q', doc, pos)[0]
+                elif t == 0x10:
+                    out[key] = struct.unpack_from('<i', doc, pos)[0]
+            pos += sizes[t]
+        else:
+            break
+    return out
+
+
+def _ms_to_seconds(ms):
+    return ms // 1000 if isinstance(ms, int) and 0 < ms < 4102444800000 else None
+
+
+def _playnite_game_from_doc(f):
+    game = {'plugin': None, 'game_id': f['GameId'], 'name': f.get('Name')}
+    pid = f.get('PluginId')
+    if isinstance(pid, bytes) and len(pid) == 16:
+        game['plugin'] = str(uuid.UUID(bytes_le=pid))
+    added = _ms_to_seconds(f.get('Added'))
+    if added:
+        game['date_added'] = datetime.fromtimestamp(added, tz=timezone.utc).strftime('%Y-%m-%d')
+    last = _ms_to_seconds(f.get('LastActivity'))
+    if last:
+        game['last_played'] = last
+    play = f.get('Playtime')
+    if isinstance(play, int) and play >= 60:
+        game['playtime'] = play // 60
+    return game
+
+
+def parse_playnite_games(zip_path):
+    """
+    Every game in a Playnite backup, from any library plugin, as a list of
+    {'plugin': 'cb91dfc9-...' | None, 'game_id': str, 'name': str | None,
+     'date_added': 'YYYY-MM-DD', 'last_played': unix_seconds, 'playtime': minutes}
+    with only the date keys a game actually has.
+
+    `plugin` is the library plugin's PluginId; `game_id` is that plugin's own ID for the
+    game (Steam appid, GOG product id, 'amzn1.adg.product...', an Xbox package name...).
+    Read from real documents (a LiteDB v4 reader), so one game's fields can't be paired
+    with another's. A file in some other format falls back to scanning for byte patterns
+    near each GameId: Steam-style GameId plus nearest dates, no names.
+    """
+    data = _read_playnite_games_db(zip_path)
+    if not data:
+        return []
+    games = []
+    for doc in _litedb4_documents(data):
+        f = _bson_fields(doc, ('GameId', 'Name', 'PluginId', 'Added', 'LastActivity', 'Playtime'))
+        if isinstance(f.get('GameId'), str):
+            games.append(_playnite_game_from_doc(f))
+    if games:
+        return games
+    # Fallback: not a v4 file. Only Steam appids can be recognised without a plugin id.
+    return [{'plugin': None, 'game_id': str(appid), **vals}
+            for appid, vals in _parse_playnite_fields_scan(data).items()]
+
+
+def match_playnite_games(games, db):
+    """
+    Resolve parsed Playnite games to PlayDate appids.
+    Returns ({appid: {'date_added':..., ...}}, {platform_label: matched_count}, unmatched_count).
+
+    Steam: PluginId is Steam's and GameId is the appid. Every other plugin: GameId is
+    compared with the platform_id / platform_appname of non-Steam games (GOG product id,
+    Epic appName, Amazon product id, Xbox package name, ...), confined to the plugin's own
+    PlayDate platform when it is one of Playnite's built-in libraries
+    (KNOWN_PLAYNITE_PLUGINS). A community plugin's platform is learned from its id matches.
+    Either way the platform then confines the name fallback (exact normalised name), so a
+    same-named game on another store is not touched.
+    A name that fits several games in the platform is skipped rather than guessed.
+    """
+    from database import _normalize_name_for_dup as norm
+    rows = db.execute(
+        "SELECT appid, platform, platform_id, platform_appname, name FROM games WHERE platform != 'steam'"
+    ).fetchall()
+    steam_owned = {r['appid'] for r in db.execute("SELECT appid FROM games WHERE platform = 'steam'").fetchall()}
+    by_id = {}      # lowercased id -> [(platform, appid)]
+    by_name = {}    # (platform, normalised name) -> [appid]
+    for r in rows:
+        for key in (r['platform_id'], r['platform_appname']):
+            if key not in (None, ''):
+                by_id.setdefault(str(key).strip().lower(), []).append((r['platform'], r['appid']))
+        by_name.setdefault((r['platform'], norm(r['name'] or '')), []).append(r['appid'])
+
+    have_plugins = any(g['plugin'] for g in games)
+    resolved = {}   # index -> (platform, appid)
+    votes = {}      # plugin not in the table above -> {platform: n}
+    for i, g in enumerate(games):
+        plugin = g['plugin']
+        if plugin == STEAM_PLUGIN_ID or (not have_plugins and g['game_id'].isdigit()):
+            if g['game_id'].isdigit() and int(g['game_id']) in steam_owned:
+                resolved[i] = ('steam', int(g['game_id']))
+            continue
+        if plugin in (None, _NO_PLUGIN):
+            continue
+        hits = by_id.get(g['game_id'].strip().lower(), [])
+        if plugin in KNOWN_PLAYNITE_PLUGINS:
+            hits = [h for h in hits if h[0] == KNOWN_PLAYNITE_PLUGINS[plugin]]
+        if len(hits) == 1:
+            resolved[i] = hits[0]
+            if plugin not in KNOWN_PLAYNITE_PLUGINS:
+                votes.setdefault(plugin, {}).setdefault(hits[0][0], 0)
+                votes[plugin][hits[0][0]] += 1
+    plugin_platform = dict(KNOWN_PLAYNITE_PLUGINS)
+    plugin_platform.update({p: max(v, key=v.get) for p, v in votes.items()})
+
+    for i, g in enumerate(games):
+        if i in resolved or g['plugin'] == STEAM_PLUGIN_ID:
+            continue
+        plugin = g['plugin']
+        # A plugin with no ID matches at all is not tied to a platform: names may match
+        # any non-Steam platform, but only when exactly one game does.
+        platforms = ([plugin_platform[plugin]] if plugin in plugin_platform
+                     else [None] if plugin not in (None, _NO_PLUGIN) else ['custom'])
+        for name in ([g['name']] if g.get('name') else []):
+            n = norm(name)
+            if not n:
+                continue
+            cands = [(plat, a) for (plat, nn), apps in by_name.items() if nn == n
+                     for a in apps if platforms == [None] or plat in platforms]
+            if len(cands) == 1:
+                resolved[i] = cands[0]
+                break
+
+    out, per_platform = {}, {}
+    for i, (plat, appid) in resolved.items():
+        vals = {f: games[i][f] for f in _PLAYNITE_FIELDS if f in games[i]}
+        if not vals:
+            continue
+        cur = out.setdefault(appid, {})
+        for f, v in vals.items():
+            # A game with copies in Playnite: earliest date added, otherwise first seen wins.
+            if f == 'date_added' and f in cur:
+                cur[f] = min(cur[f], v)
+            else:
+                cur.setdefault(f, v)
+        per_platform[plat] = per_platform.get(plat, 0) + 1
+    return out, per_platform, len(games) - len(resolved)
 
 
 def parse_playnite_dates(zip_path):
@@ -473,37 +748,37 @@ def import_playnite_dates():
 
     def _run_playnite_scan():
         try:
-            parsed = parse_playnite_fields(zip_path)
-            log.info(f"Playnite import: parsed {len(parsed)} Steam games")
+            games = parse_playnite_games(zip_path)
+            log.info(f"Playnite import: parsed {len(games)} games")
         except Exception:
             log.exception("Playnite import: parse failed")
             _playnite_import_state.update({'status': 'error', 'error': 'Failed to parse that backup. Check playdate.log for details.'})
             return
-        if not parsed:
-            log.warning("Playnite import: no Steam games found")
-            _playnite_import_state.update({'status': 'error', 'error': 'No Steam games found in the backup.'})
+        if not games:
+            log.warning("Playnite import: no games found")
+            _playnite_import_state.update({'status': 'error', 'error': 'No games found in the backup.'})
             return
-        # Only count games already in the library: that's all an import can touch.
+        # Only games already in the library can be updated.
         db = get_db()
         try:
-            owned = {r['appid'] for r in db.execute("SELECT appid FROM games").fetchall()}
+            matched, per_platform, unmatched = match_playnite_games(games, db)
         finally:
             db.close()
-        matched = {a: v for a, v in parsed.items() if a in owned}
+        log.info(f"Playnite import: matched {per_platform}, {unmatched} not in library")
         found = {f: sum(1 for v in matched.values() if f in v) for f in _PLAYNITE_FIELDS}
         _playnite_parsed.clear()
         _playnite_parsed.update(matched)
-        _playnite_import_state.update({'status': 'ready', 'error': None, 'found': found})
+        _playnite_import_state.update({'status': 'ready', 'error': None, 'found': found,
+                                       'platforms': per_platform, 'unmatched': unmatched})
 
     with _playnite_import_lock:
         if _playnite_import_state['status'] == 'running':
             return jsonify({"status": "error", "message": "An import is already in progress."}), 409
-        _playnite_import_state.update({'status': 'running', 'error': None, 'found': None})
+        _playnite_import_state.update({'status': 'running', 'error': None, 'found': None, 'platforms': None, 'unmatched': None})
         threading.Thread(target=_run_playnite_scan, daemon=True).start()
     return jsonify({"status": "started"})
 
 
-_PLAYNITE_FIELDS = ('date_added', 'last_played', 'playtime')
 _PLAYNITE_COLUMNS = {'date_added': 'date_added', 'last_played': 'last_played', 'playtime': 'playtime_forever'}
 
 
