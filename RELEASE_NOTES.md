@@ -1,11 +1,6 @@
 # Release Notes
 
-## v2026.10.6
-### New
-- Added an Open Data Folder button to Settings -> Advanced.
-
-### Improvements
-- "playdate.log" in any message is now a link that shows the log file.
-
+## v2026.10.7
 ### Fixes
-- Fixed Proton not being found for many Steam and Proton setups. (reported by woutercools)
+- Fixed the Playnite import skipping GOG, Amazon and other non-Steam games. (reported by woutercools)
+- Fixed some Playnite dates and playtimes landing on the wrong game.

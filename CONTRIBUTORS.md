@@ -168,6 +168,7 @@ People who've helped make PlayDate better - bug reports, feature suggestions, te
 - Reported Proton not being found - led to Proton being found in more places (other builds, Flatpak/Snap Steam, extra Steam libraries)
 - Reported not being able to find the log file - led to every mention of playdate.log being a link, and the Open Data Folder button
 - Reported spacing around the cover in the info tooltip (empty gap beside the cover) - led to the cover filling the tooltip's width
+- Reported the Playnite import skipping GOG and Amazon games - led to it matching games from every library, not only Steam
 - Suggested toggling the info tooltip separately for Library, Home and Pick 6 - led to the per-page tooltip settings and the Pick 6 tooltip
 - Suggested choosing what each mouse button does on a game card (tooltip, context menu, launch, store page, edit) - led to the Mouse Actions settings and the gamepad shortcuts
 - Reported Epic Games release dates being wrong (e.g. Luftrausers showing August 2026) - led to release dates coming from Epic's own Release Date field
