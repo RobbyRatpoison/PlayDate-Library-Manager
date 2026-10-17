@@ -72,6 +72,11 @@ window.PDInfoTip = {
             let html = '';
             if (fields.has('description')) html += '<div class="ht-desc" style="display:none;margin-bottom:6px;"></div>';
             if (fields.has('playtime')) row('Time played', game.playtime_forever > 0 ? fmtHours(game.playtime_forever) : 'Never played');
+            if (fields.has('hltb')) {
+                const t = [['Main', game.hltb_main], ['+Extras', game.hltb_extras], ['100%', game.hltb_completionist]]
+                    .filter(([, m]) => Number(m) > 0).map(([l, m]) => `${l} ${fmtHours(Number(m))}`);
+                if (t.length) row('Time to beat', t.join(' \u00b7 '));
+            }
             if (fields.has('last_played')) row('Last played', tipDate(game.last_played) || 'Never');
             if (fields.has('date_added')) row('Date added', tipDate(game.date_added));
             if (fields.has('release_date')) row('Released', tipDate(game.release_date));

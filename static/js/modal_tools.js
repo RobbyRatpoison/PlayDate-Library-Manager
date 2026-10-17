@@ -6801,7 +6801,7 @@ function _grmStopPoll() {
 // ── Card hover tooltip settings (Settings modal) ─────────────────────────────
 const _HOVER_TIP_LABELS = {
     cover_alt: 'Other-orientation cover', description: 'Short description (Steam / plugin)',
-    playtime: 'Time played', last_played: 'Last played', date_added: 'Date added',
+    playtime: 'Time played', hltb: 'HowLongToBeat times (main, extras, 100%)', last_played: 'Last played', date_added: 'Date added',
     release_date: 'Release date', platform: 'Library (Steam, Epic, GOG...)',
     community_score: 'Steam community score', metacritic: 'Metacritic score',
     developers: 'Developer', publishers: 'Publisher',

@@ -1246,7 +1246,7 @@ def load_state():
         return _load_state_unlocked()
 
 # Fields the optional library-card hover tooltip can show (order = display order).
-HOVER_TIP_FIELDS = ('cover_alt', 'description', 'playtime', 'last_played', 'date_added',
+HOVER_TIP_FIELDS = ('cover_alt', 'description', 'playtime', 'hltb', 'last_played', 'date_added',
                     'release_date', 'platform', 'community_score', 'metacritic',
                     'developers', 'publishers')
 DEFAULT_HOVER_TIP = {'library': False, 'home': False, 'pick6': False, 'fields': list(HOVER_TIP_FIELDS)}
