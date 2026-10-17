@@ -5971,9 +5971,41 @@ function _tuneRemoveTag(tag, pinned) {
     _tuneRefreshAffinity();
 }
 
-function _tuneAddTag(mode) {
+// Suggestions for the add-tag boxes: tags starting with what was typed first,
+// then tags containing it. An inline list, not a native datalist (native
+// popups stay visible when pywebview loses focus).
+function _tuneSuggestions(typed, mode) {
+    const q = typed.trim().toLowerCase();
+    if (!q) return [];
+    const starts = [], has = [];
+    for (const t of (window._TUNE_TAGS || [])) {
+        if (_tuneOverrides[t] === mode) continue;
+        const l = t.toLowerCase(), i = l.indexOf(q);
+        if (i === 0) starts.push(t); else if (i > 0) has.push(t);
+    }
+    return starts.concat(has).slice(0, 6);
+}
+
+function _tuneSuggest(mode) {
+    const input = document.getElementById('tune-add-' + mode);
+    const host = document.getElementById('tune-sug-' + mode);
+    const list = _tuneSuggestions(input.value, mode);
+    host.innerHTML = list.map(t => `<button class="nav-btn" data-modal-row="${input.dataset.modalRow}" style="padding:0 8px; height:1.5rem; min-height:0; font-size:0.75rem;"
+        onclick="_tuneAddTag('${mode}', ${escHtml(JSON.stringify(t))})">${escHtml(t)}</button>`).join('');
+    host.style.display = list.length ? 'flex' : 'none';
+}
+
+function _tuneEnter(mode) {
+    const input = document.getElementById('tune-add-' + mode);
+    const typed = input.value.trim().toLowerCase();
+    const exact = (window._TUNE_TAGS || []).some(t => t.toLowerCase() === typed);
+    _tuneAddTag(mode, exact ? null : (_tuneSuggestions(input.value, mode)[0] || null));
+}
+
+function _tuneAddTag(mode, picked) {
     const input = document.getElementById('tune-add-' + mode);
     const status = document.getElementById('tune-aff-status');
+    if (picked) input.value = picked;
     const typed = input.value.trim().toLowerCase();
     if (!typed) return;
     const tag = (window._TUNE_TAGS || []).find(t => t.toLowerCase() === typed);
@@ -5981,6 +6013,7 @@ function _tuneAddTag(mode) {
     status.textContent = '';
     _tuneOverrides[tag] = mode;
     input.value = '';
+    _tuneSuggest(mode);
     _tuneRefreshAffinity();
 }
 
@@ -6053,14 +6086,18 @@ function _tuneBuild() {
                 <div id="tune-affinity"></div>
                 <div style="display:flex; gap:6px; margin-top:10px; align-items:center;">
                     <input type="text" id="tune-add-like" placeholder="Add a liked tag" data-modal-row="${row}" style="flex:1; min-width:0;"
-                        onkeydown="if(event.key==='Enter'){event.preventDefault();_tuneAddTag('like');}">
-                    <button class="nav-btn" data-modal-row="${row}" style="font-size:0.78rem;" onclick="_tuneAddTag('like')">Like</button>
+                        oninput="_tuneSuggest('like')" autocomplete="off"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();_tuneEnter('like');}">
+                    <button class="nav-btn" data-modal-row="${row}" style="font-size:0.78rem;" onclick="_tuneEnter('like')">Like</button>
                 </div>
+                <div id="tune-sug-like" style="display:none; flex-wrap:wrap; gap:4px; margin-top:4px;"></div>
                 <div style="display:flex; gap:6px; margin-top:6px; align-items:center;">
                     <input type="text" id="tune-add-dislike" placeholder="Add a disliked tag" data-modal-row="${row + 1}" style="flex:1; min-width:0;"
-                        onkeydown="if(event.key==='Enter'){event.preventDefault();_tuneAddTag('dislike');}">
-                    <button class="nav-btn" data-modal-row="${row + 1}" style="font-size:0.78rem;" onclick="_tuneAddTag('dislike')">Dislike</button>
+                        oninput="_tuneSuggest('dislike')" autocomplete="off"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();_tuneEnter('dislike');}">
+                    <button class="nav-btn" data-modal-row="${row + 1}" style="font-size:0.78rem;" onclick="_tuneEnter('dislike')">Dislike</button>
                 </div>
+                <div id="tune-sug-dislike" style="display:none; flex-wrap:wrap; gap:4px; margin-top:4px;"></div>
                 <div id="tune-aff-status" style="font-size:0.75rem; color:#8f98a0; margin-top:4px; min-height:1em;"></div></div>`;
             _tuneAffRow = row + 2;
             row += 3;
