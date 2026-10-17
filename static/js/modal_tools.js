@@ -5069,11 +5069,13 @@ async function _renderPluginsList() {
     const body = document.getElementById('plugins-list-body');
     body.innerHTML = '<div style="color:var(--text-secondary);font-size:0.85rem;">Loading...</div>';
     try {
-        const [pluginsResp, statusResp, incompatResp] = await Promise.all([
+        const [pluginsResp, statusResp, incompatResp, syncResp] = await Promise.all([
             fetch('/api/plugins'),
             fetch('/api/plugins/launcher-status'),
             fetch('/api/plugins/incompatible'),
+            fetch('/api/plugins/sync-status').catch(() => null),
         ]);
+        const syncStatus = syncResp ? await syncResp.json().catch(() => ({})) : {};
         const plugins = await pluginsResp.json();
         const launcherStatus = await statusResp.json();
         const incompatible = await incompatResp.json();
@@ -5122,6 +5124,10 @@ async function _renderPluginsList() {
             let launcherBadge = '';
             if (needsLauncher) {
                 launcherBadge = `<div id="plugin-launcher-badge-${escHtml(p.id)}" style="margin-top:6px;font-size:0.78rem;">${_launcherBadgeInner(lstatus)}</div>`;
+            }
+            const sfail = syncStatus[p.platform];
+            if (sfail) {
+                launcherBadge += `<div id="plugin-sync-badge-${escHtml(p.id)}" style="margin-top:6px;font-size:0.78rem;color:#ffa500;" title="${escHtml(sfail.error)}">&#9888; Last startup sync failed. Open Manage to check the connection.</div>`;
             }
             if (p.manage_ui) _manageSpecs[p.id] = {name: p.name, spec: p.manage_ui};
             const manageBtn = p.manage_ui
@@ -5457,8 +5463,10 @@ async function _checkPluginUpdates(force = false) {
                 el.innerHTML = `<button${mr} style="font:inherit;font-size:0.75rem;font-weight:400;background:none;border:none;padding:0;margin-left:7px;color:var(--accent);cursor:pointer;vertical-align:baseline;" onclick="_updatePlugin('${escHtml(u.id)}','${escHtml(u.source || '')}')">v${escHtml(u.latest_version)} available &#8595;</button>`;
             }
         }
+        let anySyncFailed = false;
+        try { anySyncFailed = Object.keys(await (await fetch('/api/plugins/sync-status')).json()).length > 0; } catch (_) {}
         document.getElementById('plugin-update-dot')?.style.setProperty(
-            'visibility', (anyStandalone || anyGated) ? 'visible' : 'hidden');
+            'visibility', (anyStandalone || anyGated || anySyncFailed) ? 'visible' : 'hidden');
         // "Update All" button: shown whenever >=1 plugin has a standalone
         // (non-core-gated) update available.
         const _uaBtn = document.getElementById('plugin-update-all-btn');

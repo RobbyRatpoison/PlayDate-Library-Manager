@@ -161,6 +161,13 @@ class MyPlugin:
         """Optional. Called when the user triggers a library sync."""
         pass
 
+    def sync_status(self):
+        """Optional, with sync(). Core starts sync() once per launch for a plugin that has both,
+        then polls this until `running` is False. Return {'running': bool, 'error': str | None,
+        'connected': bool}. `connected: False` (no saved login) skips the plugin without a badge;
+        an `error` shows an amber badge on the plugin's card in the Plugins modal."""
+        return {'running': False, 'error': None, 'connected': True}
+
     # Optional class attribute. If your platform has an external orders/activation page
     # that the Tampermonkey date-import script should open, declare it here.
     # Core collects these from all plugins whose games are in a bulk date-import selection

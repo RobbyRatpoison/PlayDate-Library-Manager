@@ -1704,6 +1704,7 @@ if __name__ == '__main__':
             log.warning(f"Startup tag similarity recalculation failed: {e}")
 
     threading.Thread(target=_run_plugin_on_startup, daemon=True).start()
+    plugins.start_startup_library_sync()
 
     def _run_install_sync():
         try:

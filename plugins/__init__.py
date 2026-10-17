@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import sys
+import threading
 import time
 
 from flask import Blueprint, jsonify, request
@@ -410,6 +411,56 @@ def _startup_launcher_status_check():
             _launcher_status_cache[p.platform] = {'available': False,
                                                   'detail': 'Launcher status check failed.',
                                                   'checked_at': time.time()}
+
+
+_startup_sync_status = {}  # platform -> {'error': str, 'finished_at': float}; only failures are kept
+
+
+def _startup_library_sync():
+    """Library sync for every plugin that has one, once per launch (nothing the first page waits for).
+
+    A plugin opts in by defining sync() (starts a background sync) and sync_status(), returning
+    {'running': bool, 'error': str | None, 'connected': bool}; a plugin without sync_status is
+    started but its outcome is unknown, so it never gets a badge. A failure is kept for the
+    Plugins modal's badge, a plugin that isn't connected is skipped quietly. Rate limits are the
+    sync's own business, same as for a manual sync."""
+    time.sleep(10)
+    started = []
+    for p in list(loaded().values()):
+        if not hasattr(p, 'sync') or not hasattr(p, 'sync_status'):
+            continue
+        try:
+            st = p.sync_status() or {}
+            if st.get('running') or st.get('connected') is False:
+                continue
+            p.sync()
+            started.append(p)
+        except Exception as e:
+            log.warning(f"Startup library sync failed to start for {p.platform}: {e}")
+            _startup_sync_status[p.platform] = {'error': 'Could not start the sync.', 'finished_at': time.time()}
+    deadline = time.time() + 30 * 60
+    while started and time.time() < deadline:
+        time.sleep(5)
+        for p in list(started):
+            try:
+                st = p.sync_status() or {}
+                if st.get('running'):
+                    continue
+                started.remove(p)
+                if st.get('connected') is False:
+                    continue
+                if st.get('error'):
+                    log.warning(f"Startup library sync for {p.platform} failed: {st['error']}")
+                    _startup_sync_status[p.platform] = {'error': str(st['error']), 'finished_at': time.time()}
+                else:
+                    _startup_sync_status.pop(p.platform, None)
+            except Exception as e:
+                log.warning(f"sync_status failed for {p.platform}: {e}")
+                started.remove(p)
+
+
+def start_startup_library_sync():
+    threading.Thread(target=_startup_library_sync, daemon=True).start()
 
 
 def load_all(app):
@@ -987,6 +1038,10 @@ def check_plugin_updates():
     except Exception:
         pass
     return jsonify(results)
+
+@plugins_bp.route('/api/plugins/sync-status', methods=['GET'])
+def get_startup_sync_status():
+    return jsonify(_startup_sync_status)
 
 @plugins_bp.route('/api/plugins/launcher-status', methods=['GET'])
 def get_launcher_status():
