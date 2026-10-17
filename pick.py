@@ -77,7 +77,8 @@ def pick():
                 if bf.get('where') == cs:
                     filter_name = bf['label']
                     break
-    return render_template('pick.html', state=state, has_filters=has_filters, filter_name=filter_name)
+    return render_template('pick.html', state=state, has_filters=has_filters, filter_name=filter_name,
+                           hidden_platforms=[p for p in (state.get('hidden_platforms') or []) if isinstance(p, str)])
 
 @pick_bp.route('/api/pick-game', methods=['POST'])
 def pick_game():

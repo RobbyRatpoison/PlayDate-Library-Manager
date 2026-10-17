@@ -577,6 +577,7 @@
 <script>
 const _imgV = window._ART_V || Date.now(); // cache-buster, matching library.js
 const _activeFilterName = {{ filter_name | tojson }};
+window._hiddenPlatforms = new Set({{ hidden_platforms | tojson }});
 window.CARD_BADGES = {{ (state.card_badges if state.get('card_badges', {}).get('enabled', {}).get('pick6', True) else none) | tojson }};
 window.EDIT_BUTTON = {{ (state.edit_button if state.get('edit_button', {}).get('pages', {}).get('pick6', False) else none) | tojson }};
 
