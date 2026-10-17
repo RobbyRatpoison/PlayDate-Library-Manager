@@ -671,6 +671,8 @@ function _libOnReady(fn) {
         } else if (clear && !v.has_clear) clear.remove();
         const search = document.getElementById('library-search');
         if (search) search.value = v.search || '';
+        // buildGrid() reapplies _liveSearchQuery, so it must follow the box or CLEAR keeps the old search
+        _liveSearchQuery = (v.search || '').trim().toLowerCase();
         const empty = document.getElementById('library-empty-state');
         if (empty) empty.remove();
         if (v.has_empty_state && v.empty_state_html) document.getElementById('game-grid')?.insertAdjacentHTML('beforebegin', v.empty_state_html);
