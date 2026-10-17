@@ -191,6 +191,7 @@
         </div>
 
         <p id="steam-appid-row" style="margin-bottom: 8px; color: #8f98a0; font-size: 0.85rem;">
+            <strong id="edit-header-title" style="color: #ffffff; font-size: 1rem; margin-right: 8px;"></strong>
             <span id="display-appid-label">AppID:</span> <span id="display-appid"></span>
             <a id="store-link" href="#" target="_blank" data-modal-row="1"
                style="color: var(--accent); font-size: 0.8rem; text-decoration: none; margin-left: 12px;">
@@ -831,6 +832,7 @@
         safeSet('edit-appid', game.appid);
         safeSet('display-appid', (game.platform !== 'steam' && game.platform_id) ? game.platform_id : game.appid, 'textContent');
         safeSet('edit-name', game.name);
+        _setEditHeaderTitle(game.name);
         safeSet('edit-dev', game.developers);
         safeSet('edit-pub', game.publishers);
         safeSet('edit-rel', game.release_date);
@@ -1542,6 +1544,7 @@ const achLink = document.getElementById('achievements-link');
             if (data.status === 'success') {
                 const game = data.data;
                 safeSet('edit-name', game.name);
+                _setEditHeaderTitle(game.name);
                 safeSet('edit-dev', game.developers);
                 safeSet('edit-pub', game.publishers);
                 safeSet('edit-rel', game.release_date);
@@ -1726,6 +1729,11 @@ const achLink = document.getElementById('achievements-link');
 
     // Fully replace the cached game entry with fresh data from the server,
     // then update the visible card elements.
+    function _setEditHeaderTitle(name) {
+        const el = document.getElementById('edit-header-title');
+        if (el) el.textContent = name || '';
+    }
+
     const _VIEW_NEUTRAL = /^(edge_|short_description|icon_hash|meta_|cheevos_|hltb_fetched|protondb_fetched)/;
 
     function _patchGameCard(game) {
