@@ -162,7 +162,7 @@ class MyPlugin:
         pass
 
     def sync_status(self):
-        """Optional, with sync(). Core starts sync() once per launch for a plugin that has both,
+        """Optional, with sync(). Core starts sync() once per launch, one plugin at a time, for a plugin that has both and that the user ticked "Sync library when PlayDate starts" on its Plugins card (off by default),
         then polls this until `running` is False. Return {'running': bool, 'error': str | None,
         'connected': bool}. `connected: False` (no saved login) skips the plugin without a badge;
         an `error` shows an amber badge on the plugin's card in the Plugins modal."""

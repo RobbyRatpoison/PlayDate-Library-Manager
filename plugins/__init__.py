@@ -414,49 +414,52 @@ def _startup_launcher_status_check():
 
 
 _startup_sync_status = {}  # platform -> {'error': str, 'finished_at': float}; only failures are kept
+_STARTUP_SYNC_LIMIT = 10 * 60  # seconds one plugin may take before the next one starts
+
+
+def _startup_sync_one(p):
+    """Run one plugin's library sync and record a failure. Returns when it is done or out of time."""
+    st = p.sync_status() or {}
+    if st.get('running') or st.get('connected') is False:
+        return
+    p.sync()
+    deadline = time.time() + _STARTUP_SYNC_LIMIT
+    while time.time() < deadline:
+        time.sleep(3)
+        st = p.sync_status() or {}
+        if st.get('running'):
+            continue
+        if st.get('connected') is False:
+            return
+        if st.get('error'):
+            log.warning(f"Startup library sync for {p.platform} failed: {st['error']}")
+            _startup_sync_status[p.platform] = {'error': str(st['error']), 'finished_at': time.time()}
+        else:
+            _startup_sync_status.pop(p.platform, None)
+        return
+    log.warning(f"Startup library sync for {p.platform} still running after {_STARTUP_SYNC_LIMIT}s; moving on")
 
 
 def _startup_library_sync():
-    """Library sync for every plugin that has one, once per launch (nothing the first page waits for).
+    """Library sync, once per launch and one plugin at a time, for each plugin the user switched on.
 
-    A plugin opts in by defining sync() (starts a background sync) and sync_status(), returning
+    Opt-in per plugin (state.json startup_sync_plugins, the checkbox on its Plugins card). A plugin
+    takes part by defining sync() (starts a background sync) and sync_status(), returning
     {'running': bool, 'error': str | None, 'connected': bool}; a plugin without sync_status is
-    started but its outcome is unknown, so it never gets a badge. A failure is kept for the
-    Plugins modal's badge, a plugin that isn't connected is skipped quietly. Rate limits are the
-    sync's own business, same as for a manual sync."""
+    never started, since its outcome would be unknown. A failure is kept for the Plugins modal's
+    badge, a plugin that isn't connected is skipped quietly. Rate limits are the sync's own business,
+    same as for a manual sync."""
+    from config import load_state
     time.sleep(10)
-    started = []
-    for p in list(loaded().values()):
-        if not hasattr(p, 'sync') or not hasattr(p, 'sync_status'):
+    enabled = set(load_state().get('startup_sync_plugins') or [])
+    for pid, p in list(loaded().items()):
+        if pid not in enabled or not hasattr(p, 'sync') or not hasattr(p, 'sync_status'):
             continue
         try:
-            st = p.sync_status() or {}
-            if st.get('running') or st.get('connected') is False:
-                continue
-            p.sync()
-            started.append(p)
+            _startup_sync_one(p)
         except Exception as e:
-            log.warning(f"Startup library sync failed to start for {p.platform}: {e}")
-            _startup_sync_status[p.platform] = {'error': 'Could not start the sync.', 'finished_at': time.time()}
-    deadline = time.time() + 30 * 60
-    while started and time.time() < deadline:
-        time.sleep(5)
-        for p in list(started):
-            try:
-                st = p.sync_status() or {}
-                if st.get('running'):
-                    continue
-                started.remove(p)
-                if st.get('connected') is False:
-                    continue
-                if st.get('error'):
-                    log.warning(f"Startup library sync for {p.platform} failed: {st['error']}")
-                    _startup_sync_status[p.platform] = {'error': str(st['error']), 'finished_at': time.time()}
-                else:
-                    _startup_sync_status.pop(p.platform, None)
-            except Exception as e:
-                log.warning(f"sync_status failed for {p.platform}: {e}")
-                started.remove(p)
+            log.warning(f"Startup library sync failed for {p.platform}: {e}")
+            _startup_sync_status[p.platform] = {'error': 'Could not run the sync.', 'finished_at': time.time()}
 
 
 def start_startup_library_sync():
@@ -808,6 +811,8 @@ def list_plugins():
     from database import get_db
     db = get_db()
     badges = platform_badge_defaults()
+    from config import load_state
+    startup_enabled = set(load_state().get('startup_sync_plugins') or [])
     result = []
     for pid, p in loaded().items():
         manifest = plugin_manifest(pid)
@@ -826,8 +831,24 @@ def list_plugins():
             # else the core-bundled badge for this platform, else None.
             'icon':       badges.get(p.platform),
             'manage_ui':  p.manage_ui() if hasattr(p, 'manage_ui') else None,
+            'can_startup_sync': hasattr(p, 'sync') and hasattr(p, 'sync_status'),
+            'startup_sync':     pid in startup_enabled,
         })
     return jsonify(result)
+
+
+@plugins_bp.route('/api/plugins/<plugin_id>/startup-sync', methods=['POST'])
+def set_startup_sync(plugin_id):
+    from config import load_state, save_state
+    if plugin_id not in loaded():
+        return jsonify({'status': 'error', 'message': 'Plugin not found'}), 404
+    enabled = set(load_state().get('startup_sync_plugins') or [])
+    if (request.get_json(silent=True) or {}).get('enabled'):
+        enabled.add(plugin_id)
+    else:
+        enabled.discard(plugin_id)
+    save_state({'startup_sync_plugins': sorted(enabled)})
+    return jsonify({'status': 'success', 'enabled': plugin_id in enabled})
 
 
 @plugins_bp.route('/api/plugins/<plugin_id>/icon')

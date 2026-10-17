@@ -5065,6 +5065,17 @@ function _pluginIconHtml(p) {
     return `<div class="plugin-icon plugin-icon-mono">${escHtml(ch)}</div>`;
 }
 
+async function _saveStartupSync(id, cb) {
+    const want = cb.checked;
+    try {
+        const r = await fetch(`/api/plugins/${encodeURIComponent(id)}/startup-sync`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({enabled: want}),
+        });
+        const d = await r.json();
+        if (d.status === 'success') cb.checked = d.enabled; else cb.checked = !want;
+    } catch (_) { cb.checked = !want; }
+}
+
 async function _renderPluginsList() {
     const body = document.getElementById('plugins-list-body');
     body.innerHTML = '<div style="color:var(--text-secondary);font-size:0.85rem;">Loading...</div>';
@@ -5150,6 +5161,12 @@ async function _renderPluginsList() {
                     </div>
                 </div>
                 ${launcherBadge}
+                ${p.can_startup_sync ? `
+                <div data-modal-row="${pluginRow}" style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:0.78rem;color:var(--text-secondary);cursor:pointer;"
+                     onclick="var cb=this.querySelector('input');cb.checked=!cb.checked;_saveStartupSync('${escHtml(p.id)}',cb)">
+                    <input type="checkbox" ${p.startup_sync ? 'checked' : ''} onclick="event.stopPropagation();_saveStartupSync('${escHtml(p.id)}',this)" style="width:auto;margin:0;">
+                    Sync library when PlayDate starts
+                </div>` : ''}
                 <div id="plugin-confirm-${escHtml(p.id)}" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(199,71,71,0.1);border:1px solid rgba(199,71,71,0.3);border-radius:4px;font-size:0.82rem;">
                     <div style="color:var(--text-primary);margin-bottom:8px;">Delete the <strong>${escHtml(p.name)}</strong> plugin folder?</div>
                     ${p.game_count > 0 ? `

@@ -460,6 +460,7 @@ DEFAULT_SHELVES = [
 ]
 
 DEFAULT_STATE = {
+    "startup_sync_plugins": [],
     "sort": "name",
     "order": "ASC",
     "saved_filters": {},
@@ -1489,6 +1490,11 @@ def save_state(updates):
             import re as _re
             _plat_re = _re.compile(r'^[a-z][a-z0-9_]*$')
             state["hidden_platforms"] = [p for p in (updates["hidden_platforms"] or []) if _plat_re.match(p or '')]
+        if "startup_sync_plugins" in updates:
+            import re as _re
+            _id_re = _re.compile(r'^[a-z][a-z0-9_]*$')
+            state["startup_sync_plugins"] = sorted({p for p in (updates["startup_sync_plugins"] or [])
+                                                    if isinstance(p, str) and _id_re.match(p)})
         if "pagywosg_comp_defaults" in updates:
             _valid_cs = {'Never Played', 'Unfinished', 'Beaten', 'Completed', "Won't Play"}
             state["pagywosg_comp_defaults"] = [s for s in (updates["pagywosg_comp_defaults"] or []) if s in _valid_cs]
