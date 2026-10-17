@@ -173,6 +173,10 @@ People who've helped make PlayDate better - bug reports, feature suggestions, te
 - Suggested choosing what each mouse button does on a game card (tooltip, context menu, launch, store page, edit) - led to the Mouse Actions settings and the gamepad shortcuts
 - Reported Epic Games release dates being wrong (e.g. Luftrausers showing August 2026) - led to release dates coming from Epic's own Release Date field
 - Reported Epic Games store links not working for newer games, especially free ones added in 2026 - led to links using the real store page address
+- Reported CLEAR leaving a search applied after using Filters
+- Suggested showing the game title in Edit Game Details
+- Suggested showing HowLongToBeat times in the card tooltip
+- Asked whether Epic and GOG libraries are scanned on startup - led to the per-plugin "Sync library when PlayDate starts" option
 
 **Celine**
 - Startup crash (`JSONDecodeError`) from a corrupted `config.json`, with no window ever opening
