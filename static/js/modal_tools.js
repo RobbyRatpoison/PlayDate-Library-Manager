@@ -5972,18 +5972,21 @@ function _tuneRemoveTag(tag, pinned) {
 }
 
 // Suggestions for the add-tag boxes: tags starting with what was typed first,
-// then tags containing it. An inline list, not a native datalist (native
-// popups stay visible when pywebview loses focus).
+// then tags with a later word starting with it ("str" -> "Tactical Strategy"),
+// then tags containing it anywhere. An inline list, not a native datalist
+// (native popups stay visible when pywebview loses focus).
 function _tuneSuggestions(typed, mode) {
     const q = typed.trim().toLowerCase();
     if (!q) return [];
-    const starts = [], has = [];
+    const starts = [], words = [], has = [];
     for (const t of (window._TUNE_TAGS || [])) {
         if (_tuneOverrides[t] === mode) continue;
         const l = t.toLowerCase(), i = l.indexOf(q);
-        if (i === 0) starts.push(t); else if (i > 0) has.push(t);
+        if (i === 0) starts.push(t);
+        else if (i > 0 && /[^a-z0-9]/.test(l[i - 1])) words.push(t);
+        else if (i > 0) has.push(t);
     }
-    return starts.concat(has).slice(0, 6);
+    return starts.concat(words, has).slice(0, 6);
 }
 
 function _tuneSuggest(mode) {
