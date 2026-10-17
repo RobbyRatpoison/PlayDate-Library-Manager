@@ -1956,6 +1956,7 @@ function _stripEmptyGroups(node) {
 }
 
 async function applyFilters() {
+    if (typeof _cancelSearchSync === 'function') _cancelSearchSync();
     const collected = _stripEmptyGroups(collectTree());
 
     // Shelf mode: hand the tree back to the shelf editor, no global state write.

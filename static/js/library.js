@@ -161,9 +161,18 @@ function _libOnReady(fn) {
     // the FILTERS modal (which reads state.filter_tree) stays accurate. No
     // reload: the visible grid is already kept in sync live by applyLiveSearch.
     let _searchSyncTimeout = null;
+    let _searchSyncPending = false;
+    // Drops a queued search save. A filter change made in the meantime replaces the saved tree, and
+    // the late save would write the old search tree back over it.
+    function _cancelSearchSync() {
+        clearTimeout(_searchSyncTimeout);
+        _searchSyncPending = false;
+    }
     function _syncSearchToState(query) {
         clearTimeout(_searchSyncTimeout);
+        _searchSyncPending = true;
         _searchSyncTimeout = setTimeout(() => {
+            _searchSyncPending = false;
             sendStateUpdate({ filter_tree: buildSearchTree(query) }, false);
         }, 400);
     }
@@ -177,7 +186,7 @@ function _libOnReady(fn) {
         if (window._inputMgr && window._inputMgr.justGamepadFocusedInput()) return;
         // Flush immediately rather than waiting out the debounce, and dismiss
         // the (on-screen or gamepad) keyboard now that the user is done typing.
-        clearTimeout(_searchSyncTimeout);
+        _cancelSearchSync();
         sendStateUpdate({ filter_tree: buildSearchTree(query) }, false);
         event.target.blur();
     }
@@ -212,11 +221,13 @@ function _libOnReady(fn) {
     }
 
     async function clearAndReload() {
+        _cancelSearchSync();
         const emptyTree = { type: 'group', logic: 'AND', items: [] };
         await sendStateUpdate({ filter_tree: emptyTree, hidden_platforms: [..._hiddenPlatforms] });
     }
 
     async function _showAllGames() {
+        _cancelSearchSync();
         const emptyTree = { type: 'group', logic: 'AND', items: [] };
         await sendStateUpdate({ filter_tree: emptyTree, hidden_platforms: [] });
     }
@@ -670,9 +681,12 @@ function _libOnReady(fn) {
             bar.insertBefore(clear, filters || null);
         } else if (clear && !v.has_clear) clear.remove();
         const search = document.getElementById('library-search');
-        if (search) search.value = v.search || '';
+        // Text still being typed (focused, or not saved yet) is ahead of the saved state: leave it
+        // alone, or a background refresh (install poll, post-edit) eats what the user just typed.
+        const typing = search && (_searchSyncPending || document.activeElement === search);
+        if (search && !typing) search.value = v.search || '';
         // buildGrid() reapplies _liveSearchQuery, so it must follow the box or CLEAR keeps the old search
-        _liveSearchQuery = (v.search || '').trim().toLowerCase();
+        _liveSearchQuery = ((search && typing ? search.value : v.search) || '').trim().toLowerCase();
         const empty = document.getElementById('library-empty-state');
         if (empty) empty.remove();
         if (v.has_empty_state && v.empty_state_html) document.getElementById('game-grid')?.insertAdjacentHTML('beforebegin', v.empty_state_html);
