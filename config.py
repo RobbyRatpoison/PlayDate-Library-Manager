@@ -16,6 +16,23 @@ _state_lock = threading.Lock()
 config_bp = Blueprint('config', __name__)
 
 
+def normalize_tag_overrides(raw):
+    """Clean the user's pinned tags: {tag: 'like'|'dislike'|'ignore'}. Tags are
+    comma-separated in the database, so a name with a comma can never match."""
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for tag, mode in raw.items():
+        if not isinstance(tag, str) or mode not in ('like', 'dislike', 'ignore'):
+            continue
+        tag = tag.strip()
+        if tag and ',' not in tag and len(tag) <= 100:
+            out[tag] = mode
+        if len(out) >= 500:
+            break
+    return out
+
+
 def api_error(message, status=500, *, exc=None, log_label=None):
     """Return a JSON error response without leaking exception detail to the
     client. When `exc` is passed, the full exception (with traceback) is written
@@ -466,6 +483,7 @@ DEFAULT_STATE = {
     "tag_similarity_min_library_rate": 2.0,
     "tag_similarity_smoothing_k": 4,
     "tag_similarity_playtime_cap_hours": 60,
+    "tag_similarity_overrides": {},   # {tag: "like" | "dislike" | "ignore"}, see database.apply_tag_overrides()
     "review_half_trust_count": 10,
     "pick6_staleness_cap_days": 730,
     "pick6_recency_cap_years": 10,
@@ -643,6 +661,7 @@ def inject_config_status():
         tag_similarity_min_library_rate=state.get('tag_similarity_min_library_rate', 2.0),
         tag_similarity_smoothing_k=state.get('tag_similarity_smoothing_k', 4),
         tag_similarity_playtime_cap_hours=state.get('tag_similarity_playtime_cap_hours', 60),
+        tag_similarity_overrides=normalize_tag_overrides(state.get('tag_similarity_overrides')),
         review_half_trust_count=state.get('review_half_trust_count', 10),
         pick6_staleness_cap_days=state.get('pick6_staleness_cap_days', 730),
         pick6_recency_cap_years=state.get('pick6_recency_cap_years', 10),
@@ -1408,6 +1427,8 @@ def save_state(updates):
             state["tag_similarity_smoothing_k"] = max(0, min(20, int(updates["tag_similarity_smoothing_k"])))
         if "tag_similarity_playtime_cap_hours" in updates:
             state["tag_similarity_playtime_cap_hours"] = max(1, min(500, int(updates["tag_similarity_playtime_cap_hours"])))
+        if "tag_similarity_overrides" in updates:
+            state["tag_similarity_overrides"] = normalize_tag_overrides(updates["tag_similarity_overrides"])
         if "review_half_trust_count" in updates:
             state["review_half_trust_count"] = max(2, min(1000, int(updates["review_half_trust_count"])))
         if "pick6_staleness_cap_days" in updates:

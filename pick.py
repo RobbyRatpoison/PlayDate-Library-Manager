@@ -230,6 +230,8 @@ def pick_game():
         # clean 0.0/neutral affinity, not fall through to whatever its
         # unfiltered liked_rate alone happens to be.
         tag_affinity = {t: liked_rate.get(t, 0.0) - library_rate[t] for t in library_rate}
+        from database import apply_tag_overrides
+        tag_affinity = apply_tag_overrides(tag_affinity, state.get('tag_similarity_overrides'))
 
         # Smoothing pseudo-count: without it, a game with one strongly-liked
         # tag and nothing else beats one with several matching tags, purely

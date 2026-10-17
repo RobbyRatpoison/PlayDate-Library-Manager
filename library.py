@@ -2282,6 +2282,40 @@ def recalculate_tag_similarity_route():
         return api_error('Something went wrong on the server. Check playdate.log for details.', 500, exc=e)
 
 
+@library_bp.route('/api/tag-affinity', methods=['POST'])
+def tag_affinity_route():
+    """Top liked / disliked tags for the Tuning modal, computed with the values
+    being previewed (not the saved ones) so the lists follow the sliders and
+    pins. Body: {min_rate, cap_hours, overrides, limit}."""
+    try:
+        from database import get_db, compute_tag_affinity
+        from config import load_state, normalize_tag_overrides
+        state = load_state()
+        data = request.get_json(silent=True) or {}
+        try:
+            min_rate = max(0.0, min(20.0, float(data.get('min_rate', state.get('tag_similarity_min_library_rate', 2.0)))))
+            cap_hours = max(1, min(500, int(float(data.get('cap_hours', state.get('tag_similarity_playtime_cap_hours', 60))))))
+            limit = max(1, min(50, int(data.get('limit', 10))))
+        except (TypeError, ValueError):
+            return api_error('Invalid tuning values.', 400)
+        overrides = normalize_tag_overrides(data['overrides'] if 'overrides' in data else state.get('tag_similarity_overrides'))
+        conn = get_db()
+        try:
+            affinity = compute_tag_affinity(conn, min_rate, cap_hours, overrides)
+        finally:
+            conn.close()
+        ranked = sorted(affinity.items(), key=lambda kv: (-kv[1], kv[0]))
+        def entry(t, a):
+            return {'tag': t, 'affinity': a, 'pinned': overrides.get(t) in ('like', 'dislike')}
+        liked = [entry(t, a) for t, a in ranked if a > 0][:limit]
+        disliked = [entry(t, a) for t, a in reversed(ranked) if a < 0][:limit]
+        ignored = sorted(t for t, m in overrides.items() if m == 'ignore')
+        return jsonify({'liked': liked, 'disliked': disliked, 'ignored': ignored})
+    except Exception as e:
+        log.error(f"tag-affinity failed: {e}", exc_info=True)
+        return api_error('Something went wrong on the server. Check playdate.log for details.', 500, exc=e)
+
+
 @library_bp.route('/api/recalculate-weighted-scores', methods=['POST'])
 def recalculate_weighted_scores_route():
     try:

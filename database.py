@@ -563,6 +563,105 @@ def refresh_duplicate_detection():
     return count
 
 
+TAG_OVERRIDE_MODES = ('like', 'dislike', 'ignore')
+_PIN_FALLBACK_STRENGTH = 0.25
+
+
+def apply_tag_overrides(affinity, overrides):
+    """Apply the user's pinned tags on top of computed affinities. `ignore`
+    makes a tag neutral (0.0). `like` / `dislike` score a tag as strongly as
+    the strongest computed liked / disliked tag among the tags not being
+    overridden (a fixed fallback when there is none), so a pin ranks at the
+    top of its list without inventing a scale. Pins apply even to tags the
+    rare-tag floor dropped or that no library game carries. Shared with
+    pick.py so Pick 6 and the cached sort column agree."""
+    if not overrides:
+        return affinity
+    rest = [a for t, a in affinity.items() if t not in overrides]
+    pos = max([a for a in rest if a > 0], default=_PIN_FALLBACK_STRENGTH)
+    neg = min([a for a in rest if a < 0], default=-_PIN_FALLBACK_STRENGTH)
+    out = dict(affinity)
+    for tag, mode in overrides.items():
+        if mode == 'like':
+            out[tag] = pos
+        elif mode == 'dislike':
+            out[tag] = neg
+        elif mode == 'ignore':
+            out[tag] = 0.0
+    return out
+
+
+def compute_tag_affinity(conn, min_library_rate_pct, playtime_cap_hours, overrides=None):
+    """Per-tag taste affinity (`liked_rate - library_rate`, see
+    recalculate_tag_similarity() for the full reasoning) for the given tuning
+    values. Shared by the recalculation and the Tuning modal's live liked /
+    disliked tag lists, so the two can never disagree."""
+    # Tunable via Settings -> Tuning; see config.DEFAULT_STATE
+    # for the shipped defaults these fall back to.
+    _PLAYTIME_WEIGHT_CAP_HOURS = playtime_cap_hours
+
+    def _playtime_weight(playtime_minutes):
+        hours = (playtime_minutes or 0) / 60.0
+        if hours <= 0:
+            return 0.0
+        return min(1.0, math.log1p(hours) / math.log1p(_PLAYTIME_WEIGHT_CAP_HOURS))
+
+    def _tag_pool_rate(rows, weights=None):
+        n = len(rows) if weights is None else sum(weights)
+        if not n:
+            return {}
+        counts: dict[str, float] = {}
+        for i, row in enumerate(rows):
+            w = 1.0 if weights is None else weights[i]
+            if w <= 0:
+                continue
+            for tag in [t.strip() for t in (row['tags'] or '').split(',') if t.strip()]:
+                counts[tag] = counts.get(tag, 0) + w
+        return {t: c / n for t, c in counts.items()}
+
+    # Steam only -- other platforms' plugins don't all populate `tags` with
+    # a real community-tag vocabulary. Confirmed live: PlayDate's Epic
+    # Games plugin stores Epic's own review-attribute checkboxes ("Windows",
+    # "Recommend this Game", "Extremely Fun", "Amazing Storytelling") in
+    # this same column, which isn't genre/style data at all and would
+    # otherwise poison both pools with noise unrelated to actual taste.
+    liked_rows = conn.execute(
+        "SELECT tags, playtime_forever FROM games "
+        "WHERE completion_status IN ('Beaten', 'Completed') "
+        "AND platform = 'steam' AND tags IS NOT NULL AND tags != ''"
+    ).fetchall()
+    if not liked_rows:
+        liked_rows = conn.execute(
+            "SELECT tags, playtime_forever FROM games "
+            "WHERE platform = 'steam' AND tags IS NOT NULL AND tags != '' "
+            "ORDER BY playtime_forever DESC LIMIT 50"
+        ).fetchall()
+    library_rows = conn.execute(
+        "SELECT tags FROM games WHERE platform = 'steam' AND tags IS NOT NULL AND tags != ''"
+    ).fetchall()
+
+    liked_weights = [_playtime_weight(r['playtime_forever']) for r in liked_rows]
+    if not any(w > 0 for w in liked_weights):
+        # No playtime data on any liked game at all (e.g. an imported
+        # library with untracked playtime) -- fall back to a flat count
+        # rather than losing the whole signal to an all-zero weighting.
+        liked_weights = None
+    liked_rate = _tag_pool_rate(liked_rows, liked_weights)
+    library_rate = _tag_pool_rate(library_rows)
+    # A tag in only a handful of library games can swing wildly on one or
+    # two data points -- not enough sample to trust either direction, so
+    # it's excluded rather than treated as a real signal (falls back to
+    # 0.0/neutral wherever it's looked up, same as an unknown tag).
+    MIN_LIBRARY_RATE = min_library_rate_pct / 100.0
+    library_rate = {t: r for t, r in library_rate.items() if r >= MIN_LIBRARY_RATE}
+    # Iterate library_rate's (already-filtered) keys only, not the union
+    # with liked_rate -- a tag the floor above excluded must default to a
+    # clean 0.0/neutral affinity, not fall through to whatever its
+    # unfiltered liked_rate alone happens to be.
+    tag_affinity = {t: liked_rate.get(t, 0.0) - library_rate[t] for t in library_rate}
+    return apply_tag_overrides(tag_affinity, overrides)
+
+
 def recalculate_tag_similarity():
     """Recompute the tag_similarity column for every game against a
     liked-vs-library tag affinity profile, same formula as pick.py's own
@@ -616,69 +715,11 @@ def recalculate_tag_similarity():
     _tuning = load_state()
     conn = get_db()
     try:
-        # Tunable via Settings -> Tuning; see config.DEFAULT_STATE
-        # for the shipped defaults these fall back to.
-        _PLAYTIME_WEIGHT_CAP_HOURS = _tuning.get('tag_similarity_playtime_cap_hours', 60)
-
-        def _playtime_weight(playtime_minutes):
-            hours = (playtime_minutes or 0) / 60.0
-            if hours <= 0:
-                return 0.0
-            return min(1.0, math.log1p(hours) / math.log1p(_PLAYTIME_WEIGHT_CAP_HOURS))
-
-        def _tag_pool_rate(rows, weights=None):
-            n = len(rows) if weights is None else sum(weights)
-            if not n:
-                return {}
-            counts: dict[str, float] = {}
-            for i, row in enumerate(rows):
-                w = 1.0 if weights is None else weights[i]
-                if w <= 0:
-                    continue
-                for tag in [t.strip() for t in (row['tags'] or '').split(',') if t.strip()]:
-                    counts[tag] = counts.get(tag, 0) + w
-            return {t: c / n for t, c in counts.items()}
-
-        # Steam only -- other platforms' plugins don't all populate `tags` with
-        # a real community-tag vocabulary. Confirmed live: PlayDate's Epic
-        # Games plugin stores Epic's own review-attribute checkboxes ("Windows",
-        # "Recommend this Game", "Extremely Fun", "Amazing Storytelling") in
-        # this same column, which isn't genre/style data at all and would
-        # otherwise poison both pools with noise unrelated to actual taste.
-        liked_rows = conn.execute(
-            "SELECT tags, playtime_forever FROM games "
-            "WHERE completion_status IN ('Beaten', 'Completed') "
-            "AND platform = 'steam' AND tags IS NOT NULL AND tags != ''"
-        ).fetchall()
-        if not liked_rows:
-            liked_rows = conn.execute(
-                "SELECT tags, playtime_forever FROM games "
-                "WHERE platform = 'steam' AND tags IS NOT NULL AND tags != '' "
-                "ORDER BY playtime_forever DESC LIMIT 50"
-            ).fetchall()
-        library_rows = conn.execute(
-            "SELECT tags FROM games WHERE platform = 'steam' AND tags IS NOT NULL AND tags != ''"
-        ).fetchall()
-
-        liked_weights = [_playtime_weight(r['playtime_forever']) for r in liked_rows]
-        if not any(w > 0 for w in liked_weights):
-            # No playtime data on any liked game at all (e.g. an imported
-            # library with untracked playtime) -- fall back to a flat count
-            # rather than losing the whole signal to an all-zero weighting.
-            liked_weights = None
-        liked_rate = _tag_pool_rate(liked_rows, liked_weights)
-        library_rate = _tag_pool_rate(library_rows)
-        # A tag in only a handful of library games can swing wildly on one or
-        # two data points -- not enough sample to trust either direction, so
-        # it's excluded rather than treated as a real signal (falls back to
-        # 0.0/neutral wherever it's looked up, same as an unknown tag).
-        MIN_LIBRARY_RATE = _tuning.get('tag_similarity_min_library_rate', 2.0) / 100.0
-        library_rate = {t: r for t, r in library_rate.items() if r >= MIN_LIBRARY_RATE}
-        # Iterate library_rate's (already-filtered) keys only, not the union
-        # with liked_rate -- a tag the floor above excluded must default to a
-        # clean 0.0/neutral affinity, not fall through to whatever its
-        # unfiltered liked_rate alone happens to be.
-        tag_affinity = {t: liked_rate.get(t, 0.0) - library_rate[t] for t in library_rate}
+        tag_affinity = compute_tag_affinity(
+            conn,
+            _tuning.get('tag_similarity_min_library_rate', 2.0),
+            _tuning.get('tag_similarity_playtime_cap_hours', 60),
+            _tuning.get('tag_similarity_overrides'))
 
         # Smoothing pseudo-count: without it, a game with one strongly-liked
         # tag and nothing else beats one with several matching tags, purely

@@ -5939,12 +5939,90 @@ function _tuneOnSlider(el, key) {
     document.getElementById('tune-val-' + key).textContent = st.fmt(st.fromSlider ? st.fromSlider(raw) : raw);
     el.style.setProperty('--slider-pct', ((raw - el.min) / (el.max - el.min) * 100) + '%');
     _tuneRedrawCharts(TUNE_SECTIONS.find(s => s.settings.includes(st)).id);
+    if (_TUNE_AFFINITY_KEYS.includes(key)) _tuneRefreshAffinity();
+}
+
+// Liked / disliked tags under Tag Similarity. Only the rare-tag floor and the
+// playtime saturation change which tags land where (smoothing only scales a
+// game's score), so only those two sliders trigger a refresh. Debounced, and
+// a sequence number drops answers that arrive after a newer request.
+const _TUNE_AFFINITY_KEYS = ['tag_similarity_min_library_rate', 'tag_similarity_playtime_cap_hours'];
+let _tuneAffinityTimer = null, _tuneAffinitySeq = 0, _tuneAffRow = 0;
+
+// Pinned tags: {tag: 'like'|'dislike'|'ignore'}, saved with the Tag Similarity
+// section. Removing an automatic entry ignores it; removing a pinned one (or an
+// ignored one) just drops the pin.
+let _tuneOverrides = {}, _tuneSavedOverrides = {};
+
+function _tuneAffinityList(items, sign) {
+    if (!items.length) return '<div style="color:#8f98a0;">None</div>';
+    return items.map(i => {
+        const t = JSON.stringify(i.tag);
+        return `<div style="display:flex; align-items:center; gap:6px;">
+        <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${i.pinned ? '&#128204; ' : ''}${escHtml(i.tag)}</span>
+        <span style="color:#8f98a0; flex-shrink:0;">${i.pinned ? '' : sign + Math.abs(i.affinity * 100).toFixed(1)}</span>
+        <button class="nav-btn" data-modal-row="${_tuneAffRow}" title="Remove" aria-label="Remove ${escHtml(i.tag)}" style="padding:0 6px; height:1.4rem; min-height:0; font-size:0.75rem; line-height:1;"
+            onclick="_tuneRemoveTag(${escHtml(t)}, ${i.pinned ? 'true' : 'false'})">&#x2715;</button></div>`;
+    }).join('');
+}
+
+function _tuneRemoveTag(tag, pinned) {
+    if (pinned) delete _tuneOverrides[tag]; else _tuneOverrides[tag] = 'ignore';
+    _tuneRefreshAffinity();
+}
+
+function _tuneAddTag(mode) {
+    const input = document.getElementById('tune-add-' + mode);
+    const status = document.getElementById('tune-aff-status');
+    const typed = input.value.trim().toLowerCase();
+    if (!typed) return;
+    const tag = (window._TUNE_TAGS || []).find(t => t.toLowerCase() === typed);
+    if (!tag) { status.textContent = 'No tag called "' + input.value.trim() + '" in your library.'; return; }
+    status.textContent = '';
+    _tuneOverrides[tag] = mode;
+    input.value = '';
+    _tuneRefreshAffinity();
+}
+
+function _tuneRefreshAffinity() {
+    clearTimeout(_tuneAffinityTimer);
+    _tuneAffinityTimer = setTimeout(async () => {
+        const host = document.getElementById('tune-affinity');
+        if (!host) return;
+        const cur = _tuneCurrent(), seq = ++_tuneAffinitySeq;
+        try {
+            const r = await fetch('/api/tag-affinity', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    min_rate: cur.tag_similarity_min_library_rate,
+                    cap_hours: cur.tag_similarity_playtime_cap_hours,
+                    overrides: _tuneOverrides,
+                }),
+            });
+            if (!r.ok) throw new Error('failed');
+            const d = await r.json();
+            if (seq !== _tuneAffinitySeq) return;
+            const ignored = d.ignored.length
+                ? `<div style="font-size:0.75rem; color:#8f98a0; margin-top:8px;">Ignored: ` + d.ignored.map(t =>
+                    `<button class="nav-btn" data-modal-row="${_tuneAffRow}" title="Stop ignoring" style="padding:0 6px; margin:2px 4px 0 0; font-size:0.72rem;"
+                        onclick="_tuneRemoveTag(${escHtml(JSON.stringify(t))}, true)">${escHtml(t)} &#x2715;</button>`).join('') + '</div>'
+                : '';
+            host.innerHTML = `<div style="display:flex; gap:16px; font-size:0.78rem;">
+                <div style="flex:1; min-width:0;"><div style="color:var(--text-secondary); margin-bottom:4px;">Liked tags</div>${_tuneAffinityList(d.liked, '+')}</div>
+                <div style="flex:1; min-width:0;"><div style="color:var(--text-secondary); margin-bottom:4px;">Disliked tags</div>${_tuneAffinityList(d.disliked, '-')}</div>
+            </div>` + ignored;
+        } catch (e) {
+            if (seq === _tuneAffinitySeq) host.innerHTML = '<div style="font-size:0.78rem; color:#8f98a0;">Could not load tags.</div>';
+        }
+    }, 150);
 }
 
 function _tuneBuild() {
     if (_tuneBuilt) return;
     const init = window._TUNE_INIT || {};
     _tuneSaved = {};
+    _tuneSavedOverrides = Object.assign({}, init.tag_similarity_overrides || {});
+    _tuneOverrides = Object.assign({}, _tuneSavedOverrides);
     let row = 0;
     let html = '';
     for (const sec of TUNE_SECTIONS) {
@@ -5968,6 +6046,25 @@ function _tuneBuild() {
                 ${st.chart ? `<div id="tune-chart-${st.chart}" style="margin-top:6px;"></div>` : ''}
             </div>`;
         }
+        if (sec.id === 'tagsim') {
+            html += `<div style="margin-top:14px;">
+                <div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:2px;">Liked and disliked tags</div>
+                <div style="font-size:0.75rem; color:#8f98a0; margin-bottom:6px;">The tags your Beaten/Completed games over- and under-represent compared with your Steam library (percentage points). Updates as you move the sliders.</div>
+                <div id="tune-affinity"></div>
+                <div style="display:flex; gap:6px; margin-top:10px; align-items:center;">
+                    <input type="text" id="tune-add-like" placeholder="Add a liked tag" data-modal-row="${row}" style="flex:1; min-width:0;"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();_tuneAddTag('like');}">
+                    <button class="nav-btn" data-modal-row="${row}" style="font-size:0.78rem;" onclick="_tuneAddTag('like')">Like</button>
+                </div>
+                <div style="display:flex; gap:6px; margin-top:6px; align-items:center;">
+                    <input type="text" id="tune-add-dislike" placeholder="Add a disliked tag" data-modal-row="${row + 1}" style="flex:1; min-width:0;"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();_tuneAddTag('dislike');}">
+                    <button class="nav-btn" data-modal-row="${row + 1}" style="font-size:0.78rem;" onclick="_tuneAddTag('dislike')">Dislike</button>
+                </div>
+                <div id="tune-aff-status" style="font-size:0.75rem; color:#8f98a0; margin-top:4px; min-height:1em;"></div></div>`;
+            _tuneAffRow = row + 2;
+            row += 3;
+        }
         html += `<div style="margin-top:12px;">
                 <button class="nav-btn" style="font-size:0.8rem;" data-modal-row="${row}" onclick="_tuneSave('${sec.id}')">Save</button>
                 <button class="nav-btn" style="margin-left:6px; font-size:0.8rem;" data-modal-row="${row}" onclick="_tuneReset('${sec.id}')">Reset to Defaults</button>
@@ -5989,7 +6086,10 @@ function _tuneToggle(id) {
     const open = body.style.display === 'none';
     body.style.display = open ? 'block' : 'none';
     document.getElementById('tune-chev-' + id).innerHTML = open ? '&#9662;' : '&#9656;';
-    if (open) _tuneRedrawCharts(id);
+    if (open) {
+        _tuneRedrawCharts(id);
+        if (id === 'tagsim') _tuneRefreshAffinity();
+    }
 }
 
 function openTuningModal() {
@@ -6006,6 +6106,7 @@ async function _tuneSave(id) {
     const cur = _tuneCurrent();
     const payload = {};
     for (const st of sec.settings) payload[st.key] = cur[st.key];
+    if (id === 'tagsim') payload.tag_similarity_overrides = _tuneOverrides;
     status.textContent = 'Saving…';
     try {
         const r = await fetch('/api/update_state', {
@@ -6013,6 +6114,7 @@ async function _tuneSave(id) {
         });
         if (!r.ok) throw new Error('save failed');
         for (const st of sec.settings) _tuneSaved[st.key] = cur[st.key];
+        if (id === 'tagsim') _tuneSavedOverrides = Object.assign({}, _tuneOverrides);
         _tuneRedrawCharts(id);
         if (sec.recalc) {
             status.textContent = 'Saved. Recalculating…';
@@ -6030,6 +6132,7 @@ async function _tuneSave(id) {
 
 function _tuneReset(id) {
     const sec = TUNE_SECTIONS.find(s => s.id === id);
+    if (id === 'tagsim') _tuneOverrides = {};
     for (const st of sec.settings) {
         const el = document.getElementById('tune-' + st.key);
         el.value = st.toSlider ? st.toSlider(st.def) : st.def;

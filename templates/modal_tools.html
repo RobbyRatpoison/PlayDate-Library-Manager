@@ -1121,10 +1121,12 @@
 <script>
 window._HOVER_TIP = {{ hover_tooltip | tojson }};
 window._ART_PREFS = {{ art_source_prefs | tojson }};
+window._TUNE_TAGS = {{ unique_tags | tojson }};
 window._TUNE_INIT = {{ {
     'tag_similarity_min_library_rate': tag_similarity_min_library_rate,
     'tag_similarity_smoothing_k': tag_similarity_smoothing_k,
     'tag_similarity_playtime_cap_hours': tag_similarity_playtime_cap_hours,
+    'tag_similarity_overrides': tag_similarity_overrides,
     'review_half_trust_count': review_half_trust_count,
     'pick6_smart_tag_weight': pick6_smart_tag_weight,
     'pick6_staleness_cap_days': pick6_staleness_cap_days,
