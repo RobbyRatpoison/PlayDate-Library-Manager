@@ -419,12 +419,18 @@ jobs:
 
       # ── 7. Create portable zip ────────────────────────────────────────────────
       - name: Create portable zip
-        shell: powershell
+        # pwsh, not Windows PowerShell 5.1: its Compress-Archive writes backslashes in the entry names
+        shell: pwsh
         run: |
           $tag = "${{ github.ref_name }}"
           $ver = if ($tag -match '^v?(\d+\.\d+\.\d+)') { $matches[1] } else { "0.0.0" }
           $zip = "PlayDate-$ver-Windows-Portable.zip"
+          # portable.txt makes the app treat itself as portable (config.IS_PORTABLE: no in-app installer update,
+          # data beside the exe). Without it the portable build offered to run the Setup installer. It goes in the
+          # zip only: it is removed again before the installer (step 9) is built, which must not ship it.
+          Set-Content -Path "dist\PlayDate\portable.txt" -Value "PlayDate v$ver portable build"
           Compress-Archive -Path "dist\PlayDate\*" -DestinationPath $zip
+          Remove-Item "dist\PlayDate\portable.txt"
           $sizeMB = [math]::Round((Get-Item $zip).Length / 1MB, 1)
           Write-Host "Created $zip ($sizeMB MB)"
           echo "PORTABLE_ZIP=$zip" >> $env:GITHUB_ENV

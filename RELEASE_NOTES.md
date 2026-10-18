@@ -17,3 +17,4 @@
 - Fixed a rare error on first start that could reset your settings.
 - Fixed cover art not being saved on Windows.
 - Fixed several plugins failing to load on Windows.
+- Fixed the portable Windows version trying to run the installer when updating.
