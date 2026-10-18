@@ -146,3 +146,73 @@ def test_remove_old_data_refuses_to_go_through_a_link(tmp_path):
     os.symlink(new, link, target_is_directory=True)
     assert installmove.remove_old_data(str(link)) == []
     assert (new / 'config.json').exists()
+
+
+def test_a_live_lock_means_another_start_is_moving_it(tmp_path):
+    old, live = _old_install(tmp_path)
+    live.close()
+    new = tmp_path / 'Zest'
+    new.mkdir()
+    (new / installmove.LOCK).write_text('')
+    assert installmove.move_install_data(str(old), str(new)) == 'busy'
+    assert not (new / 'config.json').exists()   # nothing was copied
+    assert (new / installmove.LOCK).exists()    # and the other start's lock is left alone
+
+
+def test_a_dead_attempt_is_cleaned_up_and_redone(tmp_path):
+    old, live = _old_install(tmp_path)
+    live.close()
+    new = tmp_path / 'Zest'
+    new.mkdir()
+    # what a crash mid-copy leaves behind: half the files, a truncated config, and a lock nobody touches
+    (new / 'config.json').write_text('{"truncated": ')
+    (new / 'steamgifts_wins_1.json').write_text('{"a"')
+    lock = new / installmove.LOCK
+    lock.write_text('')
+    stale = os.path.getmtime(lock) - installmove.LOCK_STALE_SECONDS - 10
+    os.utime(lock, (stale, stale))
+    assert installmove.move_install_data(str(old), str(new)) == 'done'
+    assert json.loads((new / 'config.json').read_text())['k'] == 1   # the real one, not the truncated stub
+    assert json.loads((new / 'steamgifts_wins_1.json').read_text()) == {'a': 1}
+    assert not lock.exists()
+
+
+def test_the_lock_is_gone_after_success_and_after_failure(tmp_path, monkeypatch):
+    old, live = _old_install(tmp_path)
+    live.close()
+    new = tmp_path / 'Zest'
+    assert installmove.move_install_data(str(old), str(new)) == 'done'
+    assert not (new / installmove.LOCK).exists()
+
+    old2, live2 = _old_install(tmp_path / 'again')
+    live2.close()
+    new2 = tmp_path / 'again' / 'Zest'
+
+    def locked(src, dst, *a, **k):
+        raise PermissionError('in use')
+    monkeypatch.setattr(shutil, 'copy2', locked)
+    assert installmove.move_install_data(str(old2), str(new2)).startswith('failed')
+    assert not (new2 / installmove.LOCK).exists()
+
+
+def test_two_starts_at_once_move_the_library_exactly_once(tmp_path):
+    import threading
+    old, live = _old_install(tmp_path)
+    live.close()
+    new = tmp_path / 'Zest'
+    results = []
+
+    def go():
+        results.append(installmove.move_install_data(str(old), str(new)))
+    threads = [threading.Thread(target=go) for _ in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert results.count('done') == 1
+    assert set(results) <= {'done', 'busy', 'none'}
+    assert (new / 'config.json').exists() and (new / installmove.MARKER).exists()
+    assert not (new / installmove.LOCK).exists()
+    con = sqlite3.connect(new / 'games_1.db')
+    assert con.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+    con.close()

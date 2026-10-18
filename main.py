@@ -349,8 +349,13 @@ if sys.platform == 'win32' and getattr(sys, 'frozen', False):
     _exe_dir = os.path.dirname(sys.executable)
     _old_dir = installmove.old_install_dir(_exe_dir) if datadirs.migration_active() else None
     while _old_dir:
+        _notice = installmove.MovingNotice()
         _status = installmove.move_install_data(_old_dir, _exe_dir)
+        _notice.close()
         log.info(f"User data move from {_old_dir}: {_status}")
+        if _status == 'busy':
+            installmove.tell_busy()
+            sys.exit(0)
         if not _status.startswith('failed') or not installmove.ask_retry(_status):
             if _status.startswith('failed'):
                 sys.exit(1)

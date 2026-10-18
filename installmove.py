@@ -13,12 +13,19 @@ import logging
 import os
 import shutil
 import sqlite3
+import sys
+import threading
+import time
 
 import datadirs
 
 log = logging.getLogger(__name__)
 
 MARKER = '.moved_from_old_install.json'
+# Present in the new folder while a move is running. The copier touches it every few seconds, so one that has
+# gone quiet means the attempt died (a crash, a power cut) and its half-copied data must not be trusted.
+LOCK = '.move_in_progress'
+LOCK_STALE_SECONDS = 120
 
 # Program files of the old install; the new installer provides its own.
 _CODE_NAMES = {'playdate.exe', 'zest.exe', '_internal', '.rollback', 'playdate-rollback.exe', 'zest-rollback.exe'}
@@ -26,7 +33,7 @@ _CODE_NAMES = {'playdate.exe', 'zest.exe', '_internal', '.rollback', 'playdate-r
 
 def _is_code(name):
     low = name.lower()
-    return low in _CODE_NAMES or low.startswith('unins') or low == MARKER.lower()
+    return low in _CODE_NAMES or low.startswith('unins') or low in (MARKER.lower(), LOCK.lower())
 
 
 def _data_entries(root):
@@ -51,7 +58,7 @@ def _copy_db(src, dst):
         s.close()
 
 
-def _copy_tree(src, dst, created):
+def _copy_tree(src, dst, created, beat=None):
     os.makedirs(dst, exist_ok=True)
     for entry in os.scandir(src):
         if entry.name.lower().endswith(('.db-wal', '.db-shm')):
@@ -60,13 +67,15 @@ def _copy_tree(src, dst, created):
         if entry.is_dir(follow_symlinks=False):
             if not os.path.exists(target):
                 created.append(target)
-            _copy_tree(entry.path, target, created)
+            _copy_tree(entry.path, target, created, beat)
         else:
             created.append(target)
             if entry.name.lower().endswith('.db'):
                 _copy_db(entry.path, target)
             else:
                 shutil.copy2(entry.path, target)
+            if beat:
+                beat()
 
 
 def _verify(src, dst):
@@ -103,32 +112,82 @@ def _undo(created):
             pass
 
 
+def _remove_path(path):
+    try:
+        if os.path.isdir(path) and not os.path.islink(path):
+            shutil.rmtree(path, ignore_errors=True)
+        elif os.path.lexists(path):
+            os.remove(path)
+    except OSError:
+        pass
+
+
+def _claim_lock(lock):
+    """Create the in-progress marker; False when another start already holds it."""
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return False
+    os.close(fd)
+    return True
+
+
 def move_install_data(old_dir, new_dir):
-    """Copy the user data from old_dir into new_dir. Returns 'none' (nothing to do), 'done', or
-    'failed: <why>' (new_dir put back as it was, old_dir untouched)."""
+    """Copy the user data from old_dir into new_dir. Returns 'none' (nothing to do), 'done', 'busy' (another
+    start of the app is already moving it) or 'failed: <why>' (new_dir put back as it was, old_dir untouched)."""
     old_dir, new_dir = os.path.abspath(old_dir), os.path.abspath(new_dir)
     if old_dir == new_dir or not _has_user_data(old_dir):
         return 'none'
-    if os.path.exists(os.path.join(new_dir, MARKER)) or _has_user_data(new_dir):
-        return 'none'   # moved already, or the new install has its own data: never mix the two
+    if os.path.exists(os.path.join(new_dir, MARKER)):
+        return 'none'   # moved already
+    lock = os.path.join(new_dir, LOCK)
+    if os.path.exists(lock):
+        try:
+            age = time.time() - os.path.getmtime(lock)
+        except OSError:
+            age = LOCK_STALE_SECONDS
+        if age < LOCK_STALE_SECONDS:
+            return 'busy'
+        # An earlier attempt died part-way (a crash, a power cut). What it copied is incomplete, so put the new
+        # folder back as it was before trying again; only names that exist in the old folder are touched.
+        log.warning('A previous data move did not finish; starting it again from the old folder')
+        for name in _data_entries(old_dir):
+            _remove_path(os.path.join(new_dir, name))
+        _remove_path(lock)
+    elif _has_user_data(new_dir):
+        return 'none'   # the new install has its own data: never mix the two
+    os.makedirs(new_dir, exist_ok=True)
+    if not _claim_lock(lock):
+        return 'busy'
+
+    last_beat = [time.monotonic()]
+
+    def beat():
+        if time.monotonic() - last_beat[0] > 3:
+            last_beat[0] = time.monotonic()
+            try:
+                os.utime(lock)
+            except OSError:
+                pass
 
     created = []
     try:
-        os.makedirs(new_dir, exist_ok=True)
         for name in _data_entries(old_dir):
             src, dst = os.path.join(old_dir, name), os.path.join(new_dir, name)
             if os.path.isdir(src) and not os.path.islink(src):
                 if not os.path.exists(dst):
                     created.append(dst)
-                _copy_tree(src, dst, created)
+                _copy_tree(src, dst, created, beat)
             else:
                 created.append(dst)
                 if name.lower().endswith('.db'):
                     _copy_db(src, dst)
                 else:
                     shutil.copy2(src, dst)
+                beat()
         for name in _data_entries(old_dir):
             _verify(os.path.join(old_dir, name), os.path.join(new_dir, name))
+            beat()
         variants = datadirs._spellings(old_dir)
         for name in _data_entries(new_dir):
             path = os.path.join(new_dir, name)
@@ -150,6 +209,8 @@ def move_install_data(old_dir, new_dir):
         log.error(f'Moving user data from {old_dir} failed, undoing the copy: {e}', exc_info=True)
         _undo(created)
         return f'failed: {e}'
+    finally:
+        _remove_path(lock)
     log.info(f'User data copied from {old_dir} to {new_dir}')
     return 'done'
 
@@ -249,3 +310,55 @@ def finish_move(base):
     if left:
         log.info(f'Old install folder still holds: {left}')
     return left
+
+
+_NOTICE_TITLE = 'Zest - moving your library'
+
+
+class MovingNotice:
+    """While a big library is copied, nothing else is on screen yet, so a start looks like a crash. This shows a
+    plain Windows message box if the copy runs longer than `delay` seconds, and closes it when the copy is done.
+    Anywhere else it does nothing."""
+
+    def __init__(self, delay=2.0):
+        self._timer = None
+        self._shown = False
+        if sys.platform == 'win32':
+            self._timer = threading.Timer(delay, self._show)
+            self._timer.daemon = True
+            self._timer.start()
+
+    def _show(self):
+        self._shown = True
+        try:
+            import ctypes
+            MB_OK, MB_ICONINFORMATION, MB_SETFOREGROUND, MB_TOPMOST = 0x0, 0x40, 0x10000, 0x40000
+            ctypes.windll.user32.MessageBoxW(
+                0, 'Zest is moving your library to its new folder.\n\nThis can take a minute or two for a large '
+                   'library. Please wait: Zest opens by itself when it is done, and you do not need to do anything.',
+                _NOTICE_TITLE, MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST)
+        except Exception:
+            pass
+
+    def close(self):
+        if self._timer:
+            self._timer.cancel()
+        if self._shown and sys.platform == 'win32':
+            try:
+                import ctypes
+                hwnd = ctypes.windll.user32.FindWindowW(None, _NOTICE_TITLE)
+                if hwnd:
+                    ctypes.windll.user32.PostMessageW(hwnd, 0x0010, 0, 0)   # WM_CLOSE
+            except Exception:
+                pass
+
+
+def tell_busy():
+    """Another start of the app is already moving the library: say so instead of opening on half-copied data."""
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(
+            0, 'Zest is already moving your library in another window.\n\nPlease wait for it to open.',
+            'Zest', 0x0 | 0x40 | 0x10000)
+    except Exception:
+        pass
