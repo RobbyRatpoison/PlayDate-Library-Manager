@@ -121,8 +121,11 @@ hiddenimports += collect_submodules('webview')
 hiddenimports += collect_submodules('flask')
 hiddenimports += collect_submodules('werkzeug')
 # Every runners module: plugins import several of them (installdir, diskspace, native_exe, windows) that the
-# app itself never does, so analysis of main.py alone leaves them out and those plugins fail to load.
-hiddenimports += collect_submodules('runners')
+# app itself never does, so analysis of main.py alone leaves them out and those plugins fail to load. Listed from
+# the folder: collect_submodules('runners') came back empty in the CI build (the package is not importable at
+# this point in the spec), which left the problem in place.
+hiddenimports += ['runners.' + f[:-3] for f in sorted(os.listdir(os.path.join(ROOT, 'runners')))
+                  if f.endswith('.py') and f != '__init__.py']
 
 # ── Analysis ───────────────────────────────────────────────────────────────────
 a = Analysis(
