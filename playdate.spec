@@ -91,6 +91,9 @@ hiddenimports = [
     # HLTB — lazy-imported inside scrapers.py
     'howlongtobeatpy',
 
+    # PyYAML — imported only by the Ubisoft plugin, which PyInstaller can't see
+    'yaml',
+
     # watchdog — lazy-imported in watcher.py and utils.py; needed for filesystem watching
     'watchdog',
     'watchdog.observers',
@@ -117,6 +120,9 @@ hiddenimports = [
 hiddenimports += collect_submodules('webview')
 hiddenimports += collect_submodules('flask')
 hiddenimports += collect_submodules('werkzeug')
+# Every runners module: plugins import several of them (installdir, diskspace, native_exe, windows) that the
+# app itself never does, so analysis of main.py alone leaves them out and those plugins fail to load.
+hiddenimports += collect_submodules('runners')
 
 # ── Analysis ───────────────────────────────────────────────────────────────────
 a = Analysis(

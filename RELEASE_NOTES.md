@@ -16,3 +16,4 @@
 - Fixed a search being overwritten while you type it.
 - Fixed a rare error on first start that could reset your settings.
 - Fixed cover art not being saved on Windows.
+- Fixed several plugins failing to load on Windows.
