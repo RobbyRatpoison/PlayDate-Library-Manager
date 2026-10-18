@@ -76,11 +76,11 @@ window.PDInfoTip = {
                 // Labels on one line, times under them in the same three columns. A missing time keeps
                 // a dash, so the others stay under their own label.
                 const t = [game.hltb_main, game.hltb_extras, game.hltb_completionist]
-                    .map(m => Number(m) > 0 ? fmtHours(Number(m)) : '\u2013');
+                    .map(m => Number(m) > 0 ? fmtHours(Number(m)).replace(' hrs', 'h') : '\u2013');
                 if (t.some(x => x !== '\u2013')) {
                     const cells = ['Main story', 'Extras', 'Completionist'].map(l => `<span style="${dim}">${l}</span>`)
                         .concat(t.map(x => `<span>${escHtml(x)}</span>`)).join('');
-                    rows.push(`<div style="display:grid;grid-template-columns:repeat(3,max-content);column-gap:16px;justify-content:start;">${cells}</div>`);
+                    rows.push(`<div style="display:grid;grid-template-columns:repeat(3,max-content);column-gap:16px;justify-content:start;justify-items:center;">${cells}</div>`);
                 }
             }
             if (fields.has('last_played')) row('Last played', tipDate(game.last_played) || 'Never');
