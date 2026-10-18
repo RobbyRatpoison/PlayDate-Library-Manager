@@ -138,12 +138,49 @@ begin
   end;
 end;
 
+function PdGetFileAttributes(lpFileName: String): Cardinal;
+  external 'GetFileAttributesW@kernel32.dll stdcall uninstallonly';
+
+{ After an update from a PlayDate folder, the old folder name is a junction to this one (see installmove.py). When
+  the app is uninstalled, drop that link too. RemoveDir on a junction removes only the link, never the folder it
+  points at, and the attribute check makes sure it is a junction and not a real folder. }
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  OldLink: String;
+  Attr: Cardinal;
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    OldLink := ExtractFilePath(RemoveBackslash(ExpandConstant('{app}'))) + 'PlayDate';
+    Attr := PdGetFileAttributes(OldLink);
+    if (Attr <> $FFFFFFFF) and ((Attr and $400) <> 0) then
+      RemoveDir(OldLink);
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if (CurStep = ssPostInstall) and (OldAppDir <> '') and (CompareText(OldAppDir, RemoveBackslash(ExpandConstant('{app}'))) <> 0) then
     RemoveOldProgramFiles(OldAppDir);
 end;
 #endif
+
+{ The library is one games_<steam id>.db per account (plus games_default.db), not a single games.db. }
+procedure DeleteGamesDatabases(Dir: String);
+var
+  FindRec: TFindRec;
+begin
+  if FindFirst(Dir + '\games*.db*', FindRec) then
+  begin
+    try
+      repeat
+        DeleteFile(Dir + '\' + FindRec.Name);
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
 
 function InitializeUninstall(): Boolean;
 var
@@ -171,5 +208,6 @@ begin
     DeleteFile(ExpandConstant('{app}\state.json'));
     DeleteFile(ExpandConstant('{app}\games.db'));
     DeleteFile(ExpandConstant('{app}\playdate.log'));
+    DeleteGamesDatabases(ExpandConstant('{app}'));
   end;
 end;
