@@ -8,7 +8,6 @@ Other keys in config.json[config_key] are preserved on token refresh.
 """
 
 import base64
-import json
 import logging
 import time
 
@@ -18,18 +17,16 @@ log = logging.getLogger(__name__)
 
 
 def _load_cfg():
-    from config import CONFIG_PATH
+    from config import load_config
     try:
-        with open(CONFIG_PATH, 'r') as f:
-            return json.load(f)
+        return load_config() or {}
     except Exception:
         return {}
 
 
 def _save_cfg(data):
-    from config import CONFIG_PATH
-    with open(CONFIG_PATH, 'w') as f:
-        json.dump(data, f, indent=4)
+    from config import save_config_data
+    save_config_data(data)
 
 
 def exchange_authorization_code(token_url, client_id, client_secret, code,

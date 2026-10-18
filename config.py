@@ -3,6 +3,7 @@ import requests
 from flask import Blueprint, request, jsonify
 import html as _html
 import json
+import time
 import os
 import re
 import sys
@@ -714,20 +715,44 @@ def _is_steam_deck_session():
         return True
     return os.environ.get('SteamDeck') == '1' and bool(os.environ.get('SteamAppId'))
 
+# One process, many threads (populate, page loads, plugin syncs): every read and write of config.json goes through
+# this lock, and a write goes to its own temp file and is swapped in whole, so a reader never sees a half-written file.
+_CONFIG_LOCK = threading.RLock()
+
 def load_config():
-    if is_configured():
-        with open(CONFIG_PATH, 'r') as f:
-            return json.load(f)
-    return None
+    with _CONFIG_LOCK:
+        if is_configured():
+            with open(CONFIG_PATH, 'r') as f:
+                return json.load(f)
+        return None
 
 def is_configured():
     return os.path.exists(CONFIG_PATH)
 
 def _save_config_data(data):
-    tmp = CONFIG_PATH + '.tmp'
-    with open(tmp, 'w') as f:
-        json.dump(data, f, indent=4)
-    os.replace(tmp, CONFIG_PATH)
+    import tempfile
+    with _CONFIG_LOCK:
+        fd, tmp = tempfile.mkstemp(prefix='config.', suffix='.tmp', dir=os.path.dirname(CONFIG_PATH))
+        try:
+            with os.fdopen(fd, 'w') as f:
+                json.dump(data, f, indent=4)
+                f.flush()
+                os.fsync(f.fileno())
+            for attempt in range(10):
+                try:
+                    os.replace(tmp, CONFIG_PATH)
+                    break
+                except PermissionError:
+                    # Windows: another process (antivirus, backup) has the file open for a moment
+                    if attempt == 9:
+                        raise
+                    time.sleep(0.05)
+        except BaseException:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            raise
 
 def save_config_data(data):
     """Public wrapper around the atomic config writer for other modules."""
@@ -803,8 +828,7 @@ def save_config():
 
     # Load existing multi-account config or start fresh
     if is_configured():
-        with open(CONFIG_PATH, 'r') as f:
-            config_data = json.load(f)
+        config_data = load_config()
         if 'accounts' not in config_data:
             config_data = {'active_account': None, 'sgdb_key': config_data.get('sgdb_key', ''), 'accounts': {}}
     else:
