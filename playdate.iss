@@ -165,12 +165,13 @@ begin
 end;
 #endif
 
-{ The library is one games_<steam id>.db per account (plus games_default.db), not a single games.db. }
-procedure DeleteGamesDatabases(Dir: String);
+{ Deletes every file in Dir matching Pattern (the library is one games_<steam id>.db per account plus
+  games_default.db, and there is a wins file per account, so a single file name is not enough). }
+procedure DeleteMatching(Dir: String; Pattern: String);
 var
   FindRec: TFindRec;
 begin
-  if FindFirst(Dir + '\games*.db*', FindRec) then
+  if FindFirst(Dir + '\' + Pattern, FindRec) then
   begin
     try
       repeat
@@ -180,6 +181,27 @@ begin
       FindClose(FindRec);
     end;
   end;
+end;
+
+{ Everything PlayDate saved next to the program: settings, library, caches, the game artwork (static) and the
+  installed plugins (plugins). The program files themselves are the uninstaller's own business. }
+procedure DeleteUserData(Dir: String);
+begin
+  DeleteFile(Dir + '\config.json');
+  DeleteFile(Dir + '\config.json.corrupt');
+  DeleteFile(Dir + '\state.json');
+  DeleteFile(Dir + '\theme.json');
+  DeleteFile(Dir + '\playdate.log');
+  DeleteFile(Dir + '\steam_hltb_map.json');
+  DeleteFile(Dir + '\emulators.json');
+  DeleteFile(Dir + '\santa_gifts.json');
+  DeleteFile(Dir + '\.moved_from_old_install.json');
+  DeleteFile(Dir + '\.move_in_progress');
+  DeleteMatching(Dir, 'games*.db*');
+  DeleteMatching(Dir, 'group_sources_*.json');
+  DeleteMatching(Dir, 'steamgifts_wins_*.json');
+  DelTree(Dir + '\static', True, True, True);
+  DelTree(Dir + '\plugins', True, True, True);
 end;
 
 function InitializeUninstall(): Boolean;
@@ -193,21 +215,15 @@ begin
   Msg := 'Do you want to delete your PlayDate user data?' + NL +
          NL +
          'This includes:' + NL +
-         '  - config.json  (Steam API credentials)' + NL +
-         '  - state.json   (filters, sort, shelves)' + NL +
-         '  - games.db     (your game library)' + NL +
-         '  - playdate.log (application log)' + NL +
+         '  - config.json and state.json  (accounts, API keys, filters, shelves)' + NL +
+         '  - your game library  (the games databases)' + NL +
+         '  - game artwork and installed plugins' + NL +
+         '  - playdate.log and other saved data' + NL +
          NL +
          'Click YES to delete everything.' + NL +
          'Click NO to keep your data (you can re-use it after reinstalling).';
   MsgResult := MsgBox(Msg, mbConfirmation, MB_YESNO or MB_DEFBUTTON2);
 
   if MsgResult = IDYES then
-  begin
-    DeleteFile(ExpandConstant('{app}\config.json'));
-    DeleteFile(ExpandConstant('{app}\state.json'));
-    DeleteFile(ExpandConstant('{app}\games.db'));
-    DeleteFile(ExpandConstant('{app}\playdate.log'));
-    DeleteGamesDatabases(ExpandConstant('{app}'));
-  end;
+    DeleteUserData(ExpandConstant('{app}'));
 end;
