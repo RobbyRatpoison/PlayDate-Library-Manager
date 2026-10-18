@@ -8,6 +8,10 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Test builds only: version to stamp into the Windows build (e.g. 2026.11.0), instead of one read from a tag"
+        required: false
 
 permissions:
   contents: write   # needed to create GitHub Releases
@@ -372,7 +376,7 @@ jobs:
         shell: python
         run: |
           import re
-          tag = "${{ github.ref_name }}"
+          tag = "${{ github.event.inputs.version || github.ref_name }}"
           m = re.match(r'^v?(\d+\.\d+\.\d+)', tag)
           ver = m.group(1) if m else "0.0.0"
           full = tag.lstrip('v')  # keeps any -beta.N/-rc.N suffix, unlike ver
@@ -434,10 +438,17 @@ jobs:
       # ── 9. Build installer with Inno Setup ────────────────────────────────────
       - name: Build installer with Inno Setup
         run: |
-          $tag = "${{ github.ref_name }}"
+          $tag = "${{ github.event.inputs.version || github.ref_name }}"
           $ver = if ($tag -match '^v?(\d+\.\d+\.\d+)') { $matches[1] } else { "0.0.0" }
+          # From the first Zest version the installer goes into a Zest folder (see playdate.iss / build.py)
+          $iscArgs = @("/DAppVersion=$ver")
+          $cfg = Get-Content config.py -Raw
+          if ($cfg -match 'FOLDER_MIGRATION_FROM_VERSION\s*=\s*"([^"]+)"') {
+            if ([version]$ver -ge [version]$matches[1]) { $iscArgs += "/DMoveToNewFolder=1" }
+          }
+          Write-Host "Inno Setup arguments: $iscArgs"
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          & $iscc /DAppVersion="$ver" playdate.iss
+          & $iscc @iscArgs playdate.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         shell: powershell
 
