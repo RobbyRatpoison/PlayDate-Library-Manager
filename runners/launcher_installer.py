@@ -27,11 +27,11 @@ log = logging.getLogger(__name__)
 _states: dict = {}
 _lock = threading.Lock()
 
-_DEFAULT_PREFIX_BASE = os.path.join(os.path.expanduser('~'), '.local', 'share', 'PlayDate')
 
 
 def default_prefix(platform_id: str) -> str:
-    return os.path.join(_DEFAULT_PREFIX_BASE, platform_id)
+    import datadirs
+    return os.path.join(datadirs.data_root(), platform_id)
 
 
 def get_state(platform_id: str) -> dict:

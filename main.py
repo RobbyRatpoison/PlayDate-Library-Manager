@@ -1662,6 +1662,11 @@ if __name__ == '__main__':
         log.critical(f"Database initialization failed: {e}", exc_info=True)
         raise
 
+    # 2a. Move PlayDate's own per-user folder if its name changed (a no-op until datadirs.DATA_FOLDER_NAME
+    #     differs from LEGACY_FOLDER_NAME). Before the plugins load, so none of them sees a half-moved folder.
+    import datadirs
+    datadirs.migrate_standard()
+
     # 2b. Start filesystem watchers + sync install status on launch
     _steamapps_paths = get_all_steam_library_paths()
     if _steamapps_paths:
