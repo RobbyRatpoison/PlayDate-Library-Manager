@@ -180,3 +180,50 @@ def remove_old_data(old_dir):
     except OSError:
         pass   # program files or leftovers remain
     return left
+
+
+def old_install_dir(exe_dir):
+    """The PlayDate folder next to a Zest install folder, if there is one (Windows installer layout)."""
+    if os.path.basename(os.path.abspath(exe_dir)).lower() != 'zest':
+        return None
+    old = os.path.join(os.path.dirname(os.path.abspath(exe_dir)), 'PlayDate')
+    return old if os.path.isdir(old) else None
+
+
+def moved_from(base):
+    """The old install folder this install's data was copied from, per the marker, or None."""
+    try:
+        with open(os.path.join(base, MARKER), encoding='utf-8') as f:
+            return json.load(f).get('from')
+    except (OSError, ValueError):
+        return None
+
+
+def ask_retry(detail):
+    """Windows: tell the user their data could not be moved and ask whether to try again.
+    True = retry, False = quit. Anywhere else (or if the box can't be shown) it quits."""
+    try:
+        import ctypes
+        MB_RETRYCANCEL, MB_ICONERROR, IDRETRY = 0x5, 0x10, 4
+        text = ('Zest could not move your library from the old PlayDate folder.\n\n'
+                'Your data is safe and untouched in the old folder.\n\n' + detail + '\n\nTry again?')
+        return ctypes.windll.user32.MessageBoxW(0, text, 'Zest', MB_RETRYCANCEL | MB_ICONERROR) == IDRETRY
+    except Exception:
+        return False
+
+
+def finish_move(base):
+    """After the first healthy start on the new install: clear the old install's pending-update marker,
+    then delete the old data copies. Safe to call on every start; does nothing once everything is gone."""
+    old = moved_from(base)
+    if not old or not os.path.isdir(old):
+        return []
+    try:
+        import rollback
+        rollback.mark_healthy(old)
+    except Exception as e:
+        log.warning(f'Could not clear the old install\'s update marker: {e}')
+    left = remove_old_data(old)
+    if left:
+        log.info(f'Old install folder still holds: {left}')
+    return left

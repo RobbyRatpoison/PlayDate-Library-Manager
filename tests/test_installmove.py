@@ -106,3 +106,29 @@ def test_cleanup_leaves_only_what_is_locked(tmp_path, monkeypatch):
     assert left == ['steamgifts_wins_1.json']
     assert not (old / 'config.json').exists() and not (old / 'plugins').exists()
     assert (old / 'PlayDate.exe').exists()   # program files are the installer's business
+
+
+def test_old_install_dir_only_for_a_zest_folder_next_to_playdate(tmp_path):
+    (tmp_path / 'PlayDate').mkdir()
+    (tmp_path / 'Zest').mkdir()
+    (tmp_path / 'Other').mkdir()
+    assert installmove.old_install_dir(str(tmp_path / 'Zest')) == str(tmp_path / 'PlayDate')
+    assert installmove.old_install_dir(str(tmp_path / 'Other')) is None
+    (tmp_path / 'PlayDate').rmdir()
+    assert installmove.old_install_dir(str(tmp_path / 'Zest')) is None
+
+
+def test_finish_move_clears_the_old_update_marker_and_the_data(tmp_path):
+    old, live = _old_install(tmp_path)
+    live.close()
+    (old / '.rollback').mkdir()
+    (old / '.rollback' / 'pending.json').write_text(json.dumps({'old_token': 'someone-else'}))
+    new = tmp_path / 'Zest'
+    assert installmove.move_install_data(str(old), str(new)) == 'done'
+    assert installmove.moved_from(str(new)) == str(old)
+    assert installmove.finish_move(str(new)) == []
+    assert not (old / '.rollback' / 'pending.json').exists()   # the old version's watchdog stops waiting
+    assert not (old / 'config.json').exists() and not (old / 'plugins').exists()
+    assert (old / 'PlayDate.exe').exists()
+    assert installmove.finish_move(str(new)) == []   # idempotent
+    assert (new / 'config.json').exists()

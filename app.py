@@ -182,10 +182,21 @@ def create_app(template_folder=None, static_folder=None):
         _rollback.housekeeping(_RB_BASE)
     except Exception as _e:
         log.warning("rollback housekeeping failed: %s", _e)
-    _rb_state = {'done': not _rollback.read_pending(_RB_BASE)}
+    import installmove as _installmove
+    _moved_from = _installmove.moved_from(_RB_BASE)   # Windows: data copied from an old PlayDate folder
+    _rb_state = {'done': not _rollback.read_pending(_RB_BASE) and not (_moved_from and _rollback.read_pending(_moved_from))}
+
+    _move_state = {'pending': bool(_moved_from)}
 
     @app.after_request
     def _rollback_healthy(response):
+        healthy_page = (response.status_code == 200 and request.path in ('/', '/library', '/pick')
+                        and response.mimetype == 'text/html')
+        if healthy_page and _move_state['pending']:
+            # The new install rendered a page: only now are the old folder's data copies deleted
+            # (and its update marker cleared, which the old version's watchdog is waiting on).
+            _move_state['pending'] = False
+            threading.Thread(target=_installmove.finish_move, args=(_RB_BASE,), daemon=True).start()
         if (not _rb_state['done'] and response.status_code == 200
                 and request.path in ('/', '/library', '/pick')
                 and response.mimetype == 'text/html'):

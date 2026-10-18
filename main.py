@@ -341,6 +341,21 @@ elif _USE_QT:
     qt_webview_patch.install(_stock_qt)
     log.info("Patched Qt/QtWebEngine renderer with wheel-scroll multiplier")
 
+# Windows, first start of the Zest folder: copy the user data over from the old PlayDate folder before
+# anything reads it. Nothing is touched in the old folder, so a failure only asks to try again.
+if sys.platform == 'win32' and getattr(sys, 'frozen', False):
+    import datadirs
+    import installmove
+    _exe_dir = os.path.dirname(sys.executable)
+    _old_dir = installmove.old_install_dir(_exe_dir) if datadirs.migration_active() else None
+    while _old_dir:
+        _status = installmove.move_install_data(_old_dir, _exe_dir)
+        log.info(f"User data move from {_old_dir}: {_status}")
+        if not _status.startswith('failed') or not installmove.ask_retry(_status):
+            if _status.startswith('failed'):
+                sys.exit(1)
+            break
+
 import migration
 from app import create_app, populate_cancel
 from config import BASE_DIR
