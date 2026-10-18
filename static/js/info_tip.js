@@ -73,12 +73,10 @@ window.PDInfoTip = {
             if (fields.has('description')) html += '<div class="ht-desc" style="display:none;margin-bottom:6px;"></div>';
             if (fields.has('playtime')) row('Time played', game.playtime_forever > 0 ? fmtHours(game.playtime_forever) : 'Never played');
             if (fields.has('hltb')) {
-                const h = m => Number(m) > 0 ? fmtHours(Number(m)) : null;
-                const main = h(game.hltb_main), extras = h(game.hltb_extras), full = h(game.hltb_completionist);
-                if (main && extras) row('Main / extras', `${main} / ${extras}`);
-                else if (main) row('Main story', main);
-                else if (extras) row('Main + extras', extras);
-                if (full) row('Completionist', full);
+                // Fixed order under one label, so a missing time keeps a dash rather than shifting the others
+                const t = [game.hltb_main, game.hltb_extras, game.hltb_completionist]
+                    .map(m => Number(m) > 0 ? fmtHours(Number(m)) : '\u2013');
+                if (t.some(x => x !== '\u2013')) row('Main / extras / 100%', t.join(' / '));
             }
             if (fields.has('last_played')) row('Last played', tipDate(game.last_played) || 'Never');
             if (fields.has('date_added')) row('Date added', tipDate(game.date_added));
