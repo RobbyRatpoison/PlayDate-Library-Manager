@@ -58,6 +58,10 @@ __build__ = __version__
 # name the app by its new name (see base.html's _updateAppName), so an older
 # install offered such a version can say so before it is installed.
 RENAME_FROM_VERSION = "2026.11.0"
+# First version whose per-user folders are named after the app (Zest) instead of PlayDate, and so the first
+# that moves them (datadirs.py, installmove.py). Nothing moves on an older version; a newer release can raise
+# this to hold the move back without touching the rename. PLAYDATE_FOLDER_MIGRATION=1 forces it, for testing.
+FOLDER_MIGRATION_FROM_VERSION = "2026.11.0"
 
 IN_FLATPAK = os.path.exists('/.flatpak-info')
 

@@ -103,3 +103,14 @@ def test_data_root_prefers_new_then_legacy_then_new(tmp_path):
     assert datadirs.data_root(p, 'Zest', 'PlayDate') == os.path.join(p, 'PlayDate')      # not migrated yet
     os.mkdir(os.path.join(p, 'Zest'))
     assert datadirs.data_root(p, 'Zest', 'PlayDate') == os.path.join(p, 'Zest')
+
+
+def test_migration_waits_for_the_first_zest_version(monkeypatch):
+    monkeypatch.delenv('PLAYDATE_FOLDER_MIGRATION', raising=False)
+    assert not datadirs.migration_active('2026.10.8')
+    assert not datadirs.migration_active('2026.10.99-beta.3')
+    assert datadirs.migration_active('2026.11.0')
+    assert datadirs.migration_active('2026.11.4')
+    assert datadirs.migration_active('2027.1.1')
+    monkeypatch.setenv('PLAYDATE_FOLDER_MIGRATION', '1')
+    assert datadirs.migration_active('2026.10.8')

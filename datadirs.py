@@ -1,9 +1,9 @@
 """Where PlayDate keeps its own per-user folders (Wine prefixes, plugin game installs), and the one-time
 move of that folder when the app's folder name changes.
 
-The folder is `<parent>/<DATA_FOLDER_NAME>`: ~/.local/share on Linux, %LOCALAPPDATA% on Windows,
-~/Library/Application Support on macOS. DATA_FOLDER_NAME equals LEGACY_FOLDER_NAME until the folder rename
-ships, which makes everything here a no-op; flipping it to 'Zest' is the switch.
+The folder is `<parent>/<name>`: ~/.local/share on Linux, %LOCALAPPDATA% on Windows,
+~/Library/Application Support on macOS. It keeps its old name (PlayDate) until the first Zest version, which
+makes everything here a no-op before then; the running version decides (config.FOLDER_MIGRATION_FROM_VERSION).
 
 `migrate()` renames the old folder, leaves a symlink (junction on Windows) at the old name so every
 absolute path in the wild keeps working (paths inside Wine prefixes, a plugin that still writes to the
@@ -15,11 +15,30 @@ import sys
 
 log = logging.getLogger(__name__)
 
-DATA_FOLDER_NAME = 'PlayDate'
+NEW_FOLDER_NAME = 'Zest'
 LEGACY_FOLDER_NAME = 'PlayDate'
 
 # games columns that hold absolute paths
 _DB_PATH_COLUMNS = ('install_path', 'runner_path')
+
+
+def migration_active(version=None):
+    """True once the running version is the first Zest one (or PLAYDATE_FOLDER_MIGRATION=1)."""
+    if os.environ.get('PLAYDATE_FOLDER_MIGRATION') == '1':
+        return True
+    from config import FOLDER_MIGRATION_FROM_VERSION, __version__
+
+    def nums(v):
+        try:
+            return tuple(int(x) for x in str(v).split('-')[0].split('.'))
+        except ValueError:
+            return (0,)
+    return nums(version or __version__) >= nums(FOLDER_MIGRATION_FROM_VERSION)
+
+
+def folder_name():
+    """The name the per-user folder should have right now."""
+    return NEW_FOLDER_NAME if migration_active() else LEGACY_FOLDER_NAME
 
 
 def _parent_dir():
@@ -34,7 +53,7 @@ def data_root(parent=None, name=None, legacy=None):
     """The folder to use: the new one if it exists, else the legacy one if that exists (not migrated
     yet, or the migration was skipped), else the new one (a fresh install)."""
     parent = parent or _parent_dir()
-    new = os.path.join(parent, name or DATA_FOLDER_NAME)
+    new = os.path.join(parent, name or folder_name())
     old = os.path.join(parent, legacy or LEGACY_FOLDER_NAME)
     if os.path.lexists(new):
         return new
@@ -129,7 +148,7 @@ def migrate(db_paths=(), config_path=None, parent=None, name=None, legacy=None, 
 
     in_use(path) -> bool lets the caller refuse while something (a running Wine prefix) lives there."""
     parent = parent or _parent_dir()
-    name = name or DATA_FOLDER_NAME
+    name = name or folder_name()
     legacy = legacy or LEGACY_FOLDER_NAME
     if name == legacy:
         return 'none'
