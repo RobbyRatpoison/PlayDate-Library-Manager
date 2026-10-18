@@ -53,6 +53,16 @@ def _startup_notification_check():
         _do_notif_check()
 
 
+def _applies_to_platform(n, platform_key):
+    """True when the notification's optional `platforms` list (windows / linux / mac) includes this
+    OS. A missing, blank or malformed list means every platform."""
+    platforms = n.get('platforms')
+    if not isinstance(platforms, list):
+        return True
+    wanted = {p.strip().lower() for p in platforms if isinstance(p, str) and p.strip()}
+    return not wanted or platform_key in wanted
+
+
 @notifications_bp.route('/api/notifications/status')
 def notifications_status():
     from config import __build__, load_config
@@ -65,6 +75,8 @@ def notifications_status():
     config_data = load_config() or {}
     dismissed = set(config_data.get('dismissed_notifications', []))
 
+    from plugins import _current_platform_key
+    platform_key = _current_platform_key()
     build_num, _ = _parse_build_version(__build__)
     candidates = []
     for n in notifications:
@@ -77,6 +89,8 @@ def notifications_status():
         if min_v and build_num < _parse_build_version(min_v)[0]:
             continue
         if max_v and build_num > _parse_build_version(max_v)[0]:
+            continue
+        if not _applies_to_platform(n, platform_key):
             continue
         candidates.append(n)
 
