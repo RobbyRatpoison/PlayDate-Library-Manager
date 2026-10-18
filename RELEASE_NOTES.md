@@ -18,3 +18,4 @@
 - Fixed cover art not being saved on Windows.
 - Fixed several plugins failing to load on Windows.
 - Fixed the portable Windows version trying to run the installer when updating.
+- Fixed restoring a backup sometimes keeping changes made after it was taken.

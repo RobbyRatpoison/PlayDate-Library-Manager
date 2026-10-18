@@ -40,6 +40,61 @@ def is_restore_in_progress():
     return _restore_state['status'] == 'running'
 
 
+def _write_database(data, dest):
+    """Put a backed-up games database at dest, which the running app may have open.
+
+    Overwriting the file in place leaves the live database's -wal/-shm files and open connections
+    behind: the stale write-ahead log is then applied on top of the restored file, so changes made after
+    the backup come back (or SQLite reports the image as malformed), and on Windows the sidecar files
+    cannot be deleted while a connection holds them. SQLite's backup API replaces the content under its
+    own locking instead, log included. A backup that does not pass an integrity check is refused
+    rather than written over a good library."""
+    tmp = dest + '.restore'
+    with open(tmp, 'wb') as f:
+        f.write(data)
+    try:
+        src = sqlite3.connect(tmp)
+        try:
+            verdict = src.execute('PRAGMA integrity_check').fetchone()[0]
+            if verdict != 'ok':
+                raise ValueError(f'the backed-up database failed its integrity check ({verdict})')
+            if not os.path.exists(dest):
+                src.close()
+                os.replace(tmp, dest)
+                return
+            dst = sqlite3.connect(dest, timeout=30)
+            try:
+                mode = dst.execute('PRAGMA journal_mode').fetchone()[0]
+                try:
+                    src.backup(dst)
+                except sqlite3.OperationalError:
+                    # A backup with another page size cannot be written into a WAL database. Leave WAL
+                    # mode for the copy and go back to it afterwards, which SQLite only allows while no
+                    # other connection has the file open.
+                    try:
+                        dst.execute('PRAGMA journal_mode=DELETE')
+                    except sqlite3.OperationalError:
+                        raise RuntimeError('the backed-up database uses a different page size and the '
+                                           'library is in use; close PlayDate and restore again') from None
+                    src.backup(dst)
+                    if mode.lower() == 'wal':
+                        dst.execute('PRAGMA journal_mode=WAL')
+                dst.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+                dst.commit()
+            finally:
+                dst.close()
+        finally:
+            try:
+                src.close()
+            except Exception:
+                pass
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
 def _extract_backup_zip(source, logger):
     """
     Extract a PlayDate backup zip's contents into BASE_DIR / static/img/library.
@@ -90,8 +145,12 @@ def _extract_backup_zip(source, logger):
                 continue
             with zf.open(arcname) as src:
                 data = src.read()
-            with open(dest, 'wb') as dst:
-                dst.write(data)
+            try:
+                _write_database(data, dest)
+            except Exception as e:
+                logger.error(f"Restore: could not restore {arcname}: {e}")
+                skipped.append(arcname)
+                continue
             logger.info(f"Restore: wrote {len(data)} bytes -> {dest}")
             restored.append(arcname)
 
