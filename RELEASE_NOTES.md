@@ -15,3 +15,4 @@
 - Fixed CLEAR leaving a search applied after using Filters. (reported by woutercools)
 - Fixed a search being overwritten while you type it.
 - Fixed a rare error on first start that could reset your settings.
+- Fixed cover art not being saved on Windows.

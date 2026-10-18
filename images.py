@@ -31,12 +31,20 @@ def _safe_img_path(save_path):
     regex-checked stem, so this only ever rejects on a caller bug — but routing
     it through safe_join is the barrier that keeps a bad path off os.replace /
     os.remove (and that static analysis recognizes)."""
-    from werkzeug.security import safe_join
     try:
         rel = os.path.relpath(os.path.realpath(save_path), _IMG_ROOT)
     except ValueError:
         return None
-    return safe_join(_IMG_ROOT, rel)
+    return _join_under_root(_IMG_ROOT, rel)
+
+
+def _join_under_root(root, rel, sep=os.sep):
+    """safe_join(root, rel) for a relative path made with this OS's separator. safe_join works on
+    '/' and, on Windows, rejects any backslash as an escape attempt: handing it the 'library\\vertical\\1.jpg'
+    that relpath returns there refused every cover (v1.9.3 on). Convert first; the result is OS-native."""
+    from werkzeug.security import safe_join
+    joined = safe_join(root, rel.replace(sep, '/'))
+    return os.path.normpath(joined) if joined else None
 
 
 def _ensure_dirs():
