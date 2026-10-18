@@ -2,8 +2,6 @@ import json
 import os
 import sqlite3
 
-import pytest
-
 import datadirs
 
 
