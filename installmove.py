@@ -224,6 +224,13 @@ def finish_move(base):
     except Exception as e:
         log.warning(f'Could not clear the old install\'s update marker: {e}')
     left = remove_old_data(old)
+    rb = os.path.join(old, '.rollback')
+    if os.path.isdir(rb) and not os.path.exists(os.path.join(rb, 'pending.json')):
+        shutil.rmtree(rb, ignore_errors=True)   # nothing is watching the old install any more
+        try:
+            os.rmdir(old)
+        except OSError:
+            pass   # program files the installer could not remove are still there
     if left:
         log.info(f'Old install folder still holds: {left}')
     return left

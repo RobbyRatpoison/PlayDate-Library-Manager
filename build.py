@@ -25,6 +25,15 @@ ISCC_PATHS = [
 ]
 
 
+def _folder_move_active(version):
+    """True from the first Zest version on (config.FOLDER_MIGRATION_FROM_VERSION)."""
+    text = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.py"), encoding="utf-8").read()
+    m = re.search(r'^FOLDER_MIGRATION_FROM_VERSION\s*=\s*["\']([^"\']+)["\']', text, re.MULTILINE)
+    def nums(v):
+        return tuple(int(x) for x in v.split("-")[0].split("."))
+    return bool(m) and nums(version) >= nums(m.group(1))
+
+
 def read_version():
     config = os.path.join(ROOT, "config.py")
     with open(config, encoding="utf-8") as f:
@@ -60,7 +69,10 @@ def main():
     run(["pyinstaller", "playdate.spec", "--noconfirm"])
 
     iscc = find_iscc()
-    run([iscc, f"/DAppVersion={version}", "playdate.iss"])
+    iscc_args = [iscc, f"/DAppVersion={version}"]
+    if _folder_move_active(version):
+        iscc_args.append("/DMoveToNewFolder=1")   # install into a Zest folder; see playdate.iss
+    run(iscc_args + ["playdate.iss"])
 
     # Add portable marker AFTER Inno Setup so the installer build doesn't include it
     dist_dir = os.path.join(ROOT, "dist", "PlayDate")

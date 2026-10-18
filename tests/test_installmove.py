@@ -130,5 +130,6 @@ def test_finish_move_clears_the_old_update_marker_and_the_data(tmp_path):
     assert not (old / '.rollback' / 'pending.json').exists()   # the old version's watchdog stops waiting
     assert not (old / 'config.json').exists() and not (old / 'plugins').exists()
     assert (old / 'PlayDate.exe').exists()
+    assert not (old / '.rollback').exists()
     assert installmove.finish_move(str(new)) == []   # idempotent
     assert (new / 'config.json').exists()

@@ -18,7 +18,15 @@ AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
 AppUpdatesURL={#AppURL}
 
+#ifdef MoveToNewFolder
+; From the first Zest version: install into a fresh "Zest" folder next to the old "PlayDate" one (see
+; GetDefaultDir below) and let the app move the user data on its first start. Inno would otherwise reuse the
+; previous folder, so that is switched off.
+UsePreviousAppDir=no
+DefaultDirName={code:GetDefaultDir}
+#else
 DefaultDirName={%USERPROFILE}\{#AppName}
+#endif
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 
@@ -70,6 +78,66 @@ Name: "{autodesktop}\{#AppName}";   FileName: "{app}\{#AppExeName}"; Tasks: desk
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+#ifdef MoveToNewFolder
+var
+  OldAppDir: String;
+
+const
+  UninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}_is1';
+
+function PreviousAppPath(): String;
+begin
+  Result := '';
+  if not RegQueryStringValue(HKCU, UninstallKey, 'Inno Setup: App Path', Result) then
+    RegQueryStringValue(HKLM, UninstallKey, 'Inno Setup: App Path', Result);
+end;
+
+{ A previous install in a folder called PlayDate moves to a Zest folder beside it; a previous install in any
+  other folder is updated where it is (its data is already there), and a first install goes to the profile. }
+function GetDefaultDir(Param: String): String;
+var
+  Prev: String;
+begin
+  Prev := RemoveBackslash(PreviousAppPath());
+  OldAppDir := '';
+  if Prev = '' then
+    Result := ExpandConstant('{%USERPROFILE}') + '\Zest'
+  else if CompareText(ExtractFileName(Prev), 'PlayDate') = 0 then
+  begin
+    OldAppDir := Prev;
+    Result := ExtractFilePath(Prev) + 'Zest';
+  end
+  else
+    Result := Prev;
+end;
+
+{ Only program files go: the user data stays until the new app has copied it and shown its first page, and
+  .rollback stays for the old version's update watchdog. A file Windows still holds open is simply left. }
+procedure RemoveOldProgramFiles(Dir: String);
+var
+  FindRec: TFindRec;
+begin
+  DelTree(Dir + '\_internal', True, True, True);
+  DeleteFile(Dir + '\PlayDate.exe');
+  if FindFirst(Dir + '\unins*.*', FindRec) then
+  begin
+    try
+      repeat
+        DeleteFile(Dir + '\' + FindRec.Name);
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if (CurStep = ssPostInstall) and (OldAppDir <> '') and (CompareText(OldAppDir, RemoveBackslash(ExpandConstant('{app}'))) <> 0) then
+    RemoveOldProgramFiles(OldAppDir);
+end;
+#endif
+
 function InitializeUninstall(): Boolean;
 var
   MsgResult: Integer;
