@@ -1,3 +1,10 @@
 {
-  "notifications": []
+  "notifications": [
+    {
+      "id": "zest-rename-heads-up",
+      "severity": "info",
+      "max_version": "2026.10.99",
+      "message": "PlayDate is getting a new name: Zest. It arrives as a normal update in early November, and your library, settings and plugins stay as they are."
+    }
+  ]
 }
