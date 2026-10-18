@@ -14,3 +14,4 @@
 - Fixed the Pick 6 filter not properly loading your library toggles.
 - Fixed CLEAR leaving a search applied after using Filters. (reported by woutercools)
 - Fixed a search being overwritten while you type it.
+- Fixed a rare error on first start that could reset your settings.
