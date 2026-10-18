@@ -131,5 +131,18 @@ def test_finish_move_clears_the_old_update_marker_and_the_data(tmp_path):
     assert not (old / 'config.json').exists() and not (old / 'plugins').exists()
     assert (old / 'PlayDate.exe').exists()
     assert not (old / '.rollback').exists()
+    shutil.rmtree(old / '_internal'); (old / 'PlayDate.exe').unlink()   # as if the installer had removed them
+    assert installmove.finish_move(str(new)) == []
+    assert old.is_symlink() and os.path.samefile(old, new)   # the old name leads to the new folder
     assert installmove.finish_move(str(new)) == []   # idempotent
+    assert (new / 'config.json').exists()
+
+
+def test_remove_old_data_refuses_to_go_through_a_link(tmp_path):
+    new = tmp_path / 'Zest'
+    new.mkdir()
+    (new / 'config.json').write_text('{}')
+    link = tmp_path / 'PlayDate'
+    os.symlink(new, link, target_is_directory=True)
+    assert installmove.remove_old_data(str(link)) == []
     assert (new / 'config.json').exists()

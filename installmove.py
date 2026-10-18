@@ -154,11 +154,19 @@ def move_install_data(old_dir, new_dir):
     return 'done'
 
 
+def _same_folder(a, b):
+    """a and b are one folder on disk (after the move the old name is a link to the new folder)."""
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return os.path.realpath(a) == os.path.realpath(b)
+
+
 def remove_old_data(old_dir):
     """After a successful move and a healthy start: delete the old copies. A file that can't be removed
     (Windows holds it open) is only left behind. Returns the names that are still there."""
     left = []
-    if not os.path.isdir(old_dir):
+    if not os.path.isdir(old_dir) or os.path.islink(old_dir):
         return left
     for name in _data_entries(old_dir):
         path = os.path.join(old_dir, name)
@@ -216,8 +224,8 @@ def finish_move(base):
     """After the first healthy start on the new install: clear the old install's pending-update marker,
     then delete the old data copies. Safe to call on every start; does nothing once everything is gone."""
     old = moved_from(base)
-    if not old or not os.path.isdir(old):
-        return []
+    if not old or not os.path.isdir(old) or os.path.islink(old) or _same_folder(old, base):
+        return []   # nothing left to clean, or the old name already leads to this folder: never delete through it
     try:
         import rollback
         rollback.mark_healthy(old)
@@ -231,6 +239,13 @@ def finish_move(base):
             os.rmdir(old)
         except OSError:
             pass   # program files the installer could not remove are still there
+    if not os.path.lexists(old):
+        # Leave the old name pointing at the new folder, so a taskbar pin or shortcut to the old
+        # PlayDate\PlayDate.exe still finds the exe the installer ships under that name.
+        try:
+            datadirs._link(old, base)
+        except OSError as e:
+            log.info(f'Could not leave a link at {old}: {e}')
     if left:
         log.info(f'Old install folder still holds: {left}')
     return left

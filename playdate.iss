@@ -8,6 +8,8 @@
 #define AppPublisher "PlayDate"
 #define AppURL       "https://github.com/RobbyRatpoison/PlayDate"
 #define AppExeName   "PlayDate.exe"
+; PyInstaller's output folder; change it together with the exe name
+#define DistDir      "dist\PlayDate"
 
 [Setup]
 AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
@@ -64,7 +66,12 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
 [Files]
-Source: "dist\PlayDate\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#DistDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+#if AppExeName != "PlayDate.exe"
+; A copy of the app under its old name, so a taskbar pin or shortcut to PlayDate.exe keeps working and lights up
+; (it runs the same program from the same folder; the old folder name is a link to this one, see installmove.py).
+Source: "{#DistDir}\{#AppExeName}"; DestDir: "{app}"; DestName: "PlayDate.exe"; Flags: ignoreversion
+#endif
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\.rollback"
