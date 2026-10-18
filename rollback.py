@@ -351,18 +351,24 @@ def _supervise(base, child):
         time.sleep(0.5)
 
 
-def _image_running(name):
-    try:
-        out = subprocess.run(['tasklist', '/FI', f'IMAGENAME eq {name}', '/NH'],
-                             capture_output=True, text=True, timeout=15,
-                             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).stdout
-        return name.lower() in out.lower()
-    except Exception:
-        return False
+def _names_in_tasklist(out, names):
+    """True if any of `names` is an image in `tasklist /FO CSV` output (exact names, quoted first column)."""
+    low = out.lower()
+    return any(f'"{n.lower()}"' in low for n in names)
+
+
+def _tasklist_output():
+    return subprocess.run(['tasklist', '/NH', '/FO', 'CSV'], capture_output=True, text=True, timeout=15,
+                          creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).stdout
 
 
 def _any_image_running(names):
-    return any(_image_running(n) for n in names)
+    """One process listing for all the names, so a check is a single quick call however many
+    exe names are being waited for (the new build may carry a different name)."""
+    try:
+        return _names_in_tasklist(_tasklist_output(), names)
+    except Exception:
+        return False
 
 
 def _new_launch(base, names, fallback):
@@ -387,14 +393,16 @@ def _wait_installer_launch(base, names, give_up=900):
             return 'healthy'
         if time.time() - t0 > give_up:
             return 'gave_up'   # installer cancelled or never finished
-        time.sleep(2)
+        # Short, because a build that crashes at start lives well under a second: at 2 s intervals the
+        # watchdog could miss it entirely (found on a real Windows VM: nothing rolled back, it kept waiting).
+        time.sleep(0.2)
     t1 = time.time()
     while _any_image_running(names):
         if not read_pending(base):
             return 'healthy'
         if time.time() - t1 > HANG_LIMIT:
             return 'hung'
-        time.sleep(1)
+        time.sleep(0.25)
     return 'healthy' if not read_pending(base) else 'failed'
 
 

@@ -369,22 +369,31 @@ def test_new_launch_prefers_the_renamed_exe(tmp_path):
 def test_installer_launch_wait_recognises_either_exe_name(tmp_path, monkeypatch):
     base = str(tmp_path)
     rollback.begin(base, 'frozen', '1.0.0', '2.0.0')
-    seen = []
     state = {'calls': 0}
+    row = '"{}","4242","Console","1","50,000 K"\r\n'
 
-    def fake_running(name):
-        seen.append(name)
+    def fake_tasklist():
         state['calls'] += 1
         if state['calls'] == 3:                    # the renamed exe starts...
-            return name == 'Zest.exe'
+            return row.format('Zest.exe')
         if state['calls'] > 3:                     # ...then goes healthy
             os.path.exists(rollback._p(base, 'pending.json')) and os.remove(rollback._p(base, 'pending.json'))
-        return False
+        return row.format('explorer.exe')
 
-    monkeypatch.setattr(rollback, '_image_running', fake_running)
+    monkeypatch.setattr(rollback, '_tasklist_output', fake_tasklist)
     monkeypatch.setattr(rollback.time, 'sleep', lambda s: None)
     assert rollback._wait_installer_launch(base, ['Zest.exe', 'PlayDate.exe']) == 'healthy'
-    assert 'Zest.exe' in seen and 'PlayDate.exe' in seen
+    assert state['calls'] > 3
+
+
+def test_a_start_that_vanishes_is_reported_as_failed(tmp_path, monkeypatch):
+    """The installer starts the new exe and it dies at once: seen once, gone the next check."""
+    base = str(tmp_path)
+    rollback.begin(base, 'frozen', '1.0.0', '2.0.0')
+    outputs = iter(['', '"PlayDate.exe","7","Console","1","1 K"\r\n'])
+    monkeypatch.setattr(rollback, '_tasklist_output', lambda: next(outputs, ''))
+    monkeypatch.setattr(rollback.time, 'sleep', lambda s: None)
+    assert rollback._wait_installer_launch(str(tmp_path), ['PlayDate.exe']) == 'failed'
 
 
 def _fake_flatpak(bindir, calls, install_rc=0):
@@ -514,3 +523,13 @@ def test_export_falls_back_to_a_bundle_when_the_copy_fails(tmp_path, monkeypatch
     assert handle.wait() == 0
     assert len(popens) == 1 and popens[0][:2] == ['flatpak', 'build-bundle']
     assert not (tmp_path / '.rollback' / 'repo').exists() and not (tmp_path / '.rollback' / 'repo.ref').exists()
+
+
+def test_tasklist_names_are_matched_exactly_and_all_at_once():
+    out = ('"System Idle Process","0","Services","0","8 K"\r\n'
+           '"explorer.exe","4212","Console","1","90,112 K"\r\n'
+           '"PlayDate-Setup.tmp","3500","Console","1","20,000 K"\r\n')
+    assert not rollback._names_in_tasklist(out, ['PlayDate.exe'])               # not fooled by a similar name
+    assert rollback._names_in_tasklist(out, ['Zest.exe', 'explorer.exe'])       # any of several names
+    assert rollback._names_in_tasklist(out + '"playdate.exe","99","Console","1","1 K"\r\n', ['PlayDate.exe'])
+    assert not rollback._names_in_tasklist('', ['PlayDate.exe'])
