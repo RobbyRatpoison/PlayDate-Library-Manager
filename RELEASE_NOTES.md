@@ -13,9 +13,11 @@
 ### Fixes
 - Fixed the Pick 6 filter not properly loading your library toggles.
 - Fixed CLEAR leaving a search applied after using Filters. (reported by woutercools)
-- Fixed a search being overwritten while you type it.
+- Fixed a search sometimes being overwritten while you type it.
 - Fixed a rare error on first start that could reset your settings.
 - Fixed cover art not being saved on Windows.
 - Fixed several plugins failing to load on Windows.
 - Fixed the portable Windows version trying to run the installer when updating.
-- Fixed restoring a backup sometimes keeping changes made after it was taken.
+- Fixed a restored backup sometimes still containing games you removed after making it.
+- Fixed the Windows uninstaller leaving artwork and plugins behind when deleting your data.
+- Fixed a new version that crashes immediately not being rolled back by a failed update on Windows.
