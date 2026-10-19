@@ -18,6 +18,6 @@
 - Fixed cover art not being saved on Windows.
 - Fixed several plugins failing to load on Windows.
 - Fixed the portable Windows version trying to run the installer when updating.
-- Fixed a restored backup sometimes still containing games you removed after making it.
+- Fixed restoring a backup sometimes not returning your library exactly to how it was when the backup was made.
 - Fixed the Windows uninstaller leaving artwork and plugins behind when deleting your data.
 - Fixed a new version that crashes immediately not being rolled back by a failed update on Windows.
