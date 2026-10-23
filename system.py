@@ -194,7 +194,12 @@ def launch_game(appid):
             return api_error('Could not launch this game. Check playdate.log for details.', 500, exc=e)
     else:
         import emulators as _emu
-        if _emu.is_emulation_platform(game_platform):
+        import plugins as _plugin_registry
+        _launch_plugin = _plugin_registry.get_for_platform(game_platform)
+        # A plugin that owns the platform wins: 'xbox' is both the Xbox / Game Pass
+        # plugin and the original-Xbox emulator key.
+        if (_emu.is_emulation_platform(game_platform)
+                and not (_launch_plugin and hasattr(_launch_plugin, 'launch_game'))):
             result = _emu.launch_game(appid_int)
             if result.get('status') == 'success':
                 import plugins as _plugin_registry
